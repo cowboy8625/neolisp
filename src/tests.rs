@@ -174,9 +174,7 @@ test_parser!(
         Expr::Symbol("x".to_string()),
         Expr::List(vec![
             Expr::Symbol("quote".to_string()),
-            Expr::Number(1.),
-            Expr::Number(2.),
-            Expr::Number(3.)
+            Expr::List(vec![Expr::Number(1.), Expr::Number(2.), Expr::Number(3.)])
         ]),
     ])
 );

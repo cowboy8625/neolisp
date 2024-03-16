@@ -6,7 +6,6 @@ pub fn eval(expr: &Expr, env: &mut Env) -> Result<Expr, String> {
         Expr::Bool(_) => Ok(expr.clone()),
         Expr::Number(_) => Ok(expr.clone()),
         Expr::String(_) => Ok(expr.clone()),
-        Expr::Quoted(expr) => Ok(*expr.clone()),
         Expr::Symbol(symbol) => eval_symbol(&symbol, env),
         Expr::List(list) => eval_list(list, env),
         _ => unreachable!("invalid expr: {expr:?}"),
@@ -37,10 +36,12 @@ fn eval_list(expr: &[Expr], env: &mut Env) -> Result<Expr, String> {
     };
     let args = &expr[1..];
     match &head {
+        // TODO: you was added the quotes
         Expr::Symbol(symbol) if symbol == "var" => eval_define_variable(args, env),
         Expr::Symbol(symbol) if symbol == "if" => eval_if(args, env),
         Expr::Symbol(symbol) if symbol == "lambda" => eval_define_lambda(args),
         Expr::Symbol(symbol) if symbol == "fn" => eval_define_fn(args, env),
+        Expr::Symbol(symbol) if symbol == "quote" => eval_quote(args),
         _ => match eval(head, env)? {
             Expr::Builtin(builtin) => builtin(args, env),
             Expr::Lambda(func) => eval_lambda(&func, args, env),
@@ -147,6 +148,13 @@ fn eval_if(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
         args[2].clone()
     };
     eval(&branch, env)
+}
+
+fn eval_quote(args: &[Expr]) -> Result<Expr, String> {
+    if args.len() != 1 {
+        return Err("invalid number of arguments for quote expression expected 1".to_string());
+    }
+    Ok(args[0].clone())
 }
 
 #[derive(Debug, Clone)]

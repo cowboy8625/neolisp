@@ -16,5 +16,7 @@
 
 (var d '(1 2 3))
 (print d "\n")
-(print 'this_is_a_quoted_var_name "\n")
 ;; >> 1 2 3
+
+(print 'this_is_a_quoted_var_name "\n")
+;; >> this_is_a_quoted_var_name

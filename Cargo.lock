@@ -255,6 +255,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "523dc4f511e55ab87b694dc30d0f820d60906ef06413f93d4d7a1385599cc149"
 
 [[package]]
+name = "neolisp"
+version = "0.0.0"
+dependencies = [
+ "chumsky",
+ "clap",
+ "pretty_assertions",
+ "rustyline",
+]
+
+[[package]]
 name = "nibble_vec"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -273,16 +283,6 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
-]
-
-[[package]]
-name = "nlisp"
-version = "0.0.0"
-dependencies = [
- "chumsky",
- "clap",
- "pretty_assertions",
- "rustyline",
 ]
 
 [[package]]

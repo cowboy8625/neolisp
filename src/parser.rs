@@ -8,7 +8,6 @@ use crate::eval::Env;
 pub enum Expr {
     Bool(bool),
     String(String),
-    Quoted(Box<Expr>),
     Symbol(String),
     Number(f64),
     List(Vec<Expr>),
@@ -22,7 +21,6 @@ impl std::fmt::Display for Expr {
         match self {
             Self::Bool(b) => write!(f, "{b}"),
             Self::String(s) => write!(f, "{s}"),
-            Self::Quoted(expr) => write!(f, "'{expr}"),
             Self::Symbol(s) => write!(f, "{s}"),
             Self::Number(n) => write!(f, "{n}"),
             Self::List(list) => {
@@ -47,7 +45,6 @@ impl Expr {
         match self {
             Self::Bool(_) => "Bool".to_string(),
             Self::String(_) => "String".to_string(),
-            Self::Quoted(expr) => expr.type_of(),
             Self::Symbol(_) => "Symbol".to_string(),
             Self::Number(_) => "Number".to_string(),
             Self::List(_) => "List".to_string(),
@@ -132,7 +129,7 @@ pub fn parse_expr() -> impl Parser<char, Expr, Error = Error> {
         let quoted = just('\'')
             .ignore_then(atom.clone())
             .padded_by(comment.repeated())
-            .map(|e| Expr::Quoted(Box::new(e)));
+            .map(|e| Expr::List(vec![Expr::Symbol("quote".to_string()), e]));
 
         let list = atom
             .repeated()
