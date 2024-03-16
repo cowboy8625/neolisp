@@ -1,0 +1,13 @@
+[package]
+name = "neolisp"
+version = "0.0.0"
+edition = "2021"
+
+
+[dependencies]
+chumsky = "0.9.3"
+clap = { version = "4.5.3", features = ["derive"] }
+rustyline = { version = "14.0.0", features = ["derive", "regex", "with-file-history"] }
+
+[dev-dependencies]
+pretty_assertions = "1.4.0"
