@@ -101,10 +101,7 @@ pub fn parse_expr() -> impl Parser<char, Expr, Error = Error> {
         let symbol = choice((letters.clone(), punctuation.clone()))
             .then(choice((letters, punctuation, digit)).repeated())
             .padded()
-            .map(|(start, end)| {
-                println!("{start:?}, {end:?}");
-                Expr::Symbol(format!("{start}{}", end.iter().collect::<String>()))
-            });
+            .map(|(start, end)| Expr::Symbol(format!("{start}{}", end.iter().collect::<String>())));
 
         let string = just('"')
             .ignore_then(
