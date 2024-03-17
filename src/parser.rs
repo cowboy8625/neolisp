@@ -1,7 +1,7 @@
 use chumsky::prelude::*;
 
+use crate::environment::Env;
 use crate::error::{Error, ErrorType};
-use crate::eval::Env;
 
 // TODO: make Expr remember index's for error handling
 #[derive(Debug, Clone, PartialEq)]

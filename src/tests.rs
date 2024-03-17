@@ -1,4 +1,5 @@
-use crate::eval::{eval, Env};
+use crate::environment::Env;
+use crate::eval::eval;
 use crate::parser::{parse_expr, parser, Expr};
 use chumsky::prelude::*;
 use pretty_assertions::assert_eq;

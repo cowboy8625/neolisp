@@ -1,5 +1,6 @@
 mod builtins;
 mod cli;
+mod environment;
 mod error;
 mod eval;
 mod parser;
@@ -7,8 +8,9 @@ mod repl;
 #[cfg(test)]
 mod tests;
 
+use crate::environment::Env;
 use crate::error::print_error;
-use crate::eval::{eval, Env};
+use crate::eval::eval;
 use crate::parser::parser;
 use chumsky::prelude::Parser as ChumskyParser;
 use clap::Parser as ClapParser;
