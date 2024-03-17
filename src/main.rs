@@ -1,3 +1,4 @@
+mod builtins;
 mod cli;
 mod error;
 mod eval;

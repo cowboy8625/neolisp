@@ -1,4 +1,7 @@
-use crate::parser::{Expr, Func, Lambda};
+use crate::{
+    builtins,
+    parser::{Expr, Func, Lambda},
+};
 use std::collections::HashMap;
 
 pub fn eval(expr: &Expr, env: &mut Env) -> Result<Expr, String> {
@@ -43,7 +46,7 @@ fn eval_list(expr: &[Expr], env: &mut Env) -> Result<Expr, String> {
         Expr::Symbol(symbol) if symbol == "fn" => eval_define_fn(args, env),
         Expr::Symbol(symbol) if symbol == "quote" => eval_quote(args),
         _ => match eval(head, env)? {
-            Expr::Builtin(builtin) => builtin(args, env),
+            Expr::Builtin(builtin, _) => builtin(args, env),
             Expr::Lambda(func) => eval_lambda(&func, args, env),
             Expr::Func(func) => eval_func(&func, args, env),
             expr => Err(format!(
@@ -62,7 +65,16 @@ fn eval_define_fn(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
         return Err("missing params and body in fn definition".to_string());
     };
 
-    let Some(body) = args.get(2) else {
+    let mut body_index = 2;
+    let help_doc = match args.get(2) {
+        Some(Expr::String(doc)) => {
+            body_index += 1;
+            Some(Box::new(Expr::String(doc.clone())))
+        }
+        _ => None,
+    };
+
+    let Some(body) = args.get(body_index) else {
         return Err("missing body in fn definition".to_string());
     };
     let Expr::Symbol(name) = name_symbol.clone() else {
@@ -74,6 +86,7 @@ fn eval_define_fn(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
             name: Box::new(name_symbol.clone()),
             params: Box::new(params.clone()),
             body: Box::new(body.clone()),
+            help_doc,
         }
         .into(),
     );
@@ -163,21 +176,47 @@ pub struct Env {
     outer: Option<Box<Env>>,
 }
 
+macro_rules! init_builtin {
+    ($doc:ident, $symbol:expr, $name:ident) => {
+        (
+            $symbol.to_string(),
+            crate::parser::Expr::Builtin($name, $doc.get($symbol).unwrap().to_string()),
+        )
+    };
+    ($doc:ident, $name:ident) => {
+        (
+            stringify!($name).to_string(),
+            Expr::Builtin($name, $doc.get(stringify!($name)).unwrap().to_string()),
+        )
+    };
+}
+
 impl Env {
     pub fn new() -> Self {
+        let docs = builtins::load_doc();
         let data = HashMap::from([
-            ("+".to_string(), Expr::Builtin(add)),
-            ("-".to_string(), Expr::Builtin(sub)),
-            ("=".to_string(), Expr::Builtin(eq)),
-            (">".to_string(), Expr::Builtin(gt)),
-            ("<".to_string(), Expr::Builtin(lt)),
-            (">=".to_string(), Expr::Builtin(gte)),
-            ("<=".to_string(), Expr::Builtin(lte)),
-            ("and".to_string(), Expr::Builtin(and)),
-            ("or".to_string(), Expr::Builtin(or)),
-            // ("not".to_string(), Expr::Builtin(not)),
-            ("print".to_string(), Expr::Builtin(print)),
-            ("typeof".to_string(), Expr::Builtin(type_of)),
+            init_builtin!(docs, "+", add),
+            init_builtin!(docs, "-", sub),
+            init_builtin!(docs, "=", eq),
+            init_builtin!(docs, ">", gt),
+            init_builtin!(docs, "<", lt),
+            init_builtin!(docs, ">=", gte),
+            init_builtin!(docs, "<=", lte),
+            init_builtin!(docs, "typeof", type_of),
+            init_builtin!(docs, and),
+            init_builtin!(docs, or),
+            init_builtin!(docs, help),
+            init_builtin!(docs, print),
+            init_builtin!(docs, list),
+            init_builtin!(docs, cons),
+            init_builtin!(docs, car),
+            init_builtin!(docs, cdr),
+            init_builtin!(docs, append),
+            init_builtin!(docs, reverse),
+            init_builtin!(docs, nth),
+            init_builtin!(docs, length),
+            init_builtin!(docs, map),
+            // ("not".to_string(), Expr::Builtin(not, docs.get("not").unwrap().clone())),
         ]);
         Self { data, outer: None }
     }
@@ -213,11 +252,38 @@ fn sub(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
     Ok(Expr::Number(head - sum))
 }
 
+fn help(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+    if args.is_empty() {
+        return Err("help takes one argument".to_string());
+    }
+
+    if let Expr::Symbol(name) = &args[0] {
+        let Some(item) = env.data.get(name) else {
+            return Ok(Expr::String(format!("{name}: has no help docs")));
+        };
+        match &item {
+            Expr::Builtin(_, help_doc) => {
+                return Ok(Expr::String(help_doc.to_string()));
+            }
+            Expr::Func(func) if func.help_doc.is_some() => {
+                return Ok(*func.help_doc.clone().unwrap());
+            }
+            _ => {
+                return Ok(Expr::String(format!("{item}: has no help docs")));
+            }
+        }
+    }
+    Ok(Expr::String(format!("{:?}: has no help docs", args[0])))
+}
+
 fn print(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+    if args.is_empty() {
+        return Err("print requires at least one argument".to_string());
+    }
     for arg in args {
         print!("{}", eval(arg, env)?);
     }
-    Ok(Expr::Bool(true))
+    Ok(args[0].clone())
 }
 
 fn type_of(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
@@ -229,6 +295,144 @@ fn type_of(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
     };
     let evaluated = eval(expr, env)?;
     Ok(Expr::Symbol(evaluated.type_of()))
+}
+
+fn list(args: &[Expr], _env: &mut Env) -> Result<Expr, String> {
+    Ok(Expr::List(args.to_vec()))
+}
+
+fn cons(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+    if args.len() != 2 {
+        return Err("cons requires two arguments".to_string());
+    }
+    let Expr::List(tail) = eval(&args[1], env)? else {
+        return Err("cons requires a list as the second argument".to_string());
+    };
+
+    let new = vec![args[0].clone()]
+        .into_iter()
+        .chain(tail.iter().cloned());
+    Ok(Expr::List(new.collect()))
+}
+
+fn car(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+    if args.len() != 1 {
+        return Err("car requires one argument".to_string());
+    }
+    let Expr::List(head) = eval(&args[0], env)? else {
+        return Err("car requires a list to be the first and only argument".to_string());
+    };
+    let Some(head) = head.first() else {
+        return Err("car requires a list with at least one element".to_string());
+    };
+    Ok(head.clone())
+}
+
+fn cdr(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+    if args.len() != 1 {
+        return Err("cdr requires one argument".to_string());
+    }
+    let Expr::List(head) = eval(&args[0], env)? else {
+        return Err("cdr requires a list to be the first and only argument".to_string());
+    };
+    let Some(tail) = head.get(1..) else {
+        return Ok(Expr::List(vec![]));
+    };
+    Ok(Expr::List(tail.to_vec()))
+}
+
+fn append(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+    if args.is_empty() {
+        return Err("append requires one argument".to_string());
+    }
+    let Expr::List(head) = eval(&args[0], env)? else {
+        return Err("append requires a list to be the first argument".to_string());
+    };
+    let mut result = head.clone();
+    for arg in args[1..].iter() {
+        let Expr::List(tail) = eval(arg, env)? else {
+            return Err("append requires List to be the arguments type".to_string());
+        };
+        result.extend(tail);
+    }
+    Ok(Expr::List(result))
+}
+
+fn reverse(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+    if args.is_empty() {
+        return Err("reverse requires one argument".to_string());
+    }
+    let Expr::List(head) = eval(&args[0], env)? else {
+        return Err("reverse requires a list to be the argument".to_string());
+    };
+    Ok(Expr::List(head.iter().rev().cloned().collect()))
+}
+
+fn nth(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+    if args.len() != 2 {
+        return Err("nth requires two arguments".to_string());
+    }
+    let Expr::List(head) = eval(&args[0], env)? else {
+        return Err("nth requires a list to be the first argument".to_string());
+    };
+    let Expr::Number(index) = eval(&args[1], env)? else {
+        return Err("nth requires a number to be the second argument".to_string());
+    };
+    let index = index as usize;
+    if index >= head.len() {
+        return Err("nth index out of bounds".to_string());
+    }
+    Ok(head[index].clone())
+}
+
+fn length(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+    if args.len() != 1 {
+        return Err("length requires one argument".to_string());
+    }
+    let Expr::List(head) = eval(&args[0], env)? else {
+        return Err("length requires a list to be the first argument".to_string());
+    };
+    Ok(Expr::Number(head.len() as f64))
+}
+
+fn map(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+    println!("map args: {:?}", args);
+    if args.len() != 2 {
+        return Err("map requires two arguments".to_string());
+    }
+    let Expr::List(list) = eval(&args[1], env)? else {
+        return Err("map requires a list as second argument".to_string());
+    };
+    let (params, body) = match eval(&args[0], env)? {
+        Expr::Lambda(lambda) => (*lambda.params, lambda.body),
+        Expr::Func(func) => (*func.params, func.body),
+        Expr::Builtin(func, _) => {
+            let mut new_list = vec![];
+            for item in list {
+                let new_item = func(&[item.clone()], env)?;
+                new_list.push(new_item);
+            }
+            return Ok(Expr::List(new_list));
+        }
+        _ => return Err("map requires a function as first argument".to_string()),
+    };
+
+    let Expr::List(params) = params else {
+        unreachable!("there is a bug in eval on lambda or func");
+    };
+
+    let mut new_list = vec![];
+    for item in list {
+        let mut inner_env = env.clone();
+        let Some(Expr::Symbol(param)) = params.first() else {
+            return Err("map requires a lambda function with one argument".to_string());
+        };
+
+        inner_env.data.insert(param.to_string(), item.clone());
+        let new_item = eval(&body, &mut inner_env)?;
+        new_list.push(new_item);
+    }
+    Ok(Expr::List(new_list))
 }
 
 #[macro_export]

@@ -11,7 +11,7 @@ pub enum Expr {
     Symbol(String),
     Number(f64),
     List(Vec<Expr>),
-    Builtin(fn(&[Expr], &mut Env) -> Result<Expr, String>),
+    Builtin(fn(&[Expr], &mut Env) -> Result<Expr, String>, String),
     Func(Func),
     Lambda(Lambda),
 }
@@ -33,7 +33,7 @@ impl std::fmt::Display for Expr {
                 }
                 write!(f, ")")
             }
-            Self::Builtin(b) => write!(f, "{b:?}"),
+            Self::Builtin(b, _) => write!(f, "{b:?}"),
             Self::Func(func) => write!(f, "{func:?}"),
             Self::Lambda(func) => write!(f, "{func:?}"),
         }
@@ -48,7 +48,7 @@ impl Expr {
             Self::Symbol(_) => "Symbol".to_string(),
             Self::Number(_) => "Number".to_string(),
             Self::List(_) => "List".to_string(),
-            Self::Builtin(_) => "Builtin".to_string(),
+            Self::Builtin(_, _) => "Builtin".to_string(),
             Self::Func(_) => "Function".to_string(),
             Self::Lambda(_) => "Lambda".to_string(),
         }
@@ -60,6 +60,7 @@ pub struct Func {
     pub name: Box<Expr>,
     pub params: Box<Expr>,
     pub body: Box<Expr>,
+    pub help_doc: Option<Box<Expr>>,
 }
 
 impl From<Func> for Expr {
@@ -72,6 +73,15 @@ impl From<Func> for Expr {
 pub struct Lambda {
     pub params: Box<Expr>,
     pub body: Box<Expr>,
+}
+
+impl Lambda {
+    pub fn first_param(&self) -> Option<&Expr> {
+        let Expr::List(list) = self.params.as_ref() else {
+            return None;
+        };
+        list.first()
+    }
 }
 
 impl From<Lambda> for Expr {

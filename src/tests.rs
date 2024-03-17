@@ -212,6 +212,7 @@ macro_rules! test_eval {
             let mut env = Env::new();
             let mut result = Expr::Number(0.);
             for r in ast {
+                eprintln!("{:?}", r);
                 result = eval(&r, &mut env)?;
             }
             assert_eq!(result, $expected);
@@ -317,6 +318,127 @@ test_eval!(
     ])
 );
 
+// ------------------------------------------
+// |       Test For Builtin Functions       |
+// ------------------------------------------
+test_eval!(
+    eval_test_builtin_typeof_number,
+    r#"
+(typeof 1)
+    "#,
+    Expr::Symbol("Number".to_string())
+);
+test_eval!(
+    eval_test_builtin_typeof_string,
+    r#"
+(typeof "number")
+    "#,
+    Expr::Symbol("String".to_string())
+);
+test_eval!(
+    eval_test_builtin_typeof_list,
+    r#"
+(typeof (1 2 3))
+    "#,
+    Expr::Symbol("List".to_string())
+);
+test_eval!(
+    eval_test_builtin_list,
+    r#"
+(list 1 2 3)
+    "#,
+    Expr::List(vec![
+        Expr::Number(1.0),
+        Expr::Number(2.0),
+        Expr::Number(3.0),
+    ])
+);
+test_eval!(
+    eval_test_builtin_cons,
+    r#"
+(cons 1 (list 2 3))
+    "#,
+    Expr::List(vec![
+        Expr::Number(1.0),
+        Expr::Number(2.0),
+        Expr::Number(3.0),
+    ])
+);
+test_eval!(
+    eval_test_builtin_car,
+    r#"
+(car (list 321 123))
+    "#,
+    Expr::Number(321.0)
+);
+test_eval!(
+    eval_test_builtin_cdr,
+    r#"
+(cdr (list 321 123))
+    "#,
+    Expr::List(vec![Expr::Number(123.0)])
+);
+test_eval!(
+    eval_test_builtin_append,
+    r#"
+(append (list 1 2) (list 3 4)) ; -> (1 2 3 4)
+    "#,
+    Expr::List(vec![
+        Expr::Number(1.0),
+        Expr::Number(2.0),
+        Expr::Number(3.0),
+        Expr::Number(4.0),
+    ])
+);
+test_eval!(
+    eval_test_builtin_reverse,
+    r#"
+(reverse (list 1 2 3)) ; -> (3 2 1)
+    "#,
+    Expr::List(vec![
+        Expr::Number(3.0),
+        Expr::Number(2.0),
+        Expr::Number(1.0),
+    ])
+);
+test_eval!(
+    eval_test_builtin_nth,
+    r#"
+(nth (list 1 2 3) 2) ; -> 3
+    "#,
+    Expr::Number(3.0)
+);
+test_eval!(
+    eval_test_builtin_length,
+    r#"
+(length (list 1 2 3)) ; -> 3
+    "#,
+    Expr::Number(3.0)
+);
+test_eval!(
+    eval_test_builtin_map_with_lambda,
+    r#"
+(map (lambda (x) (+ x 1)) (list 1 2 3)) ; -> (2 3 4)
+    "#,
+    Expr::List(vec![
+        Expr::Number(2.0),
+        Expr::Number(3.0),
+        Expr::Number(4.0),
+    ])
+);
+test_eval!(
+    parser,
+    eval_test_builtin_map_with_function,
+    r#"
+(fn addone (x) (+ x 1))
+(map addone (list 1 2 3)) ; -> (2 3 4)
+    "#,
+    Expr::List(vec![
+        Expr::Number(2.0),
+        Expr::Number(3.0),
+        Expr::Number(4.0),
+    ])
+);
 // ----------------------------------
 // |       Test For Debugging       |
 // ----------------------------------

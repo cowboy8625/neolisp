@@ -20,11 +20,12 @@ To get started with NeoLisp, follow these steps:
    cargo build --release -- --help
    ```
 
-2. **Run Examples**: Explore the examples provided in the `samples/` directory to understand NeoLisp's syntax and features.
+1. **Run Examples**: Explore the examples provided in the `samples/` directory to understand NeoLisp's syntax and features.
 
    ```bash
    cargo run --release -- samples/hello_world.nl
    ```
+1. ***Docs***: View the [documentation](Docs.md) for NeoLisp more in-depth info.
 
 ## Syntax
 ```lisp
