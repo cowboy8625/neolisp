@@ -344,6 +344,20 @@ test_eval!(
 // |       Test For Builtin Functions       |
 // ------------------------------------------
 test_eval!(
+    eval_test_builtin_or,
+    r#"
+(or (= 1 1) (= 1 2))
+    "#,
+    Expr::Bool(true)
+);
+test_eval!(
+    eval_test_builtin_and,
+    r#"
+(and (= 1 1) (= 1 2))
+    "#,
+    Expr::Bool(false)
+);
+test_eval!(
     eval_test_builtin_typeof_number,
     r#"
 (typeof 1)

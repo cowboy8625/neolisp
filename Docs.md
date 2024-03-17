@@ -73,6 +73,14 @@
 (print 10)
 ```
 
+### **not**:
+- returns the opposite of the first argument
+- arguments type: `Bool`
+- example:
+```lisp
+(print 10)
+```
+
 ### **print**:
 - returns the first argument
 - arguments type: `Any`

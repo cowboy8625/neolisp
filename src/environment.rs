@@ -34,9 +34,10 @@ impl Env {
             init_builtin!(docs, "<", lt),
             init_builtin!(docs, ">=", gte),
             init_builtin!(docs, "<=", lte),
-            init_builtin!(docs, "typeof", type_of),
+            init_builtin!(docs, "typeof", type_of), // typeof is a keyword in rust
             init_builtin!(docs, and),
             init_builtin!(docs, or),
+            init_builtin!(docs, not),
             init_builtin!(docs, help),
             init_builtin!(docs, print),
             init_builtin!(docs, list),
@@ -48,7 +49,6 @@ impl Env {
             init_builtin!(docs, nth),
             init_builtin!(docs, length),
             init_builtin!(docs, map),
-            // ("not".to_string(), Expr::Builtin(not, docs.get("not").unwrap().clone())),
         ]);
         Self { data, outer: None }
     }

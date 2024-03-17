@@ -272,6 +272,13 @@ pub fn map(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
     Ok(Expr::List(new_list))
 }
 
+pub fn not(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+    let Expr::Bool(b) = eval(&args[0], env)? else {
+        return Err("not requires a boolean".to_string());
+    };
+    Ok(Expr::Bool(!b))
+}
+
 #[macro_export]
 macro_rules! unwrap {
     ($expr:expr, $name:ident) => {{
