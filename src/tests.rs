@@ -22,6 +22,27 @@ macro_rules! test_parser {
 }
 
 test_parser!(
+    parse_test_ident1,
+    "
+(hello-world)
+",
+    Expr::List(vec![Expr::Symbol("hello-world".to_string())])
+);
+test_parser!(
+    parse_test_ident2,
+    "
+(*ident*)
+",
+    Expr::List(vec![Expr::Symbol("*ident*".to_string())])
+);
+test_parser!(
+    parse_test_ident3,
+    "
+(<*ident/1234567890*>!?)
+",
+    Expr::List(vec![Expr::Symbol("<*ident/1234567890*>!?".to_string())])
+);
+test_parser!(
     parse_test_bool_comment,
     "
 ; comment

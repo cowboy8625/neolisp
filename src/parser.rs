@@ -89,23 +89,22 @@ pub fn parse_expr() -> impl Parser<char, Expr, Error = Error> {
             .map(|s: String| Expr::Number(s.parse().unwrap()))
             .padded();
 
-        let op = |c| just(c).padded();
-
         let boolean = just("true")
             .map(|_| Expr::Bool(true))
             .or(just("false").map(|_| Expr::Bool(false)))
             .padded();
 
-        let symbol = text::ident()
-            .map(|s: String| Expr::Symbol(s))
-            .or(op(">=").map(|o| Expr::Symbol(o.to_string())))
-            .or(op("<=").map(|o| Expr::Symbol(o.to_string())))
-            .or(op("+").map(|o| Expr::Symbol(o.to_string())))
-            .or(op("-").map(|o| Expr::Symbol(o.to_string())))
-            .or(op("=").map(|o| Expr::Symbol(o.to_string())))
-            .or(op(">").map(|o| Expr::Symbol(o.to_string())))
-            .or(op("<").map(|o| Expr::Symbol(o.to_string())))
-            .padded();
+        let punctuation = one_of(r#"!$,_-./:;?+<=>#%&*@[\]{|}`^~"#);
+        let letters = one_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
+        let digit = one_of("0123456789");
+
+        let symbol = choice((letters.clone(), punctuation.clone()))
+            .then(choice((letters, punctuation, digit)).repeated())
+            .padded()
+            .map(|(start, end)| {
+                println!("{start:?}, {end:?}");
+                Expr::Symbol(format!("{start}{}", end.iter().collect::<String>()))
+            });
 
         let string = just('"')
             .ignore_then(
