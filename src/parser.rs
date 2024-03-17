@@ -75,15 +75,6 @@ pub struct Lambda {
     pub body: Box<Expr>,
 }
 
-impl Lambda {
-    pub fn first_param(&self) -> Option<&Expr> {
-        let Expr::List(list) = self.params.as_ref() else {
-            return None;
-        };
-        list.first()
-    }
-}
-
 impl From<Lambda> for Expr {
     fn from(func: Lambda) -> Self {
         Self::Lambda(func)
