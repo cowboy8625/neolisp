@@ -294,7 +294,6 @@
 ```
 
 ### filter
-- **NOT IMPLEMENTED**
 - returns a list with elements that satisfy a function
 - arguments
    1. `Function`
