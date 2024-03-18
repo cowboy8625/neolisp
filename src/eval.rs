@@ -36,7 +36,6 @@ fn eval_list(expr: &[Expr], env: &mut Env) -> Result<Expr, String> {
     };
     let args = &expr[1..];
     match &head {
-        // TODO: you was added the quotes
         Expr::Symbol(symbol) if symbol == "var" => eval_define_variable(args, env),
         Expr::Symbol(symbol) if symbol == "if" => eval_if(args, env),
         Expr::Symbol(symbol) if symbol == "lambda" => eval_define_lambda(args),

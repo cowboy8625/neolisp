@@ -227,6 +227,15 @@ test_parser!(
 // ------------------------
 
 macro_rules! test_eval {
+    (fail, $name:ident, $src:expr) => {
+        #[test]
+        fn $name() -> Result<(), String> {
+            let ast = parse_expr().parse($src).map_err(|e| format!("{:?}", e))?;
+            let mut env = Env::new();
+            assert!(eval(&ast, &mut env).is_err());
+            Ok(())
+        }
+    };
     (parser, $name:ident, $src:expr, $expected:expr) => {
         #[test]
         fn $name() -> Result<(), String> {
@@ -343,6 +352,41 @@ test_eval!(
 // ------------------------------------------
 // |       Test For Builtin Functions       |
 // ------------------------------------------
+test_eval!(
+    eval_test_builtin_plus,
+    r#"
+(+ 123 321) ; -> 444
+    "#,
+    Expr::Number(444.0)
+);
+test_eval!(
+    eval_test_builtin_minus,
+    r#"
+(- 123 321) ; -> -123
+    "#,
+    Expr::Number(-198.0)
+);
+test_eval!(
+    eval_test_builtin_mult,
+    r#"
+(* 2 2) ; -> 4
+    "#,
+    Expr::Number(4.0)
+);
+test_eval!(
+    eval_test_builtin_div,
+    r#"
+(/ 100 5) ; -> 20
+    "#,
+    Expr::Number(20.0)
+);
+test_eval!(
+    eval_test_builtin_mod,
+    r#"
+(/ 100 5) ; -> 20
+    "#,
+    Expr::Number(20.0)
+);
 test_eval!(
     eval_test_builtin_or,
     r#"
@@ -484,12 +528,62 @@ test_eval!(
 );
 test_eval!(
     parser,
+    eval_test_builtin_fold_with_lambda,
+    r#"
+; returns -> 6
+(fold 0
+    (lambda (x y) (+ x y))
+    (list 1 2 3))
+    "#,
+    Expr::Number(6.0)
+);
+test_eval!(
+    parser,
     eval_test_builtin_fold_with_fn,
     r#"
 (fn add (x y) (+ x y))
 (fold 0 add (list 1 2 3)) ; -> 6
     "#,
     Expr::Number(6.0)
+);
+test_eval!(
+    parser,
+    eval_test_builtin_filter_with_lambda,
+    r#"
+; returns -> (2)
+(filter
+    (lambda (x) (= (mod x 2) 0))
+    (list 1 2 3))
+    "#,
+    Expr::List(vec![Expr::Number(2.0)])
+);
+test_eval!(
+    parser,
+    eval_test_builtin_filter_with_fn,
+    r#"
+
+(fn is-even (x) (= (mod x 2) 0))
+
+; returns -> (2)
+(filter
+    is-even
+    (list 1 2 3))
+    "#,
+    Expr::List(vec![Expr::Number(2.0)])
+);
+test_eval!(
+    fail,
+    eval_test_builtin_assert,
+    r#"
+(assert (> 1 2) "1 is not greater than 2")
+    "#
+);
+test_eval!(
+    fail,
+    eval_test_builtin_assert_eq,
+    r#"
+(assert 1 2 "1 is not 1 equal than 2")
+    "#
 );
 // ----------------------------------
 // |       Test For Debugging       |

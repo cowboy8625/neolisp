@@ -2,7 +2,42 @@
 
 ## Functions
 
-### **+**:
+### fn
+- returns a `Function`
+- arguments
+   1. `Symbol`: name of the function
+   1. `List`: arguments
+   1. `List`: body
+- example:
+```lisp
+(fn add (x y) (+ x y))
+(add 10 20) ; -> 30
+```
+
+### lambda
+- returns a `Function`
+- arguments
+   1. `List`: arguments
+   1. `List`: body
+- example:
+```lisp
+(lambda (x y) (+ x y))
+(10 20) ; -> 30
+```
+
+### var
+- defines a variable
+- arguments
+   1. `Symbol`: name of the variable
+   1. `Any`: value
+- example:
+```lisp
+(var x 123)
+(var y 321)
+(+ 123 321) ; -> 444
+```
+
+### +
 - returns a sum of the arguments
 - arguments type: `Number`
 - example:
@@ -10,7 +45,7 @@
 (+ 10 20) ; -> 30
 ```
 
-### **-**:
+### -
 - returns the difference of the arguments
 - arguments type: `Number`
 - example:
@@ -18,7 +53,31 @@
 (- 20 10) ; -> 10
 ```
 
-### **=**:
+### *
+- returns the product of the arguments
+- arguments type: `Number`
+- example:
+```lisp
+(* 10 20) ; -> 200
+```
+
+### /
+- returns the quotient of the arguments
+- arguments type: `Number`
+- example:
+```lisp
+(/ 20 10) ; -> 2
+```
+
+### mod
+- returns the remainder of the arguments
+- arguments type: `Number`
+- example:
+```lisp
+(mod 10 2) ; -> 0
+```
+
+### =
 - returns true if all the arguments are equal to the first
 - arguments type: `Number`
 - example:
@@ -26,7 +85,7 @@
 (= 10 10) ; -> true
 ```
 
-### **>**:
+### >
 - returns true if the first argument is greater than the rest
 - arguments type: `Number`
 - example:
@@ -34,7 +93,7 @@
 (> 10 10) ; -> false
 ```
 
-### **<**:
+### <
 - returns true if the first argument is less than the rest
 - arguments type: `Number`
 - example:
@@ -42,7 +101,7 @@
 (< 10 10) ; -> false
 ```
 
-### **>=**:
+### >=
 - returns true if the first argument is greater than or equal to the rest
 - arguments type: `Number`
 - example:
@@ -50,7 +109,7 @@
 (>= 10 10) ; -> true
 ```
 
-### **<=**:
+### <=
 - returns true if the first argument is less than or equal to the rest
 - arguments type: `Number`
 - example:
@@ -58,14 +117,14 @@
 (<= 10 10)
 ```
 
-### **and**:
+### and
 - returns true if all the arguments are true
 - arguments type: `Bool`
 - example:
 ```lisp
 (print 10)
 ```
-### **or**:
+### or
 - returns true if any of the arguments are true
 - arguments type: `Bool`
 - example:
@@ -73,7 +132,7 @@
 (print 10)
 ```
 
-### **not**:
+### not
 - returns the opposite of the first argument
 - arguments type: `Bool`
 - example:
@@ -81,7 +140,7 @@
 (print 10)
 ```
 
-### **print**:
+### print
 - returns the first argument
 - arguments type: `Any`
 - example:
@@ -89,7 +148,7 @@
 (print 10)
 ```
 
-### **typeof**:
+### typeof
 - returns the type of the first argument
 - argument type: `Any`
 - example:
@@ -97,7 +156,8 @@
 (typeof 10) ; -> Number
 ```
 
-### **help**:
+### help
+- **Currently Help does not work on all built-in functions**
 - returns this message as a `String`
 - argument type: `Function`
 - example:
@@ -112,7 +172,7 @@
 ; prints the help message of the function
 ```
 
-### **list**:
+### list
 - returns a `List` of elements
 - arguments type: `Any`
 - example:
@@ -120,7 +180,7 @@
 (list 1 2 3) ; -> (1 2 3)
 ```
 
-### **cons**:
+### cons
 - returns a list with an element added to the beginning
 - arguments
    1. item to add
@@ -130,7 +190,7 @@
 (cons 1 (list 2 3)) ; -> (1 2 3)
 ```
 
-### **car**:
+### car
 - returns the first element of a list
 - argument
    1. List
@@ -139,7 +199,7 @@
 (car (list 1 2 3)) ; -> 1
 ```
 
-### **cdr**:
+### cdr
 - returns a list without the first element
 - argument
    1. List
@@ -148,7 +208,7 @@
 (cdr (list 1 2 3)) ; -> (2 3)
 ```
 
-### **append**:
+### append
 - returns a `List` with elements appended
 - arguments type: `List`
 - example:
@@ -156,7 +216,7 @@
 (append (list 1 2) (list 3 4)) ; -> (1 2 3 4)
 ```
 
-### **reverse**:
+### reverse
 - returns a list with elements in reverse order
 - argument type: `List`
 - example:
@@ -164,7 +224,7 @@
 (reverse (list 1 2 3)) ; -> (3 2 1)
 ```
 
-### **nth**:
+### nth
 - returns the nth element of a list
 - arguments type: `List`
 - example:
@@ -172,7 +232,7 @@
 (nth (list 1 2 3) 2) ; -> 3
 ```
 
-### **length**:
+### length
 - returns the length of a list
 - argument type: `List`
 - example:
@@ -180,7 +240,7 @@
 (length (list 1 2 3)) ; -> 3
 ```
 
-### **map**:
+### map
 - returns a list with the result of applying a function to each element of a list
 - arguments
    1. `Function`
@@ -196,7 +256,7 @@
 (map addone (list 1 2 3)) ; -> (2 3 4)
 ```
 
-### **fold**:
+### fold
 - returns the result of applying a function to each element of a list
 - arguments
    1. `T` starting value
@@ -210,7 +270,8 @@
 (fold 0 add (list 1 2 3)) ; -> 6
 ```
 
-### **fold-right**:
+### fold-right
+- **NOT IMPLEMENTED**
 - returns the result of applying a function to each element of a list in reverse order
 - arguments
    1. `Function`
@@ -220,7 +281,8 @@
 (fold-right + (list 1 2 3)) ; -> 6
 ```
 
-### **filter**:
+### filter
+- **NOT IMPLEMENTED**
 - returns a list with elements that satisfy a function
 - arguments
    1. `Function`
@@ -230,27 +292,25 @@
 (filter (lambda (x) (> x 1)) (list 1 2 3)) ; -> (2 3)
 ```
 
-### **assert**:
+### assert
 - throws an error if the condition is false
 - arguments
-   1. `Boolean`
-   1. `String`
+   1. `Boolean` condition
+   1. `String` optional error message
 - example:
 ```lisp
 (assert (> 1 2) "1 is not greater than 2")
 ```
 
-### **fn**:
-- returns a `Function`
+### assert-eq
+- throws an error if the arguments are not equal
 - arguments
-   1. `Symbol`: name of the function
-   1. `List`: arguments
-   1. `List`: body
-
+   1. `Any` first argument
+   1. All other arguments need to be equal to the first
+   1. `String` optional error message in last argument
 - example:
 ```lisp
-(fn add (x y) (+ x y))
-(add 10 20) ; -> 30
+(assert-eq 1 2 "1 is not equal than 2")
 ```
 
 ## Adding Help message to function

@@ -12,13 +12,26 @@ macro_rules! init_builtin {
     ($doc:ident, $symbol:expr, $name:ident) => {
         (
             $symbol.to_string(),
-            crate::parser::Expr::Builtin($name, $doc.get($symbol).unwrap().to_string()),
+            crate::parser::Expr::Builtin(
+                $name,
+                $doc.get($symbol)
+                    .expect(&format!("missing docs for builtin function: {}", $symbol))
+                    .to_string(),
+            ),
         )
     };
     ($doc:ident, $name:ident) => {
         (
             stringify!($name).to_string(),
-            Expr::Builtin($name, $doc.get(stringify!($name)).unwrap().to_string()),
+            Expr::Builtin(
+                $name,
+                $doc.get(stringify!($name))
+                    .expect(&format!(
+                        "missing docs for builtin function: {}",
+                        stringify!($name)
+                    ))
+                    .to_string(),
+            ),
         )
     };
 }
@@ -29,6 +42,9 @@ impl Env {
         let data = HashMap::from([
             init_builtin!(docs, "+", add),
             init_builtin!(docs, "-", sub),
+            init_builtin!(docs, "*", mul),
+            init_builtin!(docs, "/", div),
+            init_builtin!(docs, "mod", r#mod),
             init_builtin!(docs, "=", eq),
             init_builtin!(docs, ">", gt),
             init_builtin!(docs, "<", lt),
@@ -50,6 +66,9 @@ impl Env {
             init_builtin!(docs, length),
             init_builtin!(docs, map),
             init_builtin!(docs, fold),
+            init_builtin!(docs, filter),
+            init_builtin!(docs, "assert", assertnl),
+            init_builtin!(docs, "assert-eq", assert_eqnl),
         ]);
         Self { data, outer: None }
     }

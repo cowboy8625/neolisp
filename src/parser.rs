@@ -85,7 +85,12 @@ pub fn parse_expr() -> impl Parser<char, Expr, Error = Error> {
     recursive(|expr| {
         let comment = just(';').then(take_until(just('\n'))).padded();
 
-        let int = text::int(10)
+        let int = text::int(10);
+
+        let number = int.or(just('-').repeated().then(int).map(|(sign, num)|{
+            let sign = if sign.iter().count() % 2 == 0 { "" } else { "-" };
+            format!("{sign}{num}")
+        }))
             .map(|s: String| Expr::Number(s.parse().unwrap()))
             .padded();
 
@@ -116,7 +121,7 @@ pub fn parse_expr() -> impl Parser<char, Expr, Error = Error> {
             .then_ignore(just('"'))
             .padded();
 
-        let atom = int
+        let atom = number
             .or(string)
             .or(boolean)
             .or(symbol)

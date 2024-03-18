@@ -7,29 +7,24 @@ use std::collections::HashMap;
 fn doc_parser() -> impl Parser<char, HashMap<String, String>, Error = Simple<char>> {
     let find_start = take_until(just("## Functions"));
 
-    let op = |c| just(c).padded();
+    let punctuation = one_of(r#"!$,_-./:;?+<=>#%&*@[\]{|}`^~"#);
+    let letters = one_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
+    let digit = one_of("0123456789");
+
+    let symbol = choice((letters.clone(), punctuation.clone()))
+        .then(choice((letters, punctuation, digit)).repeated())
+        .map(|(start, end)| format!("{start}{}", end.iter().collect::<String>()));
 
     let name_parser = just("###")
         .padded()
-        .ignore_then(just("**").padded())
-        .ignore_then(
-            text::ident()
-                .or(op(">=").map(|o| o.to_string()))
-                .or(op("<=").map(|o| o.to_string()))
-                .or(op("+").map(|o| o.to_string()))
-                .or(op("-").map(|o| o.to_string()))
-                .or(op("=").map(|o| o.to_string()))
-                .or(op(">").map(|o| o.to_string()))
-                .or(op("<").map(|o| o.to_string())),
-        )
-        .then_ignore(just("**"))
-        .padded();
+        .ignore_then(symbol)
+        .padded()
+        .map(|name| name.trim().to_string());
 
-    let body_parser = just(':')
+    let body_parser = just('-')
+        .then(take_until(just("```\n")))
         .padded()
-        .ignore_then(take_until(just("```\n")))
-        .padded()
-        .map(|(start, end)| format!("{}\n{end}", start.iter().collect::<String>()));
+        .map(|(dash, (start, end))| format!("{dash}{}\n{end}", start.iter().collect::<String>()));
 
     let section_parser = name_parser
         .then(body_parser)
@@ -60,6 +55,44 @@ pub fn load_doc() -> HashMap<String, String> {
     }
 }
 
+#[test]
+fn test_load_doc() {
+    eprintln!("Starting test_load_doc");
+    let doc = load_doc();
+    let names = doc.keys().collect::<Vec<_>>();
+    eprintln!("{names:#?}");
+    assert!(doc.contains_key("fn"));
+    assert!(doc.contains_key("lambda"));
+    assert!(doc.contains_key("var"));
+    assert!(doc.contains_key("+"));
+    assert!(doc.contains_key("-"));
+    assert!(doc.contains_key("="));
+    assert!(doc.contains_key(">"));
+    assert!(doc.contains_key("<"));
+    assert!(doc.contains_key(">="));
+    assert!(doc.contains_key("<="));
+    assert!(doc.contains_key("and"));
+    assert!(doc.contains_key("or"));
+    assert!(doc.contains_key("not"));
+    assert!(doc.contains_key("print"));
+    assert!(doc.contains_key("typeof"));
+    assert!(doc.contains_key("help"));
+    assert!(doc.contains_key("list"));
+    assert!(doc.contains_key("cons"));
+    assert!(doc.contains_key("car"));
+    assert!(doc.contains_key("cdr"));
+    assert!(doc.contains_key("append"));
+    assert!(doc.contains_key("reverse"));
+    assert!(doc.contains_key("nth"));
+    assert!(doc.contains_key("length"));
+    assert!(doc.contains_key("map"));
+    assert!(doc.contains_key("fold"));
+    assert!(doc.contains_key("fold-right"));
+    assert!(doc.contains_key("filter"));
+    assert!(doc.contains_key("filter"));
+    assert!(doc.contains_key("assert"));
+}
+
 fn get_number(expr: &Expr) -> Result<f64, String> {
     match expr {
         Expr::Number(n) => Ok(*n),
@@ -88,6 +121,43 @@ pub fn sub(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
         sum += get_number(&i)?;
     }
     Ok(Expr::Number(head - sum))
+}
+
+pub fn mul(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+    let mut product = 1.0;
+    for arg in args {
+        let i = eval(arg, env)?;
+        product *= get_number(&i)?;
+    }
+    Ok(Expr::Number(product))
+}
+
+pub fn div(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+    let h = args
+        .first()
+        .ok_or("div requires at least one argument".to_string())?;
+    let eval_h = eval(h, env)?;
+    let head = get_number(&eval_h)?;
+    let mut sum = 1.0;
+    for arg in &args[1..] {
+        let i = eval(arg, env)?;
+        sum *= get_number(&i)?;
+    }
+    Ok(Expr::Number(head / sum))
+}
+
+pub fn r#mod(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+    let h = args
+        .first()
+        .ok_or("mod requires at least one argument".to_string())?;
+    let eval_h = eval(h, env)?;
+    let head = get_number(&eval_h)?;
+    let mut sum = 1.0;
+    for arg in &args[1..] {
+        let i = eval(arg, env)?;
+        sum *= get_number(&i)?;
+    }
+    Ok(Expr::Number(head % sum))
 }
 
 pub fn help(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
@@ -325,6 +395,93 @@ pub fn fold(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
         acc_value = eval(&body, &mut inner_env)?;
     }
     Ok(acc_value)
+}
+
+pub fn filter(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+    if args.len() != 2 {
+        return Err("filter requires two arguments".to_string());
+    }
+    let Expr::List(list) = eval(&args[1], env)? else {
+        return Err("filter requires a list as second argument".to_string());
+    };
+    let (params, body) = match eval(&args[0], env)? {
+        Expr::Lambda(lambda) => (*lambda.params, lambda.body),
+        Expr::Func(func) => (*func.params, func.body),
+        Expr::Builtin(func, _) => {
+            let mut new_list = vec![];
+            for item in list {
+                let new_item = func(&[item.clone()], env)?;
+                if matches!(new_item, Expr::Bool(true)) {
+                    new_list.push(item.clone());
+                }
+            }
+            return Ok(Expr::List(new_list));
+        }
+        _ => return Err("filter requires a function as first argument".to_string()),
+    };
+    let Expr::List(params) = params else {
+        unreachable!("there is a bug in eval on lambda or func");
+    };
+    let mut new_list = vec![];
+    let mut inner_env = env.clone();
+    for item in list {
+        inner_env.data.insert(params[0].to_string(), item.clone());
+        let new_item = eval(&body, &mut inner_env)?;
+        if matches!(new_item, Expr::Bool(true)) {
+            new_list.push(item.clone());
+        }
+    }
+    Ok(Expr::List(new_list))
+}
+
+pub fn assertnl(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+    if args.is_empty() {
+        return Err("assertnl requires one argument".to_string());
+    }
+
+    let msg = match &args.get(1) {
+        Some(Expr::String(s)) => s,
+        _ => "",
+    };
+
+    let Expr::Bool(b) = eval(&args[0], env)? else {
+        return Err("assertnl requires a boolean".to_string());
+    };
+
+    if b {
+        Ok(Expr::Bool(true))
+    } else {
+        eprintln!("{}", msg);
+        Err("assertnl failed".to_string())
+    }
+}
+
+pub fn assert_eqnl(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+    if args.len() < 2 {
+        return Err("assert_eqnl requires at lest two arguments".to_string());
+    }
+
+    let msg = match &args.last() {
+        Some(Expr::String(s)) => s,
+        _ => "",
+    };
+    if msg.is_empty() && args.len() == 2 {
+        return Err("assert_eqnl requires at lest two arguments".to_string());
+    }
+    let value = eval(&args[0], env)?;
+    let end = if msg.is_empty() {
+        args.len()
+    } else {
+        args.len() - 1
+    };
+    for arg in &args[1..end] {
+        let eval_arg = eval(arg, env)?;
+        if value != eval_arg {
+            eprintln!("{}", msg);
+            return Err(format!("{} is not equal to {}", value, eval_arg));
+        }
+    }
+    Ok(Expr::Bool(true))
 }
 
 #[macro_export]
