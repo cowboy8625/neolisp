@@ -448,7 +448,7 @@ test_eval!(
 test_eval!(
     eval_test_builtin_cons,
     r#"
-(cons 1 (list 2 3))
+(cons (+ 0 1) (list 2 3))
     "#,
     Expr::List(vec![
         Expr::Number(1.0),
