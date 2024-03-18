@@ -217,9 +217,8 @@ pub fn cons(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
         return Err("cons requires a list as the second argument".to_string());
     };
 
-    let new = vec![args[0].clone()]
-        .into_iter()
-        .chain(tail.iter().cloned());
+    let item = eval(&args[0], env)?;
+    let new = vec![item].into_iter().chain(tail.iter().cloned());
     Ok(Expr::List(new.collect()))
 }
 
