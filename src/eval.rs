@@ -37,6 +37,7 @@ fn eval_list(expr: &[Expr], env: &mut Env) -> Result<Expr, String> {
     let args = &expr[1..];
     match &head {
         Expr::Symbol(symbol) if symbol == "var" => eval_define_variable(args, env),
+        Expr::Symbol(symbol) if symbol == "let" => eval_define_let(args, env),
         Expr::Symbol(symbol) if symbol == "if" => eval_if(args, env),
         Expr::Symbol(symbol) if symbol == "lambda" => eval_define_lambda(args),
         Expr::Symbol(symbol) if symbol == "fn" => eval_define_fn(args, env),
@@ -105,18 +106,35 @@ fn eval_func(func: &Func, args: &[Expr], env: &mut Env) -> Result<Expr, String> 
 }
 
 fn eval_define_variable(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
-    let Some(name) = args.first() else {
-        return Err("empty list are not allowed in var definition".to_string());
-    };
     if args.len() != 2 {
         return Err(format!(
             "invalid number of arguments, expected 2, got {}",
             args.len()
         ));
     }
+    let Some(name) = args.first() else {
+        return Err("empty list are not allowed in var definition".to_string());
+    };
     let value = eval(&args[1], env)?;
     env.data.insert(name.to_string(), value);
     Ok(name.clone())
+}
+
+fn eval_define_let(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+    if args.len() < 2 {
+        return Err("let requires at least two arguments".to_string());
+    }
+    let Some(last) = args.last() else {
+        return Err("empty list are not allowed in let definition".to_string());
+    };
+    let mut new_env = env.clone();
+    for arg in &args[0..args.len() - 1] {
+        let Expr::List(list) = arg else {
+            return Err("let arguments must be a list".to_string());
+        };
+        eval_define_variable(list, &mut new_env)?;
+    }
+    eval(last, &mut new_env)
 }
 
 fn eval_define_lambda(args: &[Expr]) -> Result<Expr, String> {
@@ -149,7 +167,10 @@ fn eval_lambda(lambda: &Lambda, args: &[Expr], env: &mut Env) -> Result<Expr, St
 
 fn eval_if(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
     if args.len() != 3 {
-        return Err("invalid number of arguments for if expression expected 3".to_string());
+        return Err(format!(
+            "invalid number of arguments for if expression expected 3 found {}: {args:#?}",
+            args.len()
+        ));
     }
     let branch = if let Expr::Bool(true) = eval(&args[0], env)? {
         args[1].clone()

@@ -328,6 +328,18 @@ test_eval!(
 );
 test_eval!(
     parser,
+    eval_test_let,
+    r#"
+; returns -> 3
+(let
+    (x 1)
+    (y 2)
+    (+ x y))
+    "#,
+    Expr::Number(3.)
+);
+test_eval!(
+    parser,
     eval_test_fn_def_var,
     r#"
 (var a (+ 1 2))

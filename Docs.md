@@ -36,6 +36,18 @@
 (var y 321)
 (+ 123 321) ; -> 444
 ```
+### let
+- binds a list of values to symbols in the current scope and returns the last evaluated value
+- arguments
+   1. `Symbol`: name of the variable
+   1. `Any`: value
+- example:
+```lisp
+(let
+   (x 123)
+   (y 321)
+   (+ x y)) ; -> 444
+```
 
 ### +
 - returns a sum of the arguments
