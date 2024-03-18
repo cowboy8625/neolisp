@@ -1,3 +1,14 @@
+; create a list of numbers from 0 to n
+; recursively create a list of numbers from 0 to n
+; this returns a reverse list
+(fn range (n)
+    (if (> n 0)
+      (cons (- n 1) (range (- n 1)))
+      '()))
+
+(assert-eq (list 3 2 1 0) (range 4) "range n: 4 return (3 2 1 0)")
+(assert-eq (list 0 1 2 3) (reverse (range 4)) "range n: 4 return (0 1 2 3)")
+
 ; Current pattern           111 110 101 100 011 010 001 000
 ; New state for center cell  0   1   1   0   1   1   1   0
 ; returns 0..7 for all the possibile states the three cells can be in
@@ -11,6 +22,7 @@
 (assert-eq 5 (cal-rule 1 0 1) "cal-rule 1 0 1") ; 1
 (assert-eq 6 (cal-rule 1 1 0) "cal-rule 1 1 0") ; 1
 (assert-eq 7 (cal-rule 1 1 1) "cal-rule 1 1 1") ; 0
+; ----------------------------------------------------
 
 
 (fn is-alive (id)
@@ -31,6 +43,7 @@
 (assert-eq 1 (is-alive 5) "is-alive 5 -> 1")
 (assert-eq 1 (is-alive 6) "is-alive 6 -> 1")
 (assert-eq 0 (is-alive 7) "is-alive 7 -> 0")
+; ----------------------------------------------------
 
 
 ; Returns the index of the cell in the grid and will wrap around either end
@@ -42,7 +55,9 @@
 (assert-eq 1 (get-cell (list 'a 'b 'c)  1) "get-cell list len 3, index  1, returns 1")
 (assert-eq 2 (get-cell (list 'a 'b 'c)  2) "get-cell list len 3, index  2, returns 2")
 (assert-eq 0 (get-cell (list 'a 'b 'c)  3) "get-cell list len 3, index  3, returns 0")
+; ----------------------------------------------------
 
+; Returns the state of the cells next generation
 (fn generation-of-cell (grid index)
   (let
     (a (nth grid (get-cell grid (- index 1))))
@@ -70,3 +85,16 @@
   ;                               ↓
   (generation-of-cell (list 0 0 0 1) 3) ; actual
   "generation-of-cell, grid: 0 0 0 1, index 3, returns 1") ; description
+; ----------------------------------------------------
+
+;; ; Returns the next generation of the grid
+(fn next-generation (grid)
+  (map
+    (lambda (i) (generation-of-cell grid i))
+    (reverse (range (length grid)))
+))
+
+(assert-eq
+  (list 0 0 1 1) ; expected
+  (next-generation (list 0 0 0 1)) ; actual
+  "next-generation, grid: 0 0 0 1, returns 0 0 1 1") ; description
