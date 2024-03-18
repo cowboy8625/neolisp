@@ -124,7 +124,7 @@
 - returns a list with an element added to the beginning
 - arguments
    1. item to add
-   2. List
+   1. List
 - example:
 ```lisp
 (cons 1 (list 2 3)) ; -> (1 2 3)
@@ -184,7 +184,7 @@
 - returns a list with the result of applying a function to each element of a list
 - arguments
    1. `Function`
-   2. `List`
+   1. `List`
 - example:
 ```lisp
 ; map takes a lambda
@@ -194,6 +194,63 @@
 
 (fn addone (x) (+ x 1))
 (map addone (list 1 2 3)) ; -> (2 3 4)
+```
+
+### **fold**:
+- returns the result of applying a function to each element of a list
+- arguments
+   1. `T` starting value
+   1. `Function` `(lambda (x y) ...)`
+   1. `List`
+- example:
+```lisp
+(fold 0 + (list 1 2 3)) ; -> 6
+
+(fn add (x y) (+ x y))
+(fold 0 add (list 1 2 3)) ; -> 6
+```
+
+### **fold-right**:
+- returns the result of applying a function to each element of a list in reverse order
+- arguments
+   1. `Function`
+   1. `List`
+- example:
+```lisp
+(fold-right + (list 1 2 3)) ; -> 6
+```
+
+### **filter**:
+- returns a list with elements that satisfy a function
+- arguments
+   1. `Function`
+   1. `List`
+- example:
+```lisp
+(filter (lambda (x) (> x 1)) (list 1 2 3)) ; -> (2 3)
+```
+
+### **assert**:
+- throws an error if the condition is false
+- arguments
+   1. `Boolean`
+   1. `String`
+- example:
+```lisp
+(assert (> 1 2) "1 is not greater than 2")
+```
+
+### **fn**:
+- returns a `Function`
+- arguments
+   1. `Symbol`: name of the function
+   1. `List`: arguments
+   1. `List`: body
+
+- example:
+```lisp
+(fn add (x y) (+ x y))
+(add 10 20) ; -> 30
 ```
 
 ## Adding Help message to function

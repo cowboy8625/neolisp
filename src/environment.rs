@@ -49,6 +49,7 @@ impl Env {
             init_builtin!(docs, nth),
             init_builtin!(docs, length),
             init_builtin!(docs, map),
+            init_builtin!(docs, fold),
         ]);
         Self { data, outer: None }
     }

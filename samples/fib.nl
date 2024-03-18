@@ -1,5 +1,5 @@
 ;; Fibonacci sequence
-;; this function takes 46 seconds to run on a Applle M1 Max
+;; this function takes 8.66 seconds to run on a Applle M1 Max
 (fn fib (n)
   (if (or (= n 0) (= n 1))
       n

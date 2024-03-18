@@ -259,8 +259,8 @@ pub fn map(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
     };
 
     let mut new_list = vec![];
+    let mut inner_env = env.clone();
     for item in list {
-        let mut inner_env = env.clone();
         let Some(Expr::Symbol(param)) = params.first() else {
             return Err("map requires a lambda function with one argument".to_string());
         };
@@ -277,6 +277,54 @@ pub fn not(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
         return Err("not requires a boolean".to_string());
     };
     Ok(Expr::Bool(!b))
+}
+
+pub fn fold(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+    let acc_index = 0;
+    let func_index = 1;
+    let list_index = 2;
+
+    if args.len() != 3 {
+        return Err("fold requires three arguments".to_string());
+    }
+    let Expr::List(list) = eval(&args[list_index], env)? else {
+        return Err("fold requires a list as second argument".to_string());
+    };
+    let (params, body) = match eval(&args[func_index], env)? {
+        Expr::Lambda(lambda) => (*lambda.params, lambda.body),
+        Expr::Func(func) => (*func.params, func.body),
+        Expr::Builtin(func, _) => {
+            let mut acc = eval(&args[acc_index], env)?;
+            for item in list {
+                acc = func(&[acc, item.clone()], env)?;
+            }
+            return Ok(acc);
+        }
+        _ => return Err("fold requires a function as first argument".to_string()),
+    };
+    let Expr::List(params) = params else {
+        unreachable!("there is a bug in eval on lambda or func");
+    };
+
+    let Some(Expr::Symbol(acc)) = params.first() else {
+        return Err(
+            "fold requires a function with two argument, missing first argument".to_string(),
+        );
+    };
+    let Some(Expr::Symbol(item)) = params.get(1) else {
+        return Err(
+            "fold requires a function with two argument, missing second argument".to_string(),
+        );
+    };
+
+    let mut inner_env = env.clone();
+    let mut acc_value = eval(&args[acc_index], env)?;
+    for item_value in list {
+        inner_env.data.insert(acc.to_string(), acc_value.clone());
+        inner_env.data.insert(item.to_string(), item_value.clone());
+        acc_value = eval(&body, &mut inner_env)?;
+    }
+    Ok(acc_value)
 }
 
 #[macro_export]

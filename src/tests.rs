@@ -475,6 +475,22 @@ test_eval!(
         Expr::Number(4.0),
     ])
 );
+test_eval!(
+    eval_test_builtin_fold_with_plus_op,
+    r#"
+(fold 0 + (list 1 2 3)) ; -> 6
+    "#,
+    Expr::Number(6.0)
+);
+test_eval!(
+    parser,
+    eval_test_builtin_fold_with_fn,
+    r#"
+(fn add (x y) (+ x y))
+(fold 0 add (list 1 2 3)) ; -> 6
+    "#,
+    Expr::Number(6.0)
+);
 // ----------------------------------
 // |       Test For Debugging       |
 // ----------------------------------
