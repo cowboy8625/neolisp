@@ -303,6 +303,19 @@
 (filter (lambda (x) (> x 1)) (list 1 2 3)) ; -> (2 3)
 ```
 
+### loop
+- returns the result of last iteration
+- arguments
+   1. `Function`
+   1. `List`
+- example:
+```lisp
+; returns -> (2)
+(let (x 0)
+(loop (< x 3)
+    (var x (+ x 1))))
+```
+
 ### assert
 - throws an error if the condition is false
 - arguments

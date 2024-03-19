@@ -33,7 +33,9 @@
     (if (= id 4) 0
     (if (= id 5) 1
     (if (= id 6) 1
-    (if (= id 7) 0 0)))))))))
+    (if (= id 7) 0
+      ; else
+      0)))))))))
 
 (assert-eq 0 (is-alive 0) "is-alive 0 -> 0")
 (assert-eq 1 (is-alive 1) "is-alive 1 -> 1")
@@ -87,7 +89,7 @@
   "generation-of-cell, grid: 0 0 0 1, index 3, returns 1") ; description
 ; ----------------------------------------------------
 
-;; ; Returns the next generation of the grid
+; Returns the next generation of the grid
 (fn next-generation (grid)
   (map
     (lambda (i) (generation-of-cell grid i))
@@ -98,3 +100,20 @@
   (list 0 0 1 1) ; expected
   (next-generation (list 0 0 0 1)) ; actual
   "next-generation, grid: 0 0 0 1, returns 0 0 1 1") ; description
+
+
+; ----------------------------------------------------
+
+; Loop
+(fn main ()
+  (let
+    (grid (list 0 0 0 1))
+    ;      condition       body
+    (loop '(true) (
+      (var grid (next-generation grid))
+      (print grid "\n")
+    ))
+  )
+)
+
+(main)

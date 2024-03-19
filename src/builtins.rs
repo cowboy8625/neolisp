@@ -483,6 +483,23 @@ pub fn assert_eqnl(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
     Ok(Expr::Bool(true))
 }
 
+pub fn r#loop(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+    if args.len() != 2 {
+        return Err("loop requires two arguments".to_string());
+    }
+    let mut result = Expr::List(vec![]);
+    let Some(condition) = args.first() else {
+        return Err("loop requires two argument".to_string());
+    };
+    let Some(arg) = args.get(1) else {
+        return Err("loop requires second argument for body".to_string());
+    };
+    while eval(condition, env)? != Expr::Bool(false) {
+        result = eval(&arg, env)?;
+    }
+    Ok(result)
+}
+
 #[macro_export]
 macro_rules! unwrap {
     ($expr:expr, $name:ident) => {{

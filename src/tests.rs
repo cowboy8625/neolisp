@@ -584,6 +584,16 @@ test_eval!(
     Expr::List(vec![Expr::Number(2.0)])
 );
 test_eval!(
+    eval_test_builtin_loop,
+    r#"
+; returns -> (2)
+(let (x 0)
+(loop (< x 3)
+    (var x (+ x 1)))))
+    "#,
+    Expr::Symbol("x".to_string())
+);
+test_eval!(
     fail,
     eval_test_builtin_assert,
     r#"
