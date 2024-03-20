@@ -129,11 +129,7 @@ pub fn parse_expr() -> impl Parser<char, Spanned<Expr>, Error = Error> {
 
         let number = int
             .or(just('-').repeated().then(int).map(|(sign, num)| {
-                let sign = if sign.iter().count() % 2 == 0 {
-                    ""
-                } else {
-                    "-"
-                };
+                let sign = if sign.len() % 2 == 0 { "" } else { "-" };
                 format!("{sign}{num}")
             }))
             .map_with_span(|s: String, span: Span| {

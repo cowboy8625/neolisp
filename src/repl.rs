@@ -37,7 +37,7 @@ pub fn run(args: Cli) -> Result<()> {
     );
 
     let mut env = Env::new();
-    if let Err(_) = rl.load_history(&args.history_path) {
+    if rl.load_history(&args.history_path).is_err() {
         println!("No previous history.");
     }
 

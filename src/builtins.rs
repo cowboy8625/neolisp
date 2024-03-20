@@ -33,7 +33,7 @@ fn doc_parser() -> impl Parser<char, HashMap<String, String>, Error = Simple<cha
 
     let doc = find_start
         .ignore_then(section_parser.padded().repeated())
-        .map(|sections| HashMap::from_iter(sections.into_iter()));
+        .map(HashMap::from_iter);
 
     doc.padded()
         .then_ignore(take_until(end()))
@@ -47,7 +47,7 @@ pub fn load_doc() -> HashMap<String, String> {
     let src = std::fs::read_to_string(path).unwrap();
     let ast = doc_parser().parse(src);
     match ast {
-        Ok(ast) => return ast,
+        Ok(ast) => ast,
         Err(err) => {
             println!("{err:?}");
             panic!("failed to parse docs");
@@ -628,7 +628,7 @@ pub fn r#loop(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     let mut evaled_condition = eval(condition, env)?;
     while evaled_condition.expr != Expr::Bool(false) {
         evaled_condition = eval(condition, env)?;
-        result = eval(&arg, env)?;
+        result = eval(arg, env)?;
     }
     Ok(result)
 }
@@ -647,7 +647,7 @@ macro_rules! unwrap {
 }
 
 macro_rules! builtin {
-    ($name:ident, $func:expr, $type:ident) => {
+    ($name:ident, $symbol:tt, $type:ident) => {
         pub fn $name(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
             let maybe_head = args
                 .first()
@@ -657,7 +657,7 @@ macro_rules! builtin {
 
             for arg in &args[1..] {
                 let value = crate::unwrap!(&eval(arg, env)?, $type)?;
-                if $func(head, value) {
+                if head $symbol value {
                     continue;
                 }
                 return Ok((Expr::Bool(false), span).into());
@@ -667,10 +667,10 @@ macro_rules! builtin {
     };
 }
 
-builtin!(eq, |a: f64, b: f64| a == b, Number);
-builtin!(gt, |a: f64, b: f64| a > b, Number);
-builtin!(lt, |a: f64, b: f64| a < b, Number);
-builtin!(gte, |a: f64, b: f64| a >= b, Number);
-builtin!(lte, |a: f64, b: f64| a <= b, Number);
-builtin!(and, |a: bool, b: bool| a && b, Bool);
-builtin!(or, |a: bool, b: bool| a || b, Bool);
+builtin!(eq, ==,  Number);
+builtin!(gt, >,  Number);
+builtin!(lt, <,  Number);
+builtin!(gte, >=,  Number);
+builtin!(lte, <=,  Number);
+builtin!(and, &&,  Bool);
+builtin!(or, ||,  Bool);

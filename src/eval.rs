@@ -8,8 +8,8 @@ pub fn eval(expr: &Spanned<Expr>, env: &mut Env) -> EvalResult {
         Expr::Bool(_) => Ok(expr.clone()),
         Expr::Number(_) => Ok(expr.clone()),
         Expr::String(_) => Ok(expr.clone()),
-        Expr::Symbol(symbol) => eval_symbol(&symbol, env),
-        Expr::List(list) => eval_list(&list, env),
+        Expr::Symbol(symbol) => eval_symbol(symbol, env),
+        Expr::List(list) => eval_list(list, env),
         _ => unreachable!("invalid expr: {expr:?}"),
     }
 }
@@ -159,7 +159,7 @@ fn eval_define_lambda(lambda_span: Span, args: &[Spanned<Expr>]) -> EvalResult {
     let Some(Spanned {
         expr: Expr::List(params),
         span: params_span,
-    }) = args.get(0)
+    }) = args.first()
     else {
         return Err("lambda params must be a list".to_string());
     };
