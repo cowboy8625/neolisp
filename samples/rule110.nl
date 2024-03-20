@@ -107,13 +107,27 @@
 ; Loop
 (fn main ()
   (let
-    (grid (list 0 0 0 1))
-    ;      condition       body
-    (loop '(true) (
+    (grid (append (map (lambda (x) 0) (range 100)) '(1)))
+    (is-running true)
+    (loop is-running
       (var grid (next-generation grid))
-      (print grid "\n")
-    ))
+      ; (print grid)
+      (let
+        (line (to-string (map (lambda (x) (if (= x 1) "*" " ")) grid)))
+        (print line "\n")
+        ; (sleep 50)
+        )
+    )
   )
 )
+
+; Testing the creation of the grid
+(assert-eq
+  "    *" ; expected
+  (let
+    (grid (append (map (lambda (x) 0) (range 4)) '(1)))
+    (to-string (map (lambda (x) (if (= x 1) "*" " ")) grid)) ; actual
+  )
+  "to-string, grid: 0 0 0 0 1, returns 00001") ; description
 
 (main)

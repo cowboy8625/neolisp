@@ -163,16 +163,14 @@ fn eval_define_lambda(lambda_span: Span, args: &[Spanned<Expr>]) -> EvalResult {
     else {
         return Err("lambda params must be a list".to_string());
     };
-    let Some(Spanned {
-        expr: Expr::List(body),
-        span: body_span,
-    }) = args.get(1)
-    else {
-        return Err("lambda body must be a list".to_string());
+
+    let Some(body) = args.get(1) else {
+        return Err("lambda body missing".to_string());
     };
+
     let lambda = Lambda {
         params: Box::new((Expr::List(params.clone()), params_span).into()),
-        body: Box::new((Expr::List(body.clone()), body_span).into()),
+        body: Box::new(body.clone()),
     };
     Ok((Expr::Lambda(lambda), lambda_span).into())
 }

@@ -76,6 +76,8 @@ impl Env {
             init_builtin!(docs, "assert", assertnl),
             init_builtin!(docs, "assert-eq", assert_eqnl),
             init_builtin!(docs, "loop", r#loop),
+            init_builtin!(docs, sleep),
+            init_builtin!(docs, "to-string", to_string),
         ]);
         Self { data, outer: None }
     }

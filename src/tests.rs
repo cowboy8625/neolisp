@@ -723,6 +723,13 @@ test_eval!(
     TestingExpr::Symbol("x".to_string())
 );
 test_eval!(
+    eval_test_builtin_to_string,
+    r#"
+(to-string 1) ; returns -> "1"
+    "#,
+    TestingExpr::String("1".to_string())
+);
+test_eval!(
     fail,
     eval_test_builtin_assert,
     r#"

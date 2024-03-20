@@ -337,6 +337,24 @@
 (assert-eq 1 2 "1 is not equal than 2")
 ```
 
+### sleep
+- returns false
+- arguments
+   1. `Number` time to sleep in milliseconds
+- example:
+```lisp
+(sleep 1000) ; -> false
+```
+
+### to-string
+- return string representation in string form
+- arguments
+   1. `Number`, `Boolean`, `List`
+- example:
+```lisp
+(to-string 1000) ; -> "1000"
+```
+
 ## Adding Help message to function
 
 To add help message to a function, simply add a string after the function parameter in the signature.

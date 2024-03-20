@@ -608,9 +608,9 @@ pub fn assert_eqnl(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalRes
 }
 
 pub fn r#loop(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
-    if args.len() != 2 {
+    if args.len() < 2 {
         return Err(format!(
-            "{:?}: 'loop' requires two arguments but found {:?}",
+            "{:?}: 'loop' requires at lest two arguments but found {:?}",
             span,
             args.len()
         ));
@@ -622,15 +622,54 @@ pub fn r#loop(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     let Some(condition) = args.first() else {
         unreachable!("loop function");
     };
-    let Some(arg) = args.get(1) else {
-        return Err("loop requires second argument for body".to_string());
-    };
     let mut evaled_condition = eval(condition, env)?;
     while evaled_condition.expr != Expr::Bool(false) {
         evaled_condition = eval(condition, env)?;
-        result = eval(arg, env)?;
+        for arg in &args[1..] {
+            result = eval(arg, env)?;
+        }
     }
     Ok(result)
+}
+
+pub fn sleep(span: Span, args: &[Spanned<Expr>], _: &mut Env) -> EvalResult {
+    if args.len() != 1 {
+        return Err(format!("{:?}: 'sleep' requires one argument", span,));
+    }
+    let duration = match &args[0] {
+        Spanned {
+            expr: Expr::Number(n),
+            ..
+        } => *n as u64,
+        _ => {
+            return Err(format!(
+                "{:?}: 'sleep' requires one number argument but found {:?}",
+                span, args[0]
+            ))
+        }
+    };
+    std::thread::sleep(std::time::Duration::from_millis(duration));
+    Ok((Expr::Bool(true), span).into())
+}
+
+pub fn to_string(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
+    if args.len() != 1 {
+        return Err(format!(
+            "{:?}: 'to-string' requires one argument but found",
+            span
+        ));
+    }
+    let value = eval(&args[0], env)?;
+    match value.expr {
+        Expr::Number(n) => Ok((Expr::String(n.to_string()), value.span).into()),
+        Expr::Bool(b) => Ok((Expr::String(b.to_string()), value.span).into()),
+        Expr::List(l) => Ok((
+            Expr::String(l.iter().map(|v| v.expr.to_string()).collect::<String>()),
+            value.span,
+        )
+            .into()),
+        _ => Err("to-string only works on numbers, booleans and lists".to_string()),
+    }
 }
 
 #[macro_export]
