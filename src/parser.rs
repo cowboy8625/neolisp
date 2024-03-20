@@ -1,17 +1,57 @@
-use chumsky::prelude::*;
-
 use crate::environment::Env;
 use crate::error::{Error, ErrorType};
+use chumsky::prelude::*;
 
-// TODO: make Expr remember index's for error handling
+pub type Span = std::ops::Range<usize>;
+#[derive(Debug, Clone, PartialEq)]
+pub struct Spanned<T>
+where
+    T: std::fmt::Display + std::fmt::Debug + Clone,
+{
+    pub expr: T,
+    pub span: Span,
+}
+
+impl<T> From<(T, Span)> for Spanned<T>
+where
+    T: std::fmt::Display + std::fmt::Debug + Clone,
+{
+    fn from((expr, span): (T, Span)) -> Self {
+        Self { expr, span }
+    }
+}
+
+impl<T> From<(T, &Span)> for Spanned<T>
+where
+    T: std::fmt::Display + std::fmt::Debug + Clone,
+{
+    fn from((expr, span): (T, &Span)) -> Self {
+        Self {
+            expr,
+            span: span.clone(),
+        }
+    }
+}
+
+impl<T> std::fmt::Display for Spanned<T>
+where
+    T: std::fmt::Display + std::fmt::Debug + Clone,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.expr)
+    }
+}
+
+pub type Builtin = fn(Span, &[Spanned<Expr>], &mut Env) -> Result<Spanned<Expr>, String>;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Bool(bool),
     String(String),
     Symbol(String),
     Number(f64),
-    List(Vec<Expr>),
-    Builtin(fn(&[Expr], &mut Env) -> Result<Expr, String>, String),
+    List(Vec<Spanned<Expr>>),
+    Builtin(Builtin, String),
     Func(Func),
     Lambda(Lambda),
 }
@@ -34,8 +74,8 @@ impl std::fmt::Display for Expr {
                 write!(f, ")")
             }
             Self::Builtin(b, _) => write!(f, "{b:?}"),
-            Self::Func(func) => write!(f, "{func:?}"),
-            Self::Lambda(func) => write!(f, "{func:?}"),
+            Self::Func(func) => write!(f, "{func}"),
+            Self::Lambda(func) => write!(f, "{func}"),
         }
     }
 }
@@ -43,60 +83,67 @@ impl std::fmt::Display for Expr {
 impl Expr {
     pub fn type_of(&self) -> String {
         match self {
-            Self::Bool(_) => "Bool".to_string(),
-            Self::String(_) => "String".to_string(),
-            Self::Symbol(_) => "Symbol".to_string(),
-            Self::Number(_) => "Number".to_string(),
-            Self::List(_) => "List".to_string(),
-            Self::Builtin(_, _) => "Builtin".to_string(),
-            Self::Func(_) => "Function".to_string(),
-            Self::Lambda(_) => "Lambda".to_string(),
+            Self::Bool(..) => "Bool".to_string(),
+            Self::String(..) => "String".to_string(),
+            Self::Symbol(..) => "Symbol".to_string(),
+            Self::Number(..) => "Number".to_string(),
+            Self::List(..) => "List".to_string(),
+            Self::Builtin(..) => "Builtin".to_string(),
+            Self::Func(..) => "Function".to_string(),
+            Self::Lambda(..) => "Lambda".to_string(),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Func {
-    pub name: Box<Expr>,
-    pub params: Box<Expr>,
-    pub body: Box<Expr>,
-    pub help_doc: Option<Box<Expr>>,
+    pub name: Box<Spanned<Expr>>,
+    pub params: Box<Spanned<Expr>>,
+    pub body: Box<Spanned<Expr>>,
+    pub help_doc: Option<Box<Spanned<Expr>>>,
 }
 
-impl From<Func> for Expr {
-    fn from(func: Func) -> Self {
-        Self::Func(func)
+impl std::fmt::Display for Func {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "(fn {} {} {})", self.name, self.params, self.body)
     }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Lambda {
-    pub params: Box<Expr>,
-    pub body: Box<Expr>,
+    pub params: Box<Spanned<Expr>>,
+    pub body: Box<Spanned<Expr>>,
 }
 
-impl From<Lambda> for Expr {
-    fn from(func: Lambda) -> Self {
-        Self::Lambda(func)
+impl std::fmt::Display for Lambda {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "(lambda {} {})", self.params, self.body)
     }
 }
 
-pub fn parse_expr() -> impl Parser<char, Expr, Error = Error> {
+pub fn parse_expr() -> impl Parser<char, Spanned<Expr>, Error = Error> {
     recursive(|expr| {
         let comment = just(';').then(take_until(just('\n'))).padded();
 
         let int = text::int(10);
 
-        let number = int.or(just('-').repeated().then(int).map(|(sign, num)|{
-            let sign = if sign.iter().count() % 2 == 0 { "" } else { "-" };
-            format!("{sign}{num}")
-        }))
-            .map(|s: String| Expr::Number(s.parse().unwrap()))
+        let number = int
+            .or(just('-').repeated().then(int).map(|(sign, num)| {
+                let sign = if sign.iter().count() % 2 == 0 {
+                    ""
+                } else {
+                    "-"
+                };
+                format!("{sign}{num}")
+            }))
+            .map_with_span(|s: String, span: Span| {
+                Spanned::from((Expr::Number(s.parse().unwrap()), span))
+            })
             .padded();
 
         let boolean = just("true")
-            .map(|_| Expr::Bool(true))
-            .or(just("false").map(|_| Expr::Bool(false)))
+            .map_with_span(|_, span| Spanned::from((Expr::Bool(true), span)))
+            .or(just("false").map_with_span(|_, span| (Expr::Bool(false), span).into()))
             .padded();
 
         let punctuation = one_of(r#"!$,_-./:;?+<=>#%&*@[\]{|}`^~"#);
@@ -106,7 +153,13 @@ pub fn parse_expr() -> impl Parser<char, Expr, Error = Error> {
         let symbol = choice((letters.clone(), punctuation.clone()))
             .then(choice((letters, punctuation, digit)).repeated())
             .padded()
-            .map(|(start, end)| Expr::Symbol(format!("{start}{}", end.iter().collect::<String>())));
+            .map_with_span(|(start, end), span| {
+                (
+                    Expr::Symbol(format!("{start}{}", end.iter().collect::<String>())),
+                    span,
+                )
+                    .into()
+            });
 
         let string = just('"')
             .ignore_then(
@@ -116,7 +169,7 @@ pub fn parse_expr() -> impl Parser<char, Expr, Error = Error> {
                     .collect::<String>()
                     .map(|s| s.replace("\\t", "\t"))
                     .map(|s| s.replace("\\n", "\n"))
-                    .map(|s| Expr::String(s)),
+                    .map_with_span(|s, span| (Expr::String(s), span).into()),
             )
             .then_ignore(just('"'))
             .padded();
@@ -131,7 +184,16 @@ pub fn parse_expr() -> impl Parser<char, Expr, Error = Error> {
         let quoted = just('\'')
             .ignore_then(atom.clone())
             .padded_by(comment.repeated())
-            .map(|e| Expr::List(vec![Expr::Symbol("quote".to_string()), e]));
+            .map_with_span(|e: Spanned<Expr>, span: Span| {
+                (
+                    Expr::List(vec![
+                        (Expr::Symbol("quote".to_string()), span.clone()).into(),
+                        e,
+                    ]),
+                    span,
+                )
+                    .into()
+            });
 
         let list = atom
             .repeated()
@@ -141,12 +203,12 @@ pub fn parse_expr() -> impl Parser<char, Expr, Error = Error> {
             )
             .padded_by(comment.repeated())
             .padded()
-            .map(Expr::List);
+            .map_with_span(|list, span| Spanned::from((Expr::List(list), span)));
 
         list.or(quoted)
     })
 }
 
-pub fn parser() -> impl Parser<char, Vec<Expr>, Error = Error> {
+pub fn parser() -> impl Parser<char, Vec<Spanned<Expr>>, Error = Error> {
     parse_expr().repeated().padded().then_ignore(end())
 }

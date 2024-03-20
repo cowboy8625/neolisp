@@ -1,10 +1,10 @@
 use crate::builtins::*;
-use crate::parser::Expr;
+use crate::parser::{Expr, Spanned};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
 pub struct Env {
-    pub data: HashMap<String, Expr>,
+    pub data: HashMap<String, Spanned<Expr>>,
     pub outer: Option<Box<Env>>,
 }
 
@@ -12,26 +12,32 @@ macro_rules! init_builtin {
     ($doc:ident, $symbol:expr, $name:ident) => {
         (
             $symbol.to_string(),
-            crate::parser::Expr::Builtin(
-                $name,
-                $doc.get($symbol)
-                    .expect(&format!("missing docs for builtin function: {}", $symbol))
-                    .to_string(),
-            ),
+            Spanned {
+                expr: crate::parser::Expr::Builtin(
+                    $name,
+                    $doc.get($symbol)
+                        .expect(&format!("missing docs for builtin function: {}", $symbol))
+                        .to_string(),
+                ),
+                span: 0..0,
+            },
         )
     };
     ($doc:ident, $name:ident) => {
         (
             stringify!($name).to_string(),
-            Expr::Builtin(
-                $name,
-                $doc.get(stringify!($name))
-                    .expect(&format!(
-                        "missing docs for builtin function: {}",
-                        stringify!($name)
-                    ))
-                    .to_string(),
-            ),
+            Spanned {
+                expr: Expr::Builtin(
+                    $name,
+                    $doc.get(stringify!($name))
+                        .expect(&format!(
+                            "missing docs for builtin function: {}",
+                            stringify!($name)
+                        ))
+                        .to_string(),
+                ),
+                span: 0..0,
+            },
         )
     };
 }

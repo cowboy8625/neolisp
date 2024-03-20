@@ -1,6 +1,6 @@
 use crate::environment::Env;
-use crate::eval::eval;
-use crate::parser::Expr;
+use crate::eval::{eval, EvalResult};
+use crate::parser::{Expr, Span, Spanned};
 use chumsky::prelude::*;
 use std::collections::HashMap;
 
@@ -57,10 +57,7 @@ pub fn load_doc() -> HashMap<String, String> {
 
 #[test]
 fn test_load_doc() {
-    eprintln!("Starting test_load_doc");
     let doc = load_doc();
-    let names = doc.keys().collect::<Vec<_>>();
-    eprintln!("{names:#?}");
     assert!(doc.contains_key("fn"));
     assert!(doc.contains_key("lambda"));
     assert!(doc.contains_key("var"));
@@ -100,93 +97,111 @@ fn get_number(expr: &Expr) -> Result<f64, String> {
     }
 }
 
-pub fn add(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+pub fn add(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     let mut sum = 0.0;
+    let end_span = args.last().map(|a| a.span.clone()).unwrap_or(span.clone());
     for arg in args {
         let i = eval(arg, env)?;
-        sum += get_number(&i)?;
+        sum += get_number(&i.expr)?;
     }
-    Ok(Expr::Number(sum))
+    Ok((Expr::Number(sum), span.start..end_span.end).into())
 }
 
-pub fn sub(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+pub fn sub(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     let h = args
         .first()
         .ok_or("sub requires at least one argument".to_string())?;
+    let end_span = args.last().map(|a| a.span.clone()).unwrap_or(span.clone());
     let eval_h = eval(h, env)?;
-    let head = get_number(&eval_h)?;
+    let head = get_number(&eval_h.expr)?;
     let mut sum = 0.0;
     for arg in &args[1..] {
         let i = eval(arg, env)?;
-        sum += get_number(&i)?;
+        sum += get_number(&i.expr)?;
     }
-    Ok(Expr::Number(head - sum))
+    Ok((Expr::Number(head - sum), span.start..end_span.end).into())
 }
 
-pub fn mul(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+pub fn mul(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     let mut product = 1.0;
+    let end_span = args.last().map(|a| a.span.clone()).unwrap_or(span.clone());
     for arg in args {
         let i = eval(arg, env)?;
-        product *= get_number(&i)?;
+        product *= get_number(&i.expr)?;
     }
-    Ok(Expr::Number(product))
+    Ok((Expr::Number(product), span.start..end_span.end).into())
 }
 
-pub fn div(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+pub fn div(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     let h = args
         .first()
         .ok_or("div requires at least one argument".to_string())?;
+    let end_span = args.last().map(|a| a.span.clone()).unwrap_or(span.clone());
     let eval_h = eval(h, env)?;
-    let head = get_number(&eval_h)?;
+    let head = get_number(&eval_h.expr)?;
     let mut sum = 1.0;
     for arg in &args[1..] {
         let i = eval(arg, env)?;
-        sum *= get_number(&i)?;
+        sum *= get_number(&i.expr)?;
     }
-    Ok(Expr::Number(head / sum))
+    Ok((Expr::Number(head / sum), span.start..end_span.end).into())
 }
 
-pub fn r#mod(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+pub fn r#mod(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     let h = args
         .first()
         .ok_or("mod requires at least one argument".to_string())?;
+    let end_span = args.last().map(|a| a.span.clone()).unwrap_or(span.clone());
     let eval_h = eval(h, env)?;
-    let head = get_number(&eval_h)?;
+    let head = get_number(&eval_h.expr)?;
     let mut sum = 1.0;
     for arg in &args[1..] {
         let i = eval(arg, env)?;
-        sum *= get_number(&i)?;
+        sum *= get_number(&i.expr)?;
     }
-    Ok(Expr::Number(head % sum))
+    Ok((Expr::Number(head % sum), span.start..end_span.end).into())
 }
 
-pub fn help(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+pub fn help(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     if args.is_empty() {
         return Err("help takes one argument".to_string());
     }
+    let end_span = args.last().map(|a| a.span.clone()).unwrap_or(span.clone());
 
-    if let Expr::Symbol(name) = &args[0] {
+    if let Expr::Symbol(name) = &args[0].expr {
         let Some(item) = env.data.get(name) else {
-            return Ok(Expr::String(format!("{name}: has no help docs")));
+            return Ok((
+                Expr::String(format!("{name}: has no help docs")),
+                span.start..end_span.end,
+            )
+                .into());
         };
-        match &item {
+        match &item.expr {
             Expr::Builtin(_, help_doc) => {
-                return Ok(Expr::String(help_doc.to_string()));
+                return Ok((Expr::String(help_doc.to_string()), span.start..end_span.end).into());
             }
             Expr::Func(func) if func.help_doc.is_some() => {
                 return Ok(*func.help_doc.clone().unwrap());
             }
             _ => {
-                return Ok(Expr::String(format!("{item}: has no help docs")));
+                return Ok((
+                    Expr::String(format!("{item}: has no help docs")),
+                    span.start..end_span.end,
+                )
+                    .into());
             }
         }
     }
-    Ok(Expr::String(format!("{:?}: has no help docs", args[0])))
+    Ok((
+        Expr::String(format!("{:?}: has no help docs", args[0])),
+        span.start..end_span.end,
+    )
+        .into())
 }
 
-pub fn print(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+pub fn print(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     if args.is_empty() {
-        return Err("print requires at least one argument".to_string());
+        return Err(format!("{span:?}: print requires at least one argument"));
     }
     for arg in args {
         print!("{}", eval(arg, env)?);
@@ -194,39 +209,46 @@ pub fn print(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
     Ok(args[0].clone())
 }
 
-pub fn type_of(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+pub fn type_of(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     let expr = args
         .first()
         .ok_or("typeof requires at least one argument".to_string())?;
-    let Expr::Symbol(_) = expr else {
-        return Ok(Expr::Symbol(expr.type_of()));
+    let end_span = args.last().map(|a| a.span.clone()).unwrap_or(span.clone());
+    let Expr::Symbol(_) = expr.expr else {
+        return Ok((Expr::Symbol(expr.expr.type_of()), expr.span.clone()).into());
     };
     let evaluated = eval(expr, env)?;
-    Ok(Expr::Symbol(evaluated.type_of()))
+    Ok((
+        Expr::Symbol(evaluated.expr.type_of()),
+        span.start..end_span.end,
+    )
+        .into())
 }
 
-pub fn list(args: &[Expr], _env: &mut Env) -> Result<Expr, String> {
-    Ok(Expr::List(args.to_vec()))
+pub fn list(span: Span, args: &[Spanned<Expr>], _env: &mut Env) -> EvalResult {
+    let end_span = args.last().map(|a| a.span.clone()).unwrap_or(span.clone());
+    Ok((Expr::List(args.to_vec()), span.start..end_span.end).into())
 }
 
-pub fn cons(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+pub fn cons(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     if args.len() != 2 {
         return Err("cons requires two arguments".to_string());
     }
-    let Expr::List(tail) = eval(&args[1], env)? else {
+    let end_span = args.last().map(|a| a.span.clone()).unwrap_or(span.clone());
+    let Expr::List(tail) = eval(&args[1], env)?.expr else {
         return Err("cons requires a list as the second argument".to_string());
     };
 
     let item = eval(&args[0], env)?;
     let new = vec![item].into_iter().chain(tail.iter().cloned());
-    Ok(Expr::List(new.collect()))
+    Ok((Expr::List(new.collect()), span.start..end_span.end).into())
 }
 
-pub fn car(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+pub fn car(_: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     if args.len() != 1 {
         return Err("car requires one argument".to_string());
     }
-    let Expr::List(head) = eval(&args[0], env)? else {
+    let Expr::List(head) = eval(&args[0], env)?.expr else {
         return Err("car requires a list to be the first and only argument".to_string());
     };
     let Some(head) = head.first() else {
@@ -235,102 +257,138 @@ pub fn car(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
     Ok(head.clone())
 }
 
-pub fn cdr(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+pub fn cdr(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     if args.len() != 1 {
         return Err("cdr requires one argument".to_string());
     }
-    let Expr::List(head) = eval(&args[0], env)? else {
+    let Expr::List(head) = eval(&args[0], env)?.expr else {
         return Err("cdr requires a list to be the first and only argument".to_string());
     };
     let Some(tail) = head.get(1..) else {
-        return Ok(Expr::List(vec![]));
+        return Ok((Expr::List(vec![]), span).into());
     };
-    Ok(Expr::List(tail.to_vec()))
+    let start_span = tail.first().map(|a| a.span.clone()).unwrap_or(span.clone());
+    let end_span = tail.last().map(|a| a.span.clone()).unwrap_or(start_span);
+    let span = span.start..end_span.end;
+    Ok((Expr::List(tail.to_vec()), span).into())
 }
 
-pub fn append(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+pub fn append(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     if args.is_empty() {
         return Err("append requires one argument".to_string());
     }
-    let Expr::List(head) = eval(&args[0], env)? else {
+    let end_span = args.last().map(|a| a.span.clone()).unwrap_or(span.clone());
+    let item = eval(&args[0], env)?;
+    let Expr::List(head) = item.expr else {
         return Err("append requires a list to be the first argument".to_string());
     };
     let mut result = head.clone();
     for arg in args[1..].iter() {
-        let Expr::List(tail) = eval(arg, env)? else {
+        let Expr::List(tail) = eval(arg, env)?.expr else {
             return Err("append requires List to be the arguments type".to_string());
         };
         result.extend(tail);
     }
-    Ok(Expr::List(result))
+    Ok((Expr::List(result), span.start..end_span.end).into())
 }
 
-pub fn reverse(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+pub fn reverse(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     if args.is_empty() {
         return Err("reverse requires one argument".to_string());
     }
-    let Expr::List(head) = eval(&args[0], env)? else {
+    let Expr::List(head) = eval(&args[0], env)?.expr else {
         return Err("reverse requires a list to be the argument".to_string());
     };
-    Ok(Expr::List(head.iter().rev().cloned().collect()))
+    Ok((Expr::List(head.iter().rev().cloned().collect()), span).into())
 }
 
-pub fn nth(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+pub fn nth(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     if args.len() != 2 {
-        return Err("nth requires two arguments".to_string());
+        return Err(format!("{span:?}: nth requires two arguments"));
     }
-    let Expr::List(head) = eval(&args[0], env)? else {
-        return Err("nth requires a list to be the first argument".to_string());
+    let evaled_list = eval(&args[0], env)?;
+    let Expr::List(head) = evaled_list.expr else {
+        return Err(format!(
+            "{:?}: nth requires a list to be the first argument but found {:?}",
+            evaled_list.span, evaled_list.expr
+        ));
     };
-    let Expr::Number(index) = eval(&args[1], env)? else {
-        return Err("nth requires a number to be the second argument".to_string());
+    let evaled = eval(&args[1], env)?;
+    let Expr::Number(index) = evaled.expr else {
+        return Err(format!(
+            "{:?}: nth requires a number to be the second argument but found {:?}",
+            evaled.span, evaled.expr
+        ));
     };
     let index = index as usize;
     if index >= head.len() {
-        return Err("nth index out of bounds".to_string());
+        return Err(format!(
+            "{:?}: nth index out of bounds, list length is {} but index is {}",
+            evaled.span,
+            head.len(),
+            evaled.expr
+        ));
     }
     Ok(head[index].clone())
 }
 
-pub fn length(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+pub fn length(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     if args.len() != 1 {
-        return Err("length requires one argument".to_string());
+        return Err(format!("{span:?}: length requires one argument"));
     }
-    let Expr::List(head) = eval(&args[0], env)? else {
-        return Err("length requires a list to be the first argument".to_string());
+    let evaled = eval(&args[0], env)?;
+    let Expr::List(head) = evaled.expr else {
+        return Err(format!(
+            "{:?}: length requires a list to be the first argument but found {:?}",
+            evaled.span, evaled.expr
+        ));
     };
-    Ok(Expr::Number(head.len() as f64))
+    Ok((Expr::Number(head.len() as f64), span).into())
 }
 
-pub fn map(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+pub fn map(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     if args.len() != 2 {
-        return Err("map requires two arguments".to_string());
+        return Err(format!("{span:?}: map requires two arguments"));
     }
-    let Expr::List(list) = eval(&args[1], env)? else {
-        return Err("map requires a list as second argument".to_string());
+    let evaled_list = eval(&args[1], env)?;
+    let Expr::List(list) = evaled_list.expr else {
+        return Err(format!(
+            "{:?}: map requires a list as second argument but found {:?}",
+            evaled_list.span, evaled_list
+        ));
     };
-    let (params, body) = match eval(&args[0], env)? {
+    let evaled_func = eval(&args[0], env)?;
+    let (params, body) = match evaled_func.expr {
         Expr::Lambda(lambda) => (*lambda.params, lambda.body),
         Expr::Func(func) => (*func.params, func.body),
         Expr::Builtin(func, _) => {
             let mut new_list = vec![];
             for item in list {
-                let new_item = func(&[item.clone()], env)?;
+                let new_item = func(evaled_func.span.clone(), &[item.clone()], env)?;
                 new_list.push(new_item);
             }
-            return Ok(Expr::List(new_list));
+            return Ok((Expr::List(new_list), span).into());
         }
-        _ => return Err("map requires a function as first argument".to_string()),
+        _ => {
+            return Err(format!(
+                "{:?}: map requires a function as first argument but found {:?}",
+                evaled_func.span, evaled_func.expr
+            ))
+        }
     };
 
-    let Expr::List(params) = params else {
+    let Expr::List(params) = params.expr else {
         unreachable!("there is a bug in eval on lambda or func");
     };
 
     let mut new_list = vec![];
     let mut inner_env = env.clone();
     for item in list {
-        let Some(Expr::Symbol(param)) = params.first() else {
+        let Some(Spanned {
+            expr: Expr::Symbol(param),
+            ..
+        }) = params.first()
+        else {
             return Err("map requires a lambda function with one argument".to_string());
         };
 
@@ -338,52 +396,83 @@ pub fn map(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
         let new_item = eval(&body, &mut inner_env)?;
         new_list.push(new_item);
     }
-    Ok(Expr::List(new_list))
+    Ok((Expr::List(new_list), span).into())
 }
 
-pub fn not(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
-    let Expr::Bool(b) = eval(&args[0], env)? else {
-        return Err("not requires a boolean".to_string());
+pub fn not(_: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
+    let evaled_arg = eval(&args[0], env)?;
+    let Expr::Bool(b) = evaled_arg.expr else {
+        return Err(format!(
+            "{:?}: 'not' function requires a boolean as arguments but found {:?}",
+            evaled_arg.span, evaled_arg.expr
+        ));
     };
-    Ok(Expr::Bool(!b))
+    Ok((Expr::Bool(!b), evaled_arg.span).into())
 }
 
-pub fn fold(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+pub fn fold(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     let acc_index = 0;
     let func_index = 1;
     let list_index = 2;
 
     if args.len() != 3 {
-        return Err("fold requires three arguments".to_string());
+        return Err(format!(
+            "{span:?}: 'fold' function requires three arguments but found {}",
+            args.iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(",")
+        ));
     }
-    let Expr::List(list) = eval(&args[list_index], env)? else {
-        return Err("fold requires a list as second argument".to_string());
+    let evaled_list = eval(&args[list_index], env)?;
+    let Expr::List(list) = evaled_list.expr else {
+        // Start Back here with format
+        return Err(format!(
+            "{:?}: 'fold' function requires a list as second argument but found {:?}",
+            evaled_list.span, evaled_list.expr
+        ));
     };
-    let (params, body) = match eval(&args[func_index], env)? {
+    let evaled_func = eval(&args[func_index], env)?;
+    let (spanned_params, body) = match evaled_func.expr {
         Expr::Lambda(lambda) => (*lambda.params, lambda.body),
         Expr::Func(func) => (*func.params, func.body),
         Expr::Builtin(func, _) => {
             let mut acc = eval(&args[acc_index], env)?;
             for item in list {
-                acc = func(&[acc, item.clone()], env)?;
+                acc = func(evaled_func.span.clone(), &[acc, item.clone()], env)?;
             }
             return Ok(acc);
         }
-        _ => return Err("fold requires a function as first argument".to_string()),
+        _ => {
+            return Err(format!(
+                "{:?}: 'fold' requires a function as first argument but found {:?}",
+                evaled_func.span, evaled_func.expr
+            ))
+        }
     };
-    let Expr::List(params) = params else {
+    let Expr::List(params) = spanned_params.expr else {
         unreachable!("there is a bug in eval on lambda or func");
     };
 
-    let Some(Expr::Symbol(acc)) = params.first() else {
-        return Err(
-            "fold requires a function with two argument, missing first argument".to_string(),
-        );
+    let Some(Spanned {
+        expr: Expr::Symbol(acc),
+        ..
+    }) = params.first()
+    else {
+        return Err(format!(
+            "{:?}: fold requires a function with two argument, missing first argument",
+            spanned_params.span
+        ));
     };
-    let Some(Expr::Symbol(item)) = params.get(1) else {
-        return Err(
-            "fold requires a function with two argument, missing second argument".to_string(),
-        );
+    let Some(Spanned {
+        expr: Expr::Symbol(item),
+        ..
+    }) = params.get(1)
+    else {
+        return Err(format!(
+            "{:?}: 'fold' function requires two argument but found only one",
+            spanned_params.span
+        ));
     };
 
     let mut inner_env = env.clone();
@@ -396,29 +485,40 @@ pub fn fold(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
     Ok(acc_value)
 }
 
-pub fn filter(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+pub fn filter(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     if args.len() != 2 {
-        return Err("filter requires two arguments".to_string());
+        return Err(format!(
+            "{span:?}: 'filter' function requires three arguments but found {}",
+            args.iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join(",")
+        ));
     }
-    let Expr::List(list) = eval(&args[1], env)? else {
-        return Err("filter requires a list as second argument".to_string());
+    let evaled_list = eval(&args[1], env)?;
+    let Expr::List(list) = evaled_list.expr else {
+        return Err(format!(
+            "{:?}: 'filter' function requires a list as second argument but found {:?}",
+            evaled_list.span, evaled_list.expr
+        ));
     };
-    let (params, body) = match eval(&args[0], env)? {
+    let evaled_func = eval(&args[0], env)?;
+    let (spanned_params, body) = match evaled_func.expr {
         Expr::Lambda(lambda) => (*lambda.params, lambda.body),
         Expr::Func(func) => (*func.params, func.body),
         Expr::Builtin(func, _) => {
             let mut new_list = vec![];
             for item in list {
-                let new_item = func(&[item.clone()], env)?;
-                if matches!(new_item, Expr::Bool(true)) {
+                let new_item = func(evaled_func.span.clone(), &[item.clone()], env)?;
+                if matches!(new_item.expr, Expr::Bool(true)) {
                     new_list.push(item.clone());
                 }
             }
-            return Ok(Expr::List(new_list));
+            return Ok((Expr::List(new_list), evaled_func.span.clone()).into());
         }
         _ => return Err("filter requires a function as first argument".to_string()),
     };
-    let Expr::List(params) = params else {
+    let Expr::List(params) = spanned_params.expr else {
         unreachable!("there is a bug in eval on lambda or func");
     };
     let mut new_list = vec![];
@@ -426,46 +526,70 @@ pub fn filter(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
     for item in list {
         inner_env.data.insert(params[0].to_string(), item.clone());
         let new_item = eval(&body, &mut inner_env)?;
-        if matches!(new_item, Expr::Bool(true)) {
+        if matches!(new_item.expr, Expr::Bool(true)) {
             new_list.push(item.clone());
         }
     }
-    Ok(Expr::List(new_list))
+    let start_span = new_list
+        .first()
+        .map(|a| a.span.clone())
+        .unwrap_or(span.clone());
+    let end_span = new_list
+        .last()
+        .map(|a| a.span.clone())
+        .unwrap_or(span.clone());
+    let new_span = start_span.start..end_span.end;
+    Ok((Expr::List(new_list), new_span).into())
 }
 
-pub fn assertnl(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+pub fn assertnl(_: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     if args.is_empty() {
         return Err("assertnl requires one argument".to_string());
     }
 
     let msg = match &args.get(1) {
-        Some(Expr::String(s)) => s,
+        Some(Spanned {
+            expr: Expr::String(s),
+            ..
+        }) => s,
         _ => "",
     };
 
-    let Expr::Bool(b) = eval(&args[0], env)? else {
+    let condition = eval(&args[0], env)?;
+    let Expr::Bool(b) = condition.expr else {
         return Err("assertnl requires a boolean".to_string());
     };
 
     if b {
-        Ok(Expr::Bool(true))
+        Ok((Expr::Bool(true), condition.span).into())
     } else {
         eprintln!("{}", msg);
         Err("assertnl failed".to_string())
     }
 }
 
-pub fn assert_eqnl(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+pub fn assert_eqnl(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     if args.len() < 2 {
-        return Err("assert_eqnl requires at lest two arguments".to_string());
+        return Err(format!(
+            "{:?}: 'assert-eq' requires at lest two arguments but found {}",
+            span,
+            args.len()
+        ));
     }
 
     let msg = match &args.last() {
-        Some(Expr::String(s)) => s,
+        Some(Spanned {
+            expr: Expr::String(s),
+            ..
+        }) => s,
         _ => "",
     };
-    if msg.is_empty() && args.len() == 2 {
-        return Err("assert_eqnl requires at lest two arguments".to_string());
+
+    if !msg.is_empty() && args.len() == 2 {
+        return Err(format!(
+            "{:?}: 'assert-eq' requires at lest two arguments",
+            span
+        ));
     }
     let value = eval(&args[0], env)?;
     let end = if msg.is_empty() {
@@ -480,21 +604,30 @@ pub fn assert_eqnl(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
             return Err(format!("{} is not equal to {}", value, eval_arg));
         }
     }
-    Ok(Expr::Bool(true))
+    Ok((Expr::Bool(true), span).into())
 }
 
-pub fn r#loop(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+pub fn r#loop(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     if args.len() != 2 {
-        return Err("loop requires two arguments".to_string());
+        return Err(format!(
+            "{:?}: 'loop' requires two arguments but found {:?}",
+            span,
+            args.len()
+        ));
     }
-    let mut result = Expr::List(vec![]);
+    let mut result = Spanned {
+        expr: Expr::List(vec![]),
+        span,
+    };
     let Some(condition) = args.first() else {
-        return Err("loop requires two argument".to_string());
+        unreachable!("loop function");
     };
     let Some(arg) = args.get(1) else {
         return Err("loop requires second argument for body".to_string());
     };
-    while eval(condition, env)? != Expr::Bool(false) {
+    let mut evaled_condition = eval(condition, env)?;
+    while evaled_condition.expr != Expr::Bool(false) {
+        evaled_condition = eval(condition, env)?;
         result = eval(&arg, env)?;
     }
     Ok(result)
@@ -504,7 +637,10 @@ pub fn r#loop(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
 macro_rules! unwrap {
     ($expr:expr, $name:ident) => {{
         match $expr {
-            Expr::$name(n) => Ok(*n),
+            Spanned {
+                expr: Expr::$name(n),
+                ..
+            } => Ok(*n),
             e => Err(format!("{e:?} expected a {}", stringify!($name))),
         }
     }};
@@ -512,7 +648,7 @@ macro_rules! unwrap {
 
 macro_rules! builtin {
     ($name:ident, $func:expr, $type:ident) => {
-        pub fn $name(args: &[Expr], env: &mut Env) -> Result<Expr, String> {
+        pub fn $name(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
             let maybe_head = args
                 .first()
                 .ok_or("sub requires at least one argument".to_string())?;
@@ -524,9 +660,9 @@ macro_rules! builtin {
                 if $func(head, value) {
                     continue;
                 }
-                return Ok(Expr::Bool(false));
+                return Ok((Expr::Bool(false), span).into());
             }
-            Ok(Expr::Bool(true))
+            Ok((Expr::Bool(true), span).into())
         }
     };
 }
