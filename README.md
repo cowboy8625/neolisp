@@ -50,6 +50,10 @@ To get started with NeoLisp, follow these steps:
 '(10 20 30) ;;  -> (10 20 30)
 ```
 
+## Examples
+[Fibonacci](./samples/fib.nl)
+[Rule110](./samples/rule110.nl)
+
 ## Installation
 
 To install NeoLisp, simply run `cargo install --path .` from your terminal while in the `neolisp` directory.
