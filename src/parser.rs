@@ -3,13 +3,22 @@ use crate::error::{Error, ErrorType};
 use chumsky::prelude::*;
 
 pub type Span = std::ops::Range<usize>;
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Spanned<T>
 where
     T: std::fmt::Display + std::fmt::Debug + Clone,
 {
     pub expr: T,
     pub span: Span,
+}
+
+impl<T> PartialEq for Spanned<T>
+where
+    T: std::fmt::Display + std::fmt::Debug + Clone + PartialEq,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.expr == other.expr
+    }
 }
 
 impl<T> From<(T, Span)> for Spanned<T>
