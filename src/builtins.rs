@@ -225,9 +225,13 @@ pub fn type_of(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult 
         .into())
 }
 
-pub fn list(span: Span, args: &[Spanned<Expr>], _env: &mut Env) -> EvalResult {
+pub fn list(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     let end_span = args.last().map(|a| a.span.clone()).unwrap_or(span.clone());
-    Ok((Expr::List(args.to_vec()), span.start..end_span.end).into())
+    let mut evaluated_args = Vec::new();
+    for arg in args {
+        evaluated_args.push(eval(arg, env)?);
+    }
+    Ok((Expr::List(evaluated_args), span.start..end_span.end).into())
 }
 
 pub fn cons(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
@@ -248,29 +252,57 @@ pub fn car(_: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     if args.len() != 1 {
         return Err("car requires one argument".to_string());
     }
-    let Expr::List(head) = eval(&args[0], env)?.expr else {
-        return Err("car requires a list to be the first and only argument".to_string());
-    };
-    let Some(head) = head.first() else {
-        return Err("car requires a list with at least one element".to_string());
-    };
-    Ok(head.clone())
+    let item = eval(&args[0], env)?;
+    match item.expr {
+        Expr::List(list) => {
+            let Some(head) = list.first() else {
+                return Ok((Expr::Bool(false), item.span).into());
+            };
+            Ok(head.clone())
+        }
+        Expr::String(head) => {
+            let Some(head) = head.chars().next() else {
+                return Ok((Expr::Bool(false), item.span).into());
+            };
+            Ok((Expr::String(head.to_string()), item.span.clone()).into())
+        }
+        _ => {
+            return Err(format!("{:?}: car requires a list or string to be the first and only argument but found {:?}", item.span, item.expr));
+        }
+    }
 }
 
 pub fn cdr(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     if args.len() != 1 {
         return Err("cdr requires one argument".to_string());
     }
-    let Expr::List(head) = eval(&args[0], env)?.expr else {
-        return Err("cdr requires a list to be the first and only argument".to_string());
-    };
-    let Some(tail) = head.get(1..) else {
-        return Ok((Expr::List(vec![]), span).into());
-    };
-    let start_span = tail.first().map(|a| a.span.clone()).unwrap_or(span.clone());
-    let end_span = tail.last().map(|a| a.span.clone()).unwrap_or(start_span);
-    let span = span.start..end_span.end;
-    Ok((Expr::List(tail.to_vec()), span).into())
+    let item = eval(&args[0], env)?;
+    match item.expr {
+        Expr::List(list) => {
+            let Some(tail) = list.get(1..) else {
+                return Ok((Expr::Bool(false), item.span).into());
+            };
+            let start_span = tail
+                .first()
+                .map(|a| a.span.clone())
+                .unwrap_or(item.span.clone());
+            let end_span = tail.last().map(|a| a.span.clone()).unwrap_or(start_span);
+            let span = span.start..end_span.end;
+            Ok((Expr::List(tail.to_vec()), span).into())
+        }
+        Expr::String(head) => {
+            let Some(tail) = head.get(1..) else {
+                return Ok((Expr::Bool(false), item.span).into());
+            };
+            let start = item.span.start + 1;
+            let end = item.span.end;
+            Ok((Expr::String(tail.to_string()), start..end).into())
+        }
+        _ => Err(format!(
+            "{:?}: cdr requires a list or string to be the first and only argument but found {:?}",
+            item.span, item.expr
+        )),
+    }
 }
 
 pub fn append(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
@@ -655,8 +687,9 @@ pub fn sleep(span: Span, args: &[Spanned<Expr>], _: &mut Env) -> EvalResult {
 pub fn to_string(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     if args.len() != 1 {
         return Err(format!(
-            "{:?}: 'to-string' requires one argument but found",
-            span
+            "{:?}: 'to-string' requires one argument but found {:?}",
+            span,
+            args.len()
         ));
     }
     let value = eval(&args[0], env)?;
@@ -670,6 +703,61 @@ pub fn to_string(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResul
             .into()),
         _ => Err("to-string only works on numbers, booleans and lists".to_string()),
     }
+}
+
+pub fn split_string(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
+    if args.len() != 2 {
+        return Err(format!(
+            "{:?}: 'split' requires two argument but found {:?}",
+            span,
+            args.len()
+        ));
+    }
+
+    let spanned_seperator = eval(&args[0], env)?;
+    let Expr::String(seperator) = &spanned_seperator.expr else {
+        return Err(format!(
+            "{:?}: split only works on strings but found {:?}",
+            span, spanned_seperator
+        ));
+    };
+
+    let spanned_string = eval(&args[1], env)?;
+    let Expr::String(string) = &spanned_string.expr else {
+        return Err(format!(
+            "{:?}: split only works on strings but found {:?}",
+            span, spanned_seperator
+        ));
+    };
+    Ok((
+        Expr::List(
+            string
+                .split(seperator)
+                .map(|s| (Expr::String(s.to_string()), span.clone()).into())
+                .collect::<Vec<_>>(),
+        ),
+        span,
+    )
+        .into())
+}
+
+pub fn is_number(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
+    if args.len() != 1 {
+        return Err(format!(
+            "{:?}: 'number?' requires one argument but found {:?}",
+            span,
+            args.len()
+        ));
+    }
+
+    let spanned_maybe_number = eval(&args[0], env)?;
+    let value = match spanned_maybe_number.expr {
+        Expr::String(value) if value.parse::<f64>().is_ok() => true,
+        Expr::Symbol(value) if value.parse::<f64>().is_ok() => true,
+        Expr::Number(_) => true,
+        _ => false,
+    };
+    Ok((Expr::Bool(value), spanned_maybe_number.span).into())
 }
 
 #[macro_export]

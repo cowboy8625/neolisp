@@ -589,18 +589,32 @@ test_eval!(
     ])
 );
 test_eval!(
-    eval_test_builtin_car,
+    eval_test_builtin_car_list,
     r#"
 (car (list 321 123))
     "#,
     TestingExpr::Number(321.0)
 );
 test_eval!(
-    eval_test_builtin_cdr,
+    eval_test_builtin_car_string,
+    r#"
+(car "Hello World") ; -> "H"
+    "#,
+    TestingExpr::String("H".to_string())
+);
+test_eval!(
+    eval_test_builtin_cdr_list,
     r#"
 (cdr (list 321 123))
     "#,
     TestingExpr::List(vec![TestingExpr::Number(123.0)])
+);
+test_eval!(
+    eval_test_builtin_cdr_string,
+    r#"
+(cdr "Hello World") ; -> "ello World"
+    "#,
+    TestingExpr::String("ello World".to_string())
 );
 test_eval!(
     eval_test_builtin_append,
@@ -729,6 +743,42 @@ test_eval!(
     "#,
     TestingExpr::String("1".to_string())
 );
+
+test_eval!(
+    eval_test_builtin_split_string,
+    r#"
+(split " " "(+ 1 1)") ; ->  ("(+" "1" "1)")
+    "#,
+    TestingExpr::List(vec![
+        TestingExpr::String("(+".to_string()),
+        TestingExpr::String("1".to_string()),
+        TestingExpr::String("1)".to_string()),
+    ])
+);
+
+test_eval!(
+    eval_test_builtin_is_number,
+    r#"
+
+(list
+    (number? 10) ; -> true
+    (number? "10") ; -> true
+    (number? "abc") ; -> false
+    (number? '(1 2 3)) ; -> false
+)
+    "#,
+    TestingExpr::List(vec![
+        TestingExpr::Bool(true),
+        TestingExpr::Bool(true),
+        TestingExpr::Bool(false),
+        TestingExpr::Bool(false),
+    ])
+);
+
+// ----------------------------------
+// |       Test For Debugging       |
+// ----------------------------------
+
 test_eval!(
     fail,
     eval_test_builtin_assert,
@@ -743,16 +793,3 @@ test_eval!(
 (assert 1 2 "1 is not 1 equal than 2")
     "#
 );
-// ----------------------------------
-// |       Test For Debugging       |
-// ----------------------------------
-
-// #[test]
-// fn test_debug() {
-//     let src = include_str!("../test.nlisp");
-//     let ast = parser().parse(src).unwrap();
-//     let mut env = Env::new();
-//     for node in ast {
-//         eval(&node, &mut env).unwrap();
-//     }
-// }

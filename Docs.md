@@ -203,21 +203,23 @@
 ```
 
 ### car
-- returns the first element of a list
+- returns the first element of a list or string
 - argument
-   1. List
+   1. `List` | `String`
 - example:
 ```lisp
 (car (list 1 2 3)) ; -> 1
+(car "hello") ; -> "h"
 ```
 
 ### cdr
-- returns a list without the first element
+- returns a list or string without the first element
 - argument
    1. List
 - example:
 ```lisp
 (cdr (list 1 2 3)) ; -> (2 3)
+(cdr "hello") ; -> "ello"
 ```
 
 ### append
@@ -353,6 +355,50 @@
 - example:
 ```lisp
 (to-string 1000) ; -> "1000"
+```
+
+### split
+- return list of string split by separator
+- arguments
+   1. `String` separator
+   1. `String` string to split
+- example:
+```lisp
+(split " " "(+ 1 1)") ; ->  ("(+" "1" "1)")
+```
+
+### join
+- return string joined by separator
+- arguments
+   1. `String` separator
+   1. `List` list of string
+- example:
+```lisp
+(join " " (list "1" "2" "3")) ; -> "1 2 3"
+```
+
+### number?
+- return true if the argument is a number
+- arguments
+   1. `Any`
+- example:
+```lisp
+(number? 10) ; -> true
+(number? "10") ; -> true
+(number? "abc") ; -> false
+(number? '(1 2 3)) ; -> false
+```
+
+### atom?
+- return true if the argument is an atom
+- arguments
+   1. `Any`
+- example:
+```lisp
+(atom? 10) ; -> true
+(atom? "10") ; -> true
+(atom? "abc") ; -> true
+(atom? '(1 2 3)) ; -> false
 ```
 
 ## Adding Help message to function

@@ -78,6 +78,8 @@ impl Env {
             init_builtin!(docs, "loop", r#loop),
             init_builtin!(docs, sleep),
             init_builtin!(docs, "to-string", to_string),
+            init_builtin!(docs, "split", split_string),
+            init_builtin!(docs, "number?", is_number),
         ]);
         Self { data, outer: None }
     }
