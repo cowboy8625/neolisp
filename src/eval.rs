@@ -1,5 +1,5 @@
+use crate::ast::{Expr, Func, Lambda, Span, Spanned};
 use crate::environment::Env;
-use crate::parser::{Expr, Func, Lambda, Span, Spanned};
 
 pub type EvalResult = Result<Spanned<Expr>, String>;
 
@@ -9,7 +9,7 @@ pub fn eval(expr: &Spanned<Expr>, env: &mut Env) -> EvalResult {
         Expr::Number(_) => Ok(expr.clone()),
         Expr::String(_) => Ok(expr.clone()),
         Expr::Symbol(symbol) => eval_symbol(symbol, env),
-        Expr::List(list) => eval_list(list, env),
+        Expr::List(list) => eval_list(expr.span.clone(), list, env),
         _ => unreachable!("invalid expr: {expr:?}"),
     }
 }
@@ -32,14 +32,14 @@ fn eval_symbol(symbol: &str, env: &mut Env) -> EvalResult {
     }
 }
 
-fn eval_list(expr: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
+fn eval_list(span: Span, expr: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     let Some(head) = expr.first() else {
         return Err("empty list are not allowed".to_string());
     };
     let args = &expr[1..];
     match &head.expr {
         Expr::Symbol(symbol) if symbol == "var" => eval_define_variable(args, env),
-        Expr::Symbol(symbol) if symbol == "let" => eval_define_let(args, env),
+        Expr::Symbol(symbol) if symbol == "let" => eval_define_let(span.clone(), args, env),
         Expr::Symbol(symbol) if symbol == "if" => eval_if(args, env),
         Expr::Symbol(symbol) if symbol == "lambda" => eval_define_lambda(head.span.clone(), args),
         Expr::Symbol(symbol) if symbol == "fn" => eval_define_fn(head.span.clone(), args, env),
@@ -134,15 +134,33 @@ fn eval_define_variable(args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     Ok(name.clone())
 }
 
-fn eval_define_let(args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
-    if args.len() < 2 {
-        return Err("let requires at least two arguments".to_string());
+fn eval_define_let(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
+    if args.len() != 2 {
+        return Err(format!(
+            "{:?}: let requires two arguments but found {}",
+            span,
+            args.len()
+        ));
     }
-    let Some(last) = args.last() else {
-        return Err("empty list are not allowed in let definition".to_string());
+
+    let Some(spanned_first) = args.first() else {
+        unreachable!("parser bug,  or eval bug for let blocks first");
     };
+
+    let Some(body) = args.last() else {
+        unreachable!("parser bug,  or eval bug for let blocks last");
+    };
+
+    let Expr::List(first) = &spanned_first.expr else {
+        return Err(format!(
+            "{:?}: let arguments must be a list but found {:?}",
+            span, spanned_first.expr
+        ));
+    };
+
     let mut new_env = env.clone();
-    for arg in &args[0..args.len() - 1] {
+
+    for arg in first {
         let Spanned {
             expr: Expr::List(list),
             ..
@@ -152,7 +170,7 @@ fn eval_define_let(args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
         };
         eval_define_variable(list, &mut new_env)?;
     }
-    eval(last, &mut new_env)
+    eval(body, &mut new_env)
 }
 
 fn eval_define_lambda(lambda_span: Span, args: &[Spanned<Expr>]) -> EvalResult {

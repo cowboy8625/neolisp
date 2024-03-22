@@ -54,9 +54,38 @@ pub fn run(args: Cli) -> Result<()> {
         }
         rl.add_history_entry(input.as_str())?;
 
+        // Run command
         match input.as_str() {
             ":q" => break,
             ":help" => println!("{HELP}"),
+            ":clear" => rl.clear_history()?,
+            ":env" => {
+                println!("Environment:");
+                let mut e = Vec::new();
+                for (k, v) in &env.data {
+                    e.push(format!("{k} : {}", v.expr.type_of()));
+                }
+                e.sort();
+                let max = e
+                    .iter()
+                    .map(|a| a.split_once(':').unwrap().0.len())
+                    .max()
+                    .unwrap_or_default();
+                println!(
+                    "{}",
+                    e.iter()
+                        .filter_map(|x| x.split_once(':'))
+                        .map(|(k, v)| format!("{k:>max$} : {v}"))
+                        .collect::<Vec<String>>()
+                        .join("\n")
+                );
+            }
+            _ => (),
+        }
+
+        // Ignore commands
+        match input.as_str() {
+            ":q" | ":help" | ":clear" | ":env" => continue,
             _ => (),
         }
 

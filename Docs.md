@@ -368,6 +368,7 @@
 ```
 
 ### join
+- NOT IMPLEMENTED
 - return string joined by separator
 - arguments
    1. `String` separator
@@ -375,6 +376,15 @@
 - example:
 ```lisp
 (join " " (list "1" "2" "3")) ; -> "1 2 3"
+```
+
+### do
+- Evaluate all the elements of the list and return the final evaluated element.
+- arguments
+   1. `List`
+- example:
+```lisp
+(do (print "hello")(+ 321 123)) ; -> 444
 ```
 
 ### number?
@@ -390,6 +400,7 @@
 ```
 
 ### atom?
+- NOT IMPLEMENTED
 - return true if the argument is an atom
 - arguments
    1. `Any`
@@ -400,6 +411,8 @@
 (atom? "abc") ; -> true
 (atom? '(1 2 3)) ; -> false
 ```
+
+
 
 ## Adding Help message to function
 

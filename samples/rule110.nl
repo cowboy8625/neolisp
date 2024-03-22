@@ -62,9 +62,9 @@
 ; Returns the state of the cells next generation
 (fn generation-of-cell (grid index)
   (let
-    (a (nth grid (get-cell grid (- index 1))))
+    ((a (nth grid (get-cell grid (- index 1))))
     (b (nth grid (get-cell grid index)))
-    (c (nth grid (get-cell grid (+ index 1))))
+    (c (nth grid (get-cell grid (+ index 1)))))
     (is-alive (cal-rule a b c))))
 
 (assert-eq
@@ -107,25 +107,20 @@
 ; Loop
 (fn main ()
   (let
-    (grid (append (map (lambda (x) 0) (range 100)) '(1)))
-    (is-running true)
+    ((grid (append (map (lambda (x) 0) (range 100)) '(1)))
+    (is-running true))
     (loop is-running
       (var grid (next-generation grid))
       ; (print grid)
       (let
-        (line (to-string (map (lambda (x) (if (= x 1) "*" " ")) grid)))
-        (print line "\n")
-        ; (sleep 50)
-        )
-    )
-  )
-)
+        ((line (to-string (map (lambda (x) (if (= x 1) "*" " ")) grid))))
+          (print line "\n")))))
 
 ; Testing the creation of the grid
 (assert-eq
   "    *" ; expected
   (let
-    (grid (append (map (lambda (x) 0) (range 4)) '(1)))
+    ((grid (append (map (lambda (x) 0) (range 4)) '(1))))
     (to-string (map (lambda (x) (if (= x 1) "*" " ")) grid)) ; actual
   )
   "to-string, grid: 0 0 0 0 1, returns 00001") ; description

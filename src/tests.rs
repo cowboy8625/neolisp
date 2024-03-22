@@ -1,6 +1,7 @@
+use crate::ast::{Builtin, Expr, Spanned};
 use crate::environment::Env;
 use crate::eval::eval;
-use crate::parser::{parse_expr, parser, Builtin, Expr, Spanned};
+use crate::parser::{parse_expr, parser};
 use chumsky::prelude::*;
 use pretty_assertions::assert_eq;
 
@@ -161,6 +162,11 @@ test_parser!(
     parse_test_string,
     r#"("hello")"#,
     TestingExpr::List(vec![TestingExpr::String("hello".to_string())])
+);
+test_parser!(
+    parse_test_string_empty,
+    r#"("")"#,
+    TestingExpr::List(vec![TestingExpr::String("".to_string())])
 );
 test_parser!(
     parse_test_string_newline,
@@ -464,8 +470,8 @@ test_eval!(
     r#"
 ; returns -> 3
 (let
-    (x 1)
-    (y 2)
+    ((x 1)
+    (y 2))
     (+ x y))
     "#,
     TestingExpr::Number(3.)
@@ -731,7 +737,7 @@ test_eval!(
 );
 test_eval!(
     eval_test_builtin_loop,
-    r#"(let (x 0) (loop (< x 3) (var x (+ x 1))))
+    r#"(let ((x 0)) (loop (< x 3) (var x (+ x 1))))
 ; returns -> (2)
     "#,
     TestingExpr::Symbol("x".to_string())
@@ -775,6 +781,13 @@ test_eval!(
     ])
 );
 
+test_eval!(
+    eval_test_builtin_do_block,
+    r#"
+(do (print "hello")(+ 321 123)) ; -> 444
+    "#,
+    TestingExpr::Number(444.0)
+);
 // ----------------------------------
 // |       Test For Debugging       |
 // ----------------------------------

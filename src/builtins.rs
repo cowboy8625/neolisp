@@ -1,6 +1,6 @@
+use crate::ast::{Expr, Span, Spanned};
 use crate::environment::Env;
 use crate::eval::{eval, EvalResult};
-use crate::parser::{Expr, Span, Spanned};
 use chumsky::prelude::*;
 use std::collections::HashMap;
 
@@ -369,13 +369,17 @@ pub fn length(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
         return Err(format!("{span:?}: length requires one argument"));
     }
     let evaled = eval(&args[0], env)?;
-    let Expr::List(head) = evaled.expr else {
-        return Err(format!(
-            "{:?}: length requires a list to be the first argument but found {:?}",
-            evaled.span, evaled.expr
-        ));
+    let len = match evaled.expr {
+        Expr::List(head) => head.len(),
+        Expr::String(head) => head.len(),
+        _ => {
+            return Err(format!(
+                "{:?}: length requires a list to be the first argument but found {:?}",
+                evaled.span, evaled.expr
+            ))
+        }
     };
-    Ok((Expr::Number(head.len() as f64), span).into())
+    Ok((Expr::Number(len as f64), span).into())
 }
 
 pub fn map(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
@@ -631,9 +635,15 @@ pub fn assert_eqnl(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalRes
     };
     for arg in &args[1..end] {
         let eval_arg = eval(arg, env)?;
-        if value != eval_arg {
+        if value.expr != eval_arg.expr {
             eprintln!("{}", msg);
-            return Err(format!("{} is not equal to {}", value, eval_arg));
+            return Err(format!(
+                "{:?}:{} is not equal to {:?}:{}",
+                value.expr,
+                value.expr.type_of(),
+                eval_arg.expr,
+                value.expr.type_of()
+            ));
         }
     }
     Ok((Expr::Bool(true), span).into())
@@ -758,6 +768,14 @@ pub fn is_number(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResul
         _ => false,
     };
     Ok((Expr::Bool(value), spanned_maybe_number.span).into())
+}
+
+pub fn do_statement(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
+    let mut result = (Expr::Bool(true), span).into();
+    for arg in args {
+        result = eval(arg, env)?;
+    }
+    Ok(result)
 }
 
 #[macro_export]
