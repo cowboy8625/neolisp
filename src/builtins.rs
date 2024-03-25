@@ -4,6 +4,48 @@ use crate::eval::{eval, EvalResult};
 use chumsky::prelude::*;
 use std::collections::HashMap;
 
+#[macro_export]
+macro_rules! unwrap {
+    ($expr:expr, $name:ident) => {{
+        match $expr {
+            Spanned {
+                expr: Expr::$name(n),
+                ..
+            } => Ok(*n),
+            e => Err(format!("{e:?} expected a {}", stringify!($name))),
+        }
+    }};
+}
+
+macro_rules! builtin {
+    ($name:ident, $symbol:tt, $type:ident) => {
+        pub fn $name(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
+            let maybe_head = args
+                .first()
+                .ok_or("sub requires at least one argument".to_string())?;
+
+            let head = crate::unwrap!(&eval(maybe_head, env)?, $type)?;
+
+            for arg in &args[1..] {
+                let value = crate::unwrap!(&eval(arg, env)?, $type)?;
+                if head $symbol value {
+                    continue;
+                }
+                return Ok((Expr::Bool(false), span).into());
+            }
+            Ok((Expr::Bool(true), span).into())
+        }
+    };
+}
+
+// builtin!(eq, ==,  Number);
+builtin!(gt, >,  Number);
+builtin!(lt, <,  Number);
+builtin!(gte, >=,  Number);
+builtin!(lte, <=,  Number);
+builtin!(and, &&,  Bool);
+builtin!(or, ||,  Bool);
+
 fn doc_parser() -> impl Parser<char, HashMap<String, String>, Error = Simple<char>> {
     let find_start = take_until(just("## Functions"));
 
@@ -387,12 +429,20 @@ pub fn map(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
         return Err(format!("{span:?}: map requires two arguments"));
     }
     let evaled_list = eval(&args[1], env)?;
-    let Expr::List(list) = evaled_list.expr else {
-        return Err(format!(
-            "{:?}: map requires a list as second argument but found {:?}",
-            evaled_list.span, evaled_list
-        ));
+    let list = match evaled_list.expr {
+        Expr::List(list) => list,
+        Expr::String(list) => list
+            .chars()
+            .map(|c| (Expr::String(c.to_string()), evaled_list.span.clone()).into())
+            .collect::<Vec<Spanned<Expr>>>(),
+        _ => {
+            return Err(format!(
+                "{:?}: map requires a list as second argument but found {:?}",
+                evaled_list.span, evaled_list
+            ))
+        }
     };
+
     let evaled_func = eval(&args[0], env)?;
     let (params, body) = match evaled_func.expr {
         Expr::Lambda(lambda) => (*lambda.params, lambda.body),
@@ -778,44 +828,66 @@ pub fn do_statement(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalRe
     Ok(result)
 }
 
-#[macro_export]
-macro_rules! unwrap {
-    ($expr:expr, $name:ident) => {{
-        match $expr {
-            Spanned {
-                expr: Expr::$name(n),
-                ..
-            } => Ok(*n),
-            e => Err(format!("{e:?} expected a {}", stringify!($name))),
-        }
-    }};
+pub fn eq(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
+    if args.len() < 2 {
+        return Err(format!(
+            "{:?}: '=' requires at least two argument but found {:?}",
+            span,
+            args.len()
+        ));
+    }
+    let left = eval(&args[0], env)?;
+    let result = args[1..].iter().all(|arg| {
+        let right = eval(arg, env).unwrap();
+        left.expr == right.expr
+    });
+    Ok((Expr::Bool(result), span).into())
 }
 
-macro_rules! builtin {
-    ($name:ident, $symbol:tt, $type:ident) => {
-        pub fn $name(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
-            let maybe_head = args
-                .first()
-                .ok_or("sub requires at least one argument".to_string())?;
+pub fn slice(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
+    if args.len() != 3 {
+        return Err(format!(
+            "{:?}: 'slice' requires three argument but found {:?}",
+            span,
+            args.len()
+        ));
+    }
+    let spanned_items = eval(&args[0], env)?;
+    let spanned_start = eval(&args[1], env)?;
+    let spanned_end = eval(&args[2], env)?;
+    let start = unwrap!(&spanned_start, Number)?;
+    let end = unwrap!(&spanned_end, Number)?;
+    let new_span = span.clone();
 
-            let head = crate::unwrap!(&eval(maybe_head, env)?, $type)?;
-
-            for arg in &args[1..] {
-                let value = crate::unwrap!(&eval(arg, env)?, $type)?;
-                if head $symbol value {
-                    continue;
-                }
-                return Ok((Expr::Bool(false), span).into());
-            }
-            Ok((Expr::Bool(true), span).into())
+    match spanned_items.expr {
+        Expr::List(items) => Ok((
+            Expr::List(
+                items
+                    .iter()
+                    .skip(start as usize)
+                    .take((end - start) as usize)
+                    .cloned()
+                    .collect::<Vec<_>>(),
+            ),
+            new_span,
+        )
+            .into()),
+        Expr::String(items) => Ok((
+            Expr::String(
+                items
+                    .chars()
+                    .skip(start as usize)
+                    .take((end - start) as usize)
+                    .collect::<String>(),
+            ),
+            new_span,
+        )
+            .into()),
+        _ => {
+            return Err(format!(
+                "{:?}: slice only works on lists but found {:?}",
+                spanned_items.span, spanned_items.expr
+            ));
         }
-    };
+    }
 }
-
-builtin!(eq, ==,  Number);
-builtin!(gt, >,  Number);
-builtin!(lt, <,  Number);
-builtin!(gte, >=,  Number);
-builtin!(lte, <=,  Number);
-builtin!(and, &&,  Bool);
-builtin!(or, ||,  Bool);

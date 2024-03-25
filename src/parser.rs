@@ -23,6 +23,24 @@ pub fn parse_expr() -> impl Parser<char, Spanned<Expr>, Error = Error> {
             .or(just("false").map_with_span(|_, span| (Expr::Bool(false), span).into()))
             .padded();
 
+        let string = one_of('"')
+            .ignore_then(
+                choice((
+                    none_of("\"\\").map(|c: char| c.to_string()),
+                    just("\\\"").map(|_| "\"".to_string()),
+                    just("\\'").map(|_| "'".to_string()),
+                    just("\\n").map(|_| "\n".to_string()),
+                    just("\\t").map(|_| "\t".to_string()),
+                    just("\\r").map(|_| "\r".to_string()),
+                    just("\\0").map(|_| "\0".to_string()),
+                    just("\\\\").map(|_| "\\".to_string()),
+                ))
+                .repeated(),
+            )
+            .then_ignore(one_of('"'))
+            .map_with_span(|chars, span| (Expr::String(chars.join("")), span).into())
+            .padded();
+
         let punctuation = one_of(r#"!$,_-./:;?+<=>#%&*@[\]{|}`^~"#);
         let letters = one_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ");
         let digit = one_of("0123456789");
@@ -37,20 +55,6 @@ pub fn parse_expr() -> impl Parser<char, Spanned<Expr>, Error = Error> {
                 )
                     .into()
             });
-
-        let string = just('"')
-            .ignore_then(choice((
-                none_of('"')
-                    .repeated()
-                    .at_least(1)
-                    .collect::<String>()
-                    .map(|s| s.replace("\\t", "\t"))
-                    .map(|s| s.replace("\\n", "\n"))
-                    .map_with_span(|s, span| (Expr::String(s), span).into())
-                    .then_ignore(just('"')),
-                just('"').map_with_span(|_, span| (Expr::String("".to_string()), span).into()),
-            )))
-            .padded();
 
         let atom = number
             .or(string)

@@ -81,6 +81,7 @@ impl Env {
             init_builtin!(docs, "split", split_string),
             init_builtin!(docs, "number?", is_number),
             init_builtin!(docs, "do", do_statement),
+            init_builtin!(docs, slice),
         ]);
         Self { data, outer: None }
     }

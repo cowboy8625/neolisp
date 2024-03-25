@@ -169,6 +169,11 @@ test_parser!(
     TestingExpr::List(vec![TestingExpr::String("".to_string())])
 );
 test_parser!(
+    parse_test_string_ecape_char,
+    r#"("\"")"#,
+    TestingExpr::List(vec![TestingExpr::String("\"".to_string())])
+);
+test_parser!(
     parse_test_string_newline,
     r#"("hello\n")"#,
     TestingExpr::List(vec![TestingExpr::String("hello\n".to_string())])
@@ -787,6 +792,22 @@ test_eval!(
 (do (print "hello")(+ 321 123)) ; -> 444
     "#,
     TestingExpr::Number(444.0)
+);
+
+test_eval!(
+    eval_test_builtin_slice_string,
+    r#"
+(slice "abc" 1 2) ; -> "b"
+    "#,
+    TestingExpr::String("b".to_string())
+);
+
+test_eval!(
+    eval_test_builtin_slice_list,
+    r#"
+(slice (list 1 2 3) 1 2) ; -> (2)
+    "#,
+    TestingExpr::List(vec![TestingExpr::Number(2.0)])
 );
 // ----------------------------------
 // |       Test For Debugging       |

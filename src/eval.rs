@@ -8,27 +8,28 @@ pub fn eval(expr: &Spanned<Expr>, env: &mut Env) -> EvalResult {
         Expr::Bool(_) => Ok(expr.clone()),
         Expr::Number(_) => Ok(expr.clone()),
         Expr::String(_) => Ok(expr.clone()),
-        Expr::Symbol(symbol) => eval_symbol(symbol, env),
+        Expr::Symbol(symbol) => eval_symbol(expr.span.clone(), symbol, env),
         Expr::List(list) => eval_list(expr.span.clone(), list, env),
         _ => unreachable!("invalid expr: {expr:?}"),
     }
 }
 
-fn eval_symbol(symbol: &str, env: &mut Env) -> EvalResult {
+fn eval_symbol(span: Span, symbol: &str, env: &mut Env) -> EvalResult {
     if let Some(outer) = &mut env.outer {
         outer
             .as_mut()
             .data
             .get(symbol)
             .cloned()
-            .ok_or(format!("undefined symbol: {symbol}"))
+            .or(env.data.get(symbol).cloned())
+            .ok_or(format!("{span:?}: undefined symbol: {symbol}"))
     } else if env.data.contains_key(symbol) {
         env.data
             .get(symbol)
             .cloned()
             .ok_or(format!("undefined symbol: {symbol}"))
     } else {
-        Err(format!("undefined symbol: {symbol}"))
+        Err(format!("{span:?}: undefined symbol: {symbol}"))
     }
 }
 
@@ -41,7 +42,9 @@ fn eval_list(span: Span, expr: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
         Expr::Symbol(symbol) if symbol == "var" => eval_define_variable(args, env),
         Expr::Symbol(symbol) if symbol == "let" => eval_define_let(span.clone(), args, env),
         Expr::Symbol(symbol) if symbol == "if" => eval_if(args, env),
-        Expr::Symbol(symbol) if symbol == "lambda" => eval_define_lambda(head.span.clone(), args),
+        Expr::Symbol(symbol) if symbol == "lambda" => {
+            eval_define_lambda(head.span.clone(), args, env)
+        }
         Expr::Symbol(symbol) if symbol == "fn" => eval_define_fn(head.span.clone(), args, env),
         Expr::Symbol(symbol) if symbol == "quote" => eval_quote(args),
         _ => {
@@ -173,7 +176,7 @@ fn eval_define_let(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalRes
     eval(body, &mut new_env)
 }
 
-fn eval_define_lambda(lambda_span: Span, args: &[Spanned<Expr>]) -> EvalResult {
+fn eval_define_lambda(lambda_span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     let Some(Spanned {
         expr: Expr::List(params),
         span: params_span,
