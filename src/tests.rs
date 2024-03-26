@@ -810,6 +810,19 @@ test_eval!(
     TestingExpr::List(vec![TestingExpr::Number(2.0)])
 );
 // ----------------------------------
+// |       Test ENVIRONMENTS        |
+// ----------------------------------
+test_eval!(
+    parser,
+    lambda_environment,
+    r#"
+(fn create-function (outer)
+    (lambda (x) (+ x outer)))
+((create-function 10) 1) ; -> 11
+    "#,
+    TestingExpr::Number(11.0)
+);
+// ----------------------------------
 // |       Test For Debugging       |
 // ----------------------------------
 
