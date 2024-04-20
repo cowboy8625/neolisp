@@ -15,21 +15,12 @@ pub fn eval(expr: &Spanned<Expr>, env: &mut Env) -> EvalResult {
 }
 
 fn eval_symbol(span: Span, symbol: &str, env: &mut Env) -> EvalResult {
-    if let Some(outer) = &mut env.outer {
-        outer
-            .as_mut()
-            .data
-            .get(symbol)
-            .cloned()
-            .or(env.data.get(symbol).cloned())
-            .ok_or(format!("{span:?}: undefined symbol: {symbol}"))
-    } else if env.data.contains_key(symbol) {
-        env.data
-            .get(symbol)
-            .cloned()
-            .ok_or(format!("undefined symbol: {symbol}"))
-    } else {
-        Err(format!("{span:?}: undefined symbol: {symbol}"))
+    match env.data.get(symbol) {
+        Some(expr) => Ok(expr.clone()),
+        None => match &mut env.outer {
+            Some(outer_env) => eval_symbol(span, symbol, outer_env),
+            None => Err(format!("{span:?}: undefined symbol: {symbol}")),
+        },
     }
 }
 
@@ -119,7 +110,8 @@ fn eval_func(func: &Func, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
         let i = eval(arg, env)?;
         new_env.data.insert(param.to_string(), i);
     }
-    eval(&func.body, &mut new_env)
+    env.outer = Some(Box::new(new_env));
+    eval(&func.body, env)
 }
 
 fn eval_define_variable(args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
@@ -205,7 +197,8 @@ fn eval_lambda(_: Span, lambda: &Lambda, args: &[Spanned<Expr>], env: &mut Env) 
         let Expr::Symbol(param) = &param.expr else {
             unreachable!("if this message is displayed, there is a bug in the in the eval function for params buts be a list of symbol");
         };
-        new_env.data.insert(param.to_string(), eval(arg, env)?);
+        let e = eval(arg, env)?;
+        new_env.data.insert(param.to_string(), e);
     }
     eval(&lambda.body, &mut new_env)
 }

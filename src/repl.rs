@@ -11,8 +11,10 @@ use rustyline::{Cmd, Editor, EventHandler, KeyCode, KeyEvent, Modifiers, Result}
 use rustyline::{Completer, Helper, Highlighter, Hinter, Validator};
 const HELP: &str = r#"
 commands
-:q - quit
-:help - show this help message
+:q     - quit
+:help  - show this help message
+:clear -  clear the terminal screen
+:env   -  show environment variables
 "#;
 
 #[derive(Completer, Helper, Highlighter, Hinter, Validator)]
@@ -58,7 +60,7 @@ pub fn run(args: Cli) -> Result<()> {
         match input.as_str() {
             ":q" => break,
             ":help" => println!("{HELP}"),
-            ":clear" => rl.clear_history()?,
+            ":clear" => rl.clear_screen()?,
             ":env" => {
                 println!("Environment:");
                 let mut e = Vec::new();
