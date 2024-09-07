@@ -6,8 +6,8 @@
 - returns a `Function`
 - arguments
    1. `Symbol`: name of the function
-   1. `List`: arguments
-   1. `List`: body
+   2. `List`: arguments
+   3. `List`: body
 - example:
 ```lisp
 (fn add (x y) (+ x y))
@@ -18,7 +18,7 @@
 - returns a `Function`
 - arguments
    1. `List`: arguments
-   1. `List`: body
+   2. `List`: body
 - example:
 ```lisp
 (lambda (x y) (+ x y))
@@ -29,7 +29,7 @@
 - defines a variable
 - arguments
    1. `Symbol`: name of the variable
-   1. `Any`: value
+   2. `Any`: value
 - example:
 ```lisp
 (var x 123)
@@ -40,7 +40,7 @@
 - binds a list of values to symbols in the current scope and returns the last evaluated value
 - arguments
    1. `Symbol`: name of the variable
-   1. `Any`: value
+   2. `Any`: value
 - example:
 ```lisp
 (let
@@ -196,7 +196,7 @@
 - returns a list with an element added to the beginning
 - arguments
    1. item to add
-   1. List
+   2. List
 - example:
 ```lisp
 (cons 1 (list 2 3)) ; -> (1 2 3)
@@ -220,6 +220,16 @@
 ```lisp
 (cdr (list 1 2 3)) ; -> (2 3)
 (cdr "hello") ; -> "ello"
+```
+
+### last
+- returns a last element in list
+- argument
+   1. List
+- example:
+```lisp
+(last (list 1 2 3)) ; -> 3
+(last "hello") ; -> "o"
 ```
 
 ### append
@@ -258,7 +268,7 @@
 - returns a list with the result of applying a function to each element of a list
 - arguments
    1. `Function`
-   1. `List`
+   2. `List`
 - example:
 ```lisp
 ; map takes a lambda
@@ -274,8 +284,8 @@
 - returns the result of applying a function to each element of a list
 - arguments
    1. `T` starting value
-   1. `Function` `(lambda (x y) ...)`
-   1. `List`
+   2. `Function` `(lambda (x y) ...)`
+   3. `List`
 - example:
 ```lisp
 (fold 0 + (list 1 2 3)) ; -> 6
@@ -289,7 +299,7 @@
 - returns the result of applying a function to each element of a list in reverse order
 - arguments
    1. `Function`
-   1. `List`
+   2. `List`
 - example:
 ```lisp
 (fold-right + (list 1 2 3)) ; -> 6
@@ -299,7 +309,7 @@
 - returns a list with elements that satisfy a function
 - arguments
    1. `Function`
-   1. `List`
+   2. `List`
 - example:
 ```lisp
 (filter (lambda (x) (> x 1)) (list 1 2 3)) ; -> (2 3)
@@ -309,7 +319,7 @@
 - returns the result of last iteration
 - arguments
    1. `Function`
-   1. `List`
+   2. `List`
 - example:
 ```lisp
 ; returns -> (2)
@@ -322,7 +332,7 @@
 - throws an error if the condition is false
 - arguments
    1. `Boolean` condition
-   1. `String` optional error message
+   2. `String` optional error message
 - example:
 ```lisp
 (assert (> 1 2) "1 is not greater than 2")
@@ -332,8 +342,8 @@
 - throws an error if the arguments are not equal
 - arguments
    1. `Any` first argument
-   1. All other arguments need to be equal to the first
-   1. `String` optional error message in last argument
+   2. All other arguments need to be equal to the first
+   3. `String` optional error message in last argument
 - example:
 ```lisp
 (assert-eq 1 2 "1 is not equal than 2")
@@ -361,7 +371,7 @@
 - return list of string split by separator
 - arguments
    1. `String` separator
-   1. `String` string to split
+   2. `String` string to split
 - example:
 ```lisp
 (split " " "(+ 1 1)") ; ->  ("(+" "1" "1)")
@@ -372,7 +382,7 @@
 - return string joined by separator
 - arguments
    1. `String` separator
-   1. `List` list of string
+   2. `List` list of string
 - example:
 ```lisp
 (join " " (list "1" "2" "3")) ; -> "1 2 3"

@@ -89,6 +89,23 @@ macro_rules! test_parser {
         }
     };
 }
+
+#[test]
+fn test_span_simple() {
+    let ast = parse_expr().parse("(+ 1 2)").unwrap();
+    assert_eq!(
+        ast,
+        Spanned::from((
+            Expr::List(vec![
+                Spanned::from((Expr::Symbol("+".to_string()), 0..1)),
+                Spanned::from((Expr::Number(1.0), 2..3)),
+                Spanned::from((Expr::Number(2.0), 4..5)),
+            ]),
+            0..6
+        ))
+    );
+}
+
 fn strip_out_spanned(expr: Spanned<Expr>) -> TestingExpr {
     match expr.expr {
         Expr::Bool(bool) => TestingExpr::Bool(bool),
@@ -626,6 +643,20 @@ test_eval!(
 (cdr "Hello World") ; -> "ello World"
     "#,
     TestingExpr::String("ello World".to_string())
+);
+test_eval!(
+    eval_test_builtin_last_list,
+    r#"
+(last (list 321 123))
+    "#,
+    TestingExpr::Number(123.0)
+);
+test_eval!(
+    eval_test_builtin_last_string,
+    r#"
+(last "Hello")
+    "#,
+    TestingExpr::String("o".to_string())
 );
 test_eval!(
     eval_test_builtin_append,

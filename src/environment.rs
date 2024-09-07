@@ -66,6 +66,7 @@ impl Env {
             init_builtin!(docs, cons),
             init_builtin!(docs, car),
             init_builtin!(docs, cdr),
+            init_builtin!(docs, last),
             init_builtin!(docs, append),
             init_builtin!(docs, reverse),
             init_builtin!(docs, nth),

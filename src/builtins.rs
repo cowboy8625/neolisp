@@ -44,7 +44,7 @@ builtin!(lt, <,  Number);
 builtin!(gte, >=,  Number);
 builtin!(lte, <=,  Number);
 builtin!(and, &&,  Bool);
-builtin!(or, ||,  Bool);
+// builtin!(or, ||,  Bool);
 
 fn doc_parser() -> impl Parser<char, HashMap<String, String>, Error = Simple<char>> {
     let find_start = take_until(just("## Functions"));
@@ -130,6 +130,7 @@ fn test_load_doc() {
     assert!(doc.contains_key("filter"));
     assert!(doc.contains_key("filter"));
     assert!(doc.contains_key("assert"));
+    assert!(doc.contains_key("number?"));
 }
 
 fn get_number(expr: &Expr) -> Result<f64, String> {
@@ -137,6 +138,26 @@ fn get_number(expr: &Expr) -> Result<f64, String> {
         Expr::Number(n) => Ok(*n),
         e => Err(format!("{e:?} expected a number")),
     }
+}
+
+pub fn or(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
+    let maybe_head = args
+        .first()
+        .ok_or("sub requires at least one argument".to_string())?;
+
+    let head = crate::unwrap!(&eval(maybe_head, env)?, Bool)?;
+
+    return args
+        .get(1..)
+        .map_or(Ok((Expr::Bool(head), span.clone()).into()), |args| {
+            for arg in args {
+                let value = crate::unwrap!(&eval(arg, env)?, Bool)?;
+                if value {
+                    return Ok((Expr::Bool(value), span).into());
+                }
+            }
+            Ok((Expr::Bool(head), span).into())
+        });
 }
 
 pub fn add(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
@@ -304,7 +325,7 @@ pub fn car(_: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
         }
         Expr::String(head) => {
             let Some(head) = head.chars().next() else {
-                return Ok((Expr::Bool(false), item.span).into());
+                return Ok((Expr::String("".to_string()), item.span).into());
             };
             Ok((Expr::String(head.to_string()), item.span.clone()).into())
         }
@@ -334,7 +355,7 @@ pub fn cdr(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
         }
         Expr::String(head) => {
             let Some(tail) = head.get(1..) else {
-                return Ok((Expr::Bool(false), item.span).into());
+                return Ok((Expr::String("".to_string()), item.span).into());
             };
             let start = item.span.start + 1;
             let end = item.span.end;
@@ -342,6 +363,31 @@ pub fn cdr(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
         }
         _ => Err(format!(
             "{:?}: cdr requires a list or string to be the first and only argument but found {:?}",
+            item.span, item.expr
+        )),
+    }
+}
+
+pub fn last(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
+    if args.len() != 1 {
+        return Err("last requires one argument".to_string());
+    }
+    let item = eval(&args[0], env)?;
+    match item.expr {
+        Expr::List(list) => {
+            let Some(last) = list.last() else {
+                return Ok((Expr::Bool(false), item.span).into());
+            };
+            Ok(last.clone())
+        }
+        Expr::String(head) => {
+            let Some(last) = head.chars().rev().next() else {
+                return Ok((Expr::String("".to_string()), item.span).into());
+            };
+            Ok((Expr::String(last.to_string()), span).into())
+        }
+        _ => Err(format!(
+            "{:?}: last requires a list or string to be the first and only argument but found {:?}",
             item.span, item.expr
         )),
     }
@@ -684,12 +730,27 @@ pub fn assert_eqnl(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalRes
     } else {
         args.len() - 1
     };
-    for arg in &args[1..end] {
+    for (j, arg) in args[1..end].iter().enumerate() {
         let eval_arg = eval(arg, env)?;
         if value.expr != eval_arg.expr {
-            eprintln!("{}", msg);
+            let code = args
+                .iter()
+                .enumerate()
+                .map(|(i, a)| {
+                    let value = match &a.expr {
+                        Expr::String(s) => format!("\"{}\"", s),
+                        _ => a.to_string(),
+                    };
+                    if i == j + 1 {
+                        format!("\x1b[31m{value}\x1b[0m")
+                    } else {
+                        value
+                    }
+                })
+                .collect::<Vec<_>>()
+                .join(" ");
             return Err(format!(
-                "{:?}:{} is not equal to {:?}:{}",
+                "{span:?} ({msg})\n{code}\n`{:?}:{}` is not equal to `{:?}:{}`",
                 value.expr,
                 value.expr.type_of(),
                 eval_arg.expr,
@@ -717,10 +778,10 @@ pub fn r#loop(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     };
     let mut evaled_condition = eval(condition, env)?;
     while evaled_condition.expr != Expr::Bool(false) {
-        evaled_condition = eval(condition, env)?;
         for arg in &args[1..] {
             result = eval(arg, env)?;
         }
+        evaled_condition = eval(condition, env)?;
     }
     Ok(result)
 }

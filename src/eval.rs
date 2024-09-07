@@ -110,8 +110,9 @@ fn eval_func(func: &Func, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
         let i = eval(arg, env)?;
         new_env.data.insert(param.to_string(), i);
     }
-    env.outer = Some(Box::new(new_env));
-    eval(&func.body, env)
+    // env.outer = Some(Box::new(new_env.clone()));
+    new_env.outer = Some(Box::new(env.clone()));
+    eval(&func.body, &mut new_env)
 }
 
 fn eval_define_variable(args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {

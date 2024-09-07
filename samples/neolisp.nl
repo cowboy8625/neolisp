@@ -1,40 +1,12 @@
 (fn parse-number (input)
-    "accumulate the number in the input and return the parsed number and left over input"
-    ; This probably will change once concat is implemented
-    (let
-      ; variables
-      ((number '())
-      (is-running true))
-      ; block
-      (loop is-running
-        (if
-          ; condition: if the first element in input is a number
-          (number? (car input))
-
-          ; then append the number to the number
-          (do
-            ; asign new number to value
-            (var number
-                 ; append the number
-                 (append
-                   ; to the number
-                    number
-                   ; the number
-                  (list (car input))))
-            ; remove the first element
-            ; input is returned
-            (var input (cdr input))
-
-            (if
-              (= 0 (length input))
-              ; then
-              (var is-running false)
-              ; else
-              true))
-          ; else return input
-          (do
-            (var is-running false)
-            (list (to-string number) input))))))
+  (let ((number '()))
+    (loop (and (not (= 0 (length input))) (number? (car input)))
+      (var number
+           (append
+             number
+             (list (car input))))
+      (var input (cdr input))
+      (list (to-string number) input))))
 
 (assert-eq (parse-number "123") '("123" "") "parse-number failed")
 (assert-eq (parse-number "123abc") '("123" "abc") "parse-number failed")
@@ -66,47 +38,32 @@
 (assert-eq (punctuation? "\"") true "test punctuation? failed 5")
 ; -------------------------------------------------------------------------
 
-(fn is-identifier? (input) (or (letter? input) (punctuation? input)))
+(fn is-identifier? (input) (or (letter? input) (punctuation? input) (number? input)))
+
+(assert-eq (is-identifier? "-") true "test is-identifier? function failed '-'")
+(assert-eq (is-identifier? "1") true "test is-identifier? function failed '1'")
+(assert-eq (is-identifier? "?") true "test is-identifier? function failed '?'")
+(assert-eq (is-identifier? "a") true "test is-identifier? function failed 'a'")
+(assert-eq (is-identifier? " ") false "false is-identifier? function failed ' '")
+; -------------------------------------------------------------------------
 
 (fn parse-identifier (input)
-    "accumulate the identifier in the input and return the parsed identifier and left over input"
-    ; This probably will change once concat is implemented
-    (let
-      ; variables
-      ((identifier '())
-      (is-running true))
-      ; block
-      (loop is-running
-        (if
-          ; condition: if the first element in input is a letter
-          (is-identifier? (car input))
-          ; then append the identifier to the identifier
-          (do
-            ; asign new identifier to value
-            (var identifier
-                 ; append the identifier
-                 (append
-                   ; to the identifier
-                    identifier
-                   ; the identifier
-                  (list (car input))))
-            ; remove the first element
-            ; input is returned
-            (var input (cdr input))
-            (if
-              (= 0 (length input))
-              ; then
-              (var is-running false)
-              ; else
-              true))
-          ; else return input
-          (do
-            (var is-running false)
-            (list (to-string identifier) input))))))
+  "accumulate the identifier in the input and return the parsed identifier and left over input"
+  (let
+    ((identifier '()))
+    (do
+    ; TODO: I think the loop is wrong here and not stopping on false but running once tomany times
+      (loop (or (> 0 (length input)) (is-identifier? (car input)))
+        (do
+          (var identifier (append identifier (list (car input))))
+          (var input (cdr input))
+          (print "input='" input "'\n")))
+      (list (to-string identifier) input))))
 
-
+; Test cases
+(assert-eq (parse-identifier "a123457bc") '("a123457bc" "") "parse-identifier failed")
 (assert-eq (parse-identifier "abc") '("abc" "") "parse-identifier failed")
-(assert-eq (parse-identifier "abc123") '("abc" "123") "parse-identifier failed")
+(assert-eq (parse-identifier "abc123") '("abc123" "") "parse-identifier failed")
 (assert-eq (parse-identifier "a-b-c 123") '("a-b-c" " 123") "parse-identifier failed")
 ; -------------------------------------------------------------------------
 
