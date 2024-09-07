@@ -144,6 +144,7 @@ impl std::fmt::Display for Func {
 pub struct Lambda {
     pub params: Box<Spanned<Expr>>,
     pub body: Box<Spanned<Expr>>,
+    pub env: Env,
 }
 
 impl std::fmt::Display for Lambda {

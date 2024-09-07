@@ -2,7 +2,7 @@ use crate::ast::{Expr, Spanned};
 use crate::builtins::*;
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Env {
     pub data: HashMap<String, Spanned<Expr>>,
     pub outer: Option<Box<Env>>,

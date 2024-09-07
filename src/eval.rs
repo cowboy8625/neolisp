@@ -184,12 +184,13 @@ fn eval_define_lambda(lambda_span: Span, args: &[Spanned<Expr>], env: &mut Env) 
     let lambda = Lambda {
         params: Box::new((Expr::List(params.clone()), params_span).into()),
         body: Box::new(body.clone()),
+        env: env.clone(),
     };
     Ok((Expr::Lambda(lambda), lambda_span).into())
 }
 
 fn eval_lambda(_: Span, lambda: &Lambda, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
-    let mut new_env = env.clone();
+    let mut new_env = lambda.env.clone();
     let Expr::List(params) = &lambda.params.expr else {
         unreachable!("if this message is displayed, there is a bug in the in the eval function for params buts be a list");
     };
