@@ -414,6 +414,7 @@ pub fn length(span: Span, args: &[Spanned<Expr>], env: &mut Env) -> EvalResult {
     let len = match evaled.expr {
         Expr::List(head) => head.len(),
         Expr::String(head) => head.len(),
+        Expr::Symbol(head) => head.len(),
         _ => {
             return Err(format!(
                 "{:?}: length requires a list to be the first argument but found {:?}",

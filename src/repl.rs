@@ -11,7 +11,7 @@ use rustyline::{Cmd, Editor, EventHandler, KeyCode, KeyEvent, Modifiers, Result}
 use rustyline::{Completer, Helper, Highlighter, Hinter, Validator};
 const HELP: &str = r#"
 commands
-:q     - quit
+:q|e|exit|quit   - quit
 :help  - show this help message
 :clear -  clear the terminal screen
 :env   -  show environment variables
@@ -58,7 +58,7 @@ pub fn run(args: Cli) -> Result<()> {
 
         // Run command
         match input.as_str() {
-            ":q" => break,
+            ":q" | ":e" | ":exit" | ":quit" => break,
             ":help" => println!("{HELP}"),
             ":clear" => rl.clear_screen()?,
             ":env" => {
@@ -87,7 +87,7 @@ pub fn run(args: Cli) -> Result<()> {
 
         // Ignore commands
         match input.as_str() {
-            ":q" | ":help" | ":clear" | ":env" => continue,
+            ":help" | ":clear" | ":env" => continue,
             _ => (),
         }
 
