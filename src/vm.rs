@@ -81,6 +81,19 @@ enum Value {
     List(Vec<Value>),
 }
 
+impl std::fmt::Display for Value {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::U8(value) => write!(f, "{value}"),
+            Self::U32(value) => write!(f, "{value}"),
+            Self::F64(value) => write!(f, "{value}"),
+            Self::String(value) => write!(f, "{value}"),
+            Self::Bool(value) => write!(f, "{value}"),
+            Self::List(value) => write!(f, "{value:?}"),
+        }
+    }
+}
+
 /// Virtual Machine
 ///
 /// Stack based virtual machine for evaluating LISP code
@@ -127,6 +140,13 @@ impl Machine {
             OpCode::PushF64 => {
                 let value = self.get_f64()?;
                 self.stack.push(Value::F64(value));
+                Ok(())
+            }
+            OpCode::Print => {
+                let Some(value) = self.stack.pop() else {
+                    panic!("expected value on stack for print")
+                };
+                println!("{value}");
                 Ok(())
             }
             op => unimplemented!("{:?}", op),

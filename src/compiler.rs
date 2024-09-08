@@ -27,17 +27,19 @@ pub trait WalkAst {
 enum Instructions {
     F64(f64),
     AddF64,
+    Print,
 }
 
 impl Instructions {
     fn to_bytecode(&self) -> Vec<u8> {
         match self {
-            Instructions::F64(value) => {
+            Self::F64(value) => {
                 let mut bytes = vec![OpCode::PushF64 as u8];
                 bytes.extend(value.to_le_bytes());
                 bytes
             }
-            Instructions::AddF64 => vec![OpCode::AddF64 as u8],
+            Self::AddF64 => vec![OpCode::AddF64 as u8],
+            Self::Print => vec![OpCode::Print as u8],
         }
     }
 }
@@ -70,6 +72,7 @@ impl WalkAst for Compile {
     fn walk_symbol(&mut self, symbol: &str) {
         match symbol {
             "+" => self.program.push(Instructions::AddF64),
+            "print" => self.program.push(Instructions::Print),
             _ => unimplemented!("{} is not implemented", symbol),
         }
     }
