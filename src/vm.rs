@@ -58,6 +58,9 @@ pub enum OpCode {
 
     Call,
     Return,
+
+    // List manipulation
+    CreateList,
 }
 
 impl TryFrom<u8> for OpCode {
@@ -94,6 +97,7 @@ impl TryFrom<u8> for OpCode {
             27 => Ok(Self::GetGlobalVar),
             28 => Ok(Self::Call),
             29 => Ok(Self::Return),
+            30 => Ok(Self::CreateList),
             _ => Err(format!("unknown opcode: {value}")),
         }
     }
@@ -239,6 +243,19 @@ impl Machine {
                     panic!("expected value on stack for return")
                 };
                 self.ip = address as usize;
+                self.local_var.clear();
+                Ok(())
+            }
+            OpCode::CreateList => {
+                let mut items = Vec::new();
+                let count = self.get_u32()?;
+                for _ in (0..count) {
+                    let Some(item) = self.stack.pop() else {
+                        panic!("expected value on stack for CreateList")
+                    };
+                    items.insert(0, item);
+                }
+                self.stack.push(Value::List(items));
                 Ok(())
             }
             op => unimplemented!("{:?}", op),

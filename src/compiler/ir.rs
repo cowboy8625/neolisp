@@ -37,22 +37,28 @@ impl Ir {
             Self::Value(v) => v.to_bytecode(lookup_table),
             Self::If(i) => i.to_bytecode(lookup_table),
             Self::Call(name, args) => match name.as_str() {
-                "print" => {
+                "list" => {
                     let mut bytes = args
                         .iter()
                         .map(|a| a.to_bytecode(lookup_table))
                         .flatten()
                         .collect::<Vec<_>>();
-                    bytes.push(OpCode::Print as u8);
+                    bytes.push(OpCode::CreateList as u8);
+                    bytes.extend((args.len() as u32).to_le_bytes());
                     bytes
                 }
-                "+" => {
+                "+" | "print" => {
+                    let opcode = match name.as_str() {
+                        "+" => OpCode::AddF64,
+                        "print" => OpCode::Print,
+                        _ => unreachable!(),
+                    };
                     let mut bytes = args
                         .iter()
                         .map(|a| a.to_bytecode(lookup_table))
                         .flatten()
                         .collect::<Vec<_>>();
-                    bytes.push(OpCode::AddF64 as u8);
+                    bytes.push(opcode as u8);
                     bytes
                 }
                 _ => {
@@ -61,9 +67,10 @@ impl Ir {
                         .map(|a| a.to_bytecode(lookup_table))
                         .flatten()
                         .collect::<Vec<_>>();
-                    let id = match lookup_table.get(name).unwrap() {
-                        Scope::Global(id) => *id,
-                        Scope::Local(_) => panic!("cannot call function from local scope"),
+                    let id = match lookup_table.get(name) {
+                        Some(Scope::Global(id)) => *id,
+                        Some(Scope::Local(_)) => panic!("cannot call function from local scope"),
+                        None => panic!("function `{name}` not found"),
                     };
                     bytes.push(OpCode::Call as u8);
                     bytes.extend(id.to_le_bytes());
