@@ -1,1 +1,2 @@
-(print (+ (+ 123 321) (+ 123 321)))
+(fn add (x y) (+ x y ))
+(fn main () (print (add 1 2)))

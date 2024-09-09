@@ -1,5 +1,8 @@
+#![allow(dead_code)]
+#![allow(unused)]
 use std::fmt::Arguments;
 
+use crate::compiler::Header;
 use anyhow::Result;
 
 /// The byte code of a Neolisp program
@@ -33,11 +36,24 @@ pub enum OpCode {
     Not,
     Print,
     /// Stack manipulation
+    PushU8,
     PushF64,
+    PushString,
     PopF64,
+    /// Swap the top two items
     Swap,
+    /// Duplicate the top most item and push it
     Dup,
+    /// Take the top most items on stack and rotate them
     Rot,
+
+    /// Pushes a value on to the local variable stack
+    LocalVar,
+    /// Pushes a value on to the global variable stack
+    GlobalVar,
+
+    Call,
+    Return,
 }
 
 impl TryFrom<u8> for OpCode {
@@ -61,11 +77,17 @@ impl TryFrom<u8> for OpCode {
             14 => Ok(Self::Or),
             15 => Ok(Self::Not),
             16 => Ok(Self::Print),
-            17 => Ok(Self::PushF64),
-            18 => Ok(Self::PopF64),
-            19 => Ok(Self::Swap),
-            20 => Ok(Self::Dup),
-            21 => Ok(Self::Rot),
+            17 => Ok(Self::PushU8),
+            18 => Ok(Self::PushF64),
+            19 => Ok(Self::PushString),
+            20 => Ok(Self::PopF64),
+            21 => Ok(Self::Swap),
+            22 => Ok(Self::Dup),
+            23 => Ok(Self::Rot),
+            24 => Ok(Self::LocalVar),
+            25 => Ok(Self::GlobalVar),
+            26 => Ok(Self::Call),
+            27 => Ok(Self::Return),
             _ => Err(format!("unknown opcode: {value}")),
         }
     }
@@ -114,9 +136,11 @@ pub struct Machine {
 
 impl Machine {
     pub fn new(program: Vec<u8>) -> Self {
+        debug_assert!(program.len() > Header::SIZE as usize);
+        let program_header = Header::from(&program[0..Header::SIZE as usize]);
         Self {
             program,
-            ip: 0,
+            ip: program_header.start as usize,
             is_running: true,
             stack: vec![],
         }
@@ -124,6 +148,7 @@ impl Machine {
 
     pub fn run_once(&mut self) -> Result<()> {
         let op = self.get_op_code()?;
+        eprintln!("OpCode::{op:?}");
         match op {
             OpCode::Noop => Ok(()),
             OpCode::Halt => Ok(self.shutdown()),
@@ -149,13 +174,28 @@ impl Machine {
                 println!("{value}");
                 Ok(())
             }
+            OpCode::Call => todo!("CALL"),
             op => unimplemented!("{:?}", op),
         }
     }
 
     pub fn run(&mut self) -> Result<()> {
-        // TODO: make a header
-        // TODO: make halt maditory
+        eprintln!("start: {}", self.ip);
+        for (i, chunk) in self.program[Header::SIZE as usize..].chunks(4).enumerate() {
+            let debug = chunk
+                .iter()
+                .map(|b| format!("{b:02X}"))
+                .collect::<Vec<_>>()
+                .join(" ");
+            let start = i * 4 + Header::SIZE as usize;
+            let end = i * 4 + (Header::SIZE as usize) + 4;
+            let selected = if (start..end).contains(&self.ip) {
+                "> "
+            } else {
+                "  "
+            };
+            eprintln!("{selected}{debug}");
+        }
         while self.is_running && self.ip < self.program.len() {
             self.run_once()?;
         }
@@ -180,28 +220,28 @@ impl Machine {
     }
 
     fn get_u16(&mut self) -> Result<u16> {
-        let byte1 = self.get_u8()? as u16;
         let byte2 = self.get_u8()? as u16;
+        let byte1 = self.get_u8()? as u16;
         Ok(byte1 << 8 | byte2)
     }
 
     fn get_u32(&mut self) -> Result<u32> {
-        let byte1 = self.get_u8()? as u32;
-        let byte2 = self.get_u8()? as u32;
-        let byte3 = self.get_u8()? as u32;
         let byte4 = self.get_u8()? as u32;
+        let byte3 = self.get_u8()? as u32;
+        let byte2 = self.get_u8()? as u32;
+        let byte1 = self.get_u8()? as u32;
         Ok(byte1 << 24 | byte2 << 16 | byte3 << 8 | byte4)
     }
 
     fn get_u64(&mut self) -> Result<u64> {
-        let byte1 = self.get_u8()? as u64;
-        let byte2 = self.get_u8()? as u64;
-        let byte3 = self.get_u8()? as u64;
-        let byte4 = self.get_u8()? as u64;
-        let byte5 = self.get_u8()? as u64;
-        let byte6 = self.get_u8()? as u64;
-        let byte7 = self.get_u8()? as u64;
         let byte8 = self.get_u8()? as u64;
+        let byte7 = self.get_u8()? as u64;
+        let byte6 = self.get_u8()? as u64;
+        let byte5 = self.get_u8()? as u64;
+        let byte4 = self.get_u8()? as u64;
+        let byte3 = self.get_u8()? as u64;
+        let byte2 = self.get_u8()? as u64;
+        let byte1 = self.get_u8()? as u64;
         Ok(byte1 << 56
             | byte2 << 48
             | byte3 << 40
@@ -213,14 +253,14 @@ impl Machine {
     }
 
     fn get_f64(&mut self) -> Result<f64> {
-        let byte1 = self.get_u8()? as u64;
-        let byte2 = self.get_u8()? as u64;
-        let byte3 = self.get_u8()? as u64;
-        let byte4 = self.get_u8()? as u64;
-        let byte5 = self.get_u8()? as u64;
-        let byte6 = self.get_u8()? as u64;
-        let byte7 = self.get_u8()? as u64;
         let byte8 = self.get_u8()? as u64;
+        let byte7 = self.get_u8()? as u64;
+        let byte6 = self.get_u8()? as u64;
+        let byte5 = self.get_u8()? as u64;
+        let byte4 = self.get_u8()? as u64;
+        let byte3 = self.get_u8()? as u64;
+        let byte2 = self.get_u8()? as u64;
+        let byte1 = self.get_u8()? as u64;
         Ok(f64::from_le_bytes([
             byte1 as u8,
             byte2 as u8,
@@ -248,6 +288,21 @@ mod tests {
         let mut machine = Machine::new(vec![0, 1]);
         assert_eq!(machine.get_op_code()?, OpCode::Noop);
         assert_eq!(machine.get_op_code()?, OpCode::Halt);
+        Ok(())
+    }
+
+    #[test]
+    fn test_get_u16() -> Result<()> {
+        eprintln!("F64: {:?}", 10.0f64.to_le_bytes());
+        let number: u16 = 0x0102;
+        let bytes = number.to_le_bytes();
+        let mut h = Header::new();
+        let mut program = h.to_bytecode();
+        program.extend(bytes.to_vec());
+        let mut machine = Machine::new(program);
+        let bytes_u16 = machine.get_u16()?;
+        eprintln!("{:02X}", bytes_u16);
+        assert_eq!(bytes_u16, 0x0102);
         Ok(())
     }
 }

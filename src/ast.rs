@@ -51,13 +51,14 @@ where
 
 pub type Builtin = fn(Span, &[Spanned<Expr>], &mut Env) -> Result<Spanned<Expr>, String>;
 
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
     Bool(bool),
     String(String),
     Symbol(String),
     Number(f64),
     List(Vec<Spanned<Expr>>),
+    // Only used in eval
     Builtin(Builtin, String),
     Func(Func),
     Lambda(Lambda),
@@ -87,29 +88,29 @@ impl std::fmt::Display for Expr {
     }
 }
 
-impl std::fmt::Debug for Expr {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Bool(b) => write!(f, "{b:?}"),
-            Self::String(s) => write!(f, "{s:?}"),
-            Self::Symbol(s) => write!(f, "{s:?}"),
-            Self::Number(n) => write!(f, "{n:?}"),
-            Self::List(list) => {
-                write!(f, "(")?;
-                for (i, item) in list.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, " ")?;
-                    }
-                    write!(f, "{:?}", item.expr)?;
-                }
-                write!(f, ")")
-            }
-            Self::Builtin(b, _) => write!(f, "{b:?}"),
-            Self::Func(func) => write!(f, "{func}"),
-            Self::Lambda(func) => write!(f, "{func}"),
-        }
-    }
-}
+// impl std::fmt::Debug for Expr {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         match self {
+//             Self::Bool(b) => write!(f, "{b:?}"),
+//             Self::String(s) => write!(f, "{s:?}"),
+//             Self::Symbol(s) => write!(f, "{s:?}"),
+//             Self::Number(n) => write!(f, "{n:?}"),
+//             Self::List(list) => {
+//                 write!(f, "(")?;
+//                 for (i, item) in list.iter().enumerate() {
+//                     if i > 0 {
+//                         write!(f, " ")?;
+//                     }
+//                     write!(f, "{:?}", item.expr)?;
+//                 }
+//                 write!(f, ")")
+//             }
+//             Self::Builtin(b, _) => write!(f, "{b:?}"),
+//             Self::Func(func) => write!(f, "{func}"),
+//             Self::Lambda(func) => write!(f, "{func}"),
+//         }
+//     }
+// }
 
 impl Expr {
     pub fn type_of(&self) -> String {

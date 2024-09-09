@@ -12,11 +12,12 @@ mod tests;
 mod vm;
 
 // use crate::environment::Env;
-use crate::error::print_error;
+// use crate::error::print_error;
 // use crate::eval::eval;
-use crate::parser::parser;
-use chumsky::prelude::Parser as ChumskyParser;
+// use crate::parser::parser;
+// use chumsky::prelude::Parser as ChumskyParser;
 use clap::Parser as ClapParser;
+use compiler::compile;
 
 fn main() -> anyhow::Result<()> {
     let args = cli::Cli::parse();
@@ -35,31 +36,17 @@ fn main() -> anyhow::Result<()> {
         panic!("failed to read file")
     };
 
-    let ast = match parser().parse(src.clone()) {
-        Ok(ast) => ast,
-        Err(error) => {
-            for e in error.iter() {
-                print_error(&src, e);
+    let program = match compile(&src) {
+        Ok(program) => program,
+        Err(e) => {
+            for e in e {
+                println!("{:?}", e);
             }
             return Ok(());
         }
     };
 
-    let mut comp = compiler::Compile::default();
-    let program = comp.compile(&ast);
-
     let mut machine = vm::Machine::new(program);
     machine.run()?;
-    // let mut env = Env::new();
-    // for expr in ast {
-    //     let r = eval(&expr, &mut env);
-    //     match r {
-    //         Ok(_) => {}
-    //         Err(e) => {
-    //             println!("{e}");
-    //             break;
-    //         }
-    //     }
-    // }
     Ok(())
 }
