@@ -36,6 +36,7 @@ pub fn compile(src: &str) -> Result<Vec<u8>, Vec<String>> {
         offset += function_size;
     }
 
+    // eprintln!("{:#?}", func);
     let mut program = Vec::new();
     let mut program_header = Header::new();
 
@@ -137,7 +138,11 @@ fn compile_function(func: &mut Vec<Function>, s_expr: &[Spanned<Expr>]) {
 
     let mut instruction = Vec::new();
     compile_s_expr(func, &mut instruction, body);
-    instruction.push(Ir::Return);
+    if name == "main" {
+        instruction.push(Ir::Halt);
+    } else {
+        instruction.push(Ir::Return);
+    }
 
     let function = Function {
         name: name.to_string(),

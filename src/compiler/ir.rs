@@ -7,6 +7,7 @@ pub enum Ir {
     If(If),
     Call(String, Vec<Ir>),
     Return,
+    Halt,
 }
 
 impl Ir {
@@ -18,7 +19,8 @@ impl Ir {
                 "+" | "print" => 1 + args.iter().map(|a| a.size()).sum::<u32>(),
                 _ => 1 + 4 + args.iter().map(|a| a.size()).sum::<u32>(),
             },
-            Self::Return => 1,
+            Self::Return => 2,
+            Self::Halt => 1,
         }
     }
     pub fn to_bytecode(&self, lookup_table: &std::collections::HashMap<String, u32>) -> Vec<u8> {
@@ -41,7 +43,7 @@ impl Ir {
                         .map(|a| a.to_bytecode(lookup_table))
                         .flatten()
                         .collect::<Vec<_>>();
-                    bytes.push(OpCode::Print as u8);
+                    bytes.push(OpCode::AddF64 as u8);
                     bytes
                 }
                 _ => {
@@ -56,7 +58,8 @@ impl Ir {
                     bytes
                 }
             },
-            Self::Return => vec![OpCode::Return as u8],
+            Self::Return => vec![OpCode::Rot as u8, OpCode::Return as u8],
+            Self::Halt => vec![OpCode::Halt as u8],
         }
     }
 }
@@ -89,7 +92,7 @@ impl Value {
                 let Some(id) = lookup_table.get(id) else {
                     panic!("unknown id: {id}");
                 };
-                let mut bytes = vec![OpCode::LocalVar as u8];
+                let mut bytes = vec![OpCode::GetLocalVar as u8];
                 bytes.extend(id.to_le_bytes());
                 bytes
             }
@@ -123,7 +126,8 @@ impl Function {
         let mut size = 0;
 
         for param in self.params.iter() {
-            size += 1; // for opcode
+            size += 1; // for opcode Rot
+            size += 1; // for opcode LoadLocalVar
             size += 4; // for id
         }
         for instruction in self.instruction.iter() {
@@ -142,7 +146,8 @@ impl Function {
         for (i, param) in self.params.iter().enumerate() {
             let id = i as u32;
             lookup_table.insert(param.clone(), id);
-            bytes.push(OpCode::LocalVar as u8);
+            bytes.push(OpCode::Rot as u8);
+            bytes.push(OpCode::LoadLocalVar as u8);
             bytes.extend(id.to_le_bytes());
         }
 

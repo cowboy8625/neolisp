@@ -47,10 +47,14 @@ pub enum OpCode {
     /// Take the top most items on stack and rotate them
     Rot,
 
-    /// Pushes a value on to the local variable stack
-    LocalVar,
-    /// Pushes a value on to the global variable stack
-    GlobalVar,
+    /// Load a value on to the local variable stack
+    LoadLocalVar,
+    /// Get a value on to the local variable stack
+    GetLocalVar,
+    /// Load a value on to the global variable stack
+    LoadGlobalVar,
+    /// Get a value on to the global variable stack
+    GetGlobalVar,
 
     Call,
     Return,
@@ -84,10 +88,12 @@ impl TryFrom<u8> for OpCode {
             21 => Ok(Self::Swap),
             22 => Ok(Self::Dup),
             23 => Ok(Self::Rot),
-            24 => Ok(Self::LocalVar),
-            25 => Ok(Self::GlobalVar),
-            26 => Ok(Self::Call),
-            27 => Ok(Self::Return),
+            24 => Ok(Self::LoadLocalVar),
+            25 => Ok(Self::GetLocalVar),
+            26 => Ok(Self::LoadGlobalVar),
+            27 => Ok(Self::GetGlobalVar),
+            28 => Ok(Self::Call),
+            29 => Ok(Self::Return),
             _ => Err(format!("unknown opcode: {value}")),
         }
     }
@@ -132,6 +138,7 @@ pub struct Machine {
     ip: usize,
     is_running: bool,
     stack: Vec<Value>,
+    local_var: Vec<Value>,
 }
 
 impl Machine {
@@ -143,12 +150,13 @@ impl Machine {
             ip: program_header.start as usize,
             is_running: true,
             stack: vec![],
+            local_var: vec![],
         }
     }
 
     pub fn run_once(&mut self) -> Result<()> {
         let op = self.get_op_code()?;
-        eprintln!("OpCode::{op:?}");
+        // eprintln!("OpCode::{op:?} {:02X}", op as u8);
         match op {
             OpCode::Noop => Ok(()),
             OpCode::Halt => Ok(self.shutdown()),
@@ -174,28 +182,69 @@ impl Machine {
                 println!("{value}");
                 Ok(())
             }
-            OpCode::Call => todo!("CALL"),
+            OpCode::Call => {
+                let address = self.get_u32()? as usize;
+                self.stack.push(Value::U32(self.ip as u32));
+                self.ip = address;
+                Ok(())
+            }
+
+            OpCode::LoadLocalVar => {
+                // NOTE: I dont think this LocalVar(index) is used
+                let _ = self.get_u32()? as usize;
+                let Some(value) = self.stack.pop() else {
+                    panic!("expected value on stack for LocalVar")
+                };
+                self.local_var.push(value);
+                Ok(())
+            }
+            OpCode::GetLocalVar => {
+                let index = self.get_u32()? as usize;
+                let Some(value) = self.local_var.get(index) else {
+                    panic!("expected value on stack for LocalVar")
+                };
+                self.stack.push(value.clone());
+                Ok(())
+            }
+            OpCode::Rot => {
+                let Some(right) = self.stack.pop() else {
+                    panic!("expected value on stack for rot")
+                };
+                let Some(left) = self.stack.pop() else {
+                    panic!("expected value on stack for rot")
+                };
+                self.stack.push(right);
+                self.stack.push(left);
+                Ok(())
+            }
+            OpCode::Return => {
+                let Some(Value::U32(address)) = self.stack.pop() else {
+                    panic!("expected value on stack for return")
+                };
+                self.ip = address as usize;
+                Ok(())
+            }
             op => unimplemented!("{:?}", op),
         }
     }
 
     pub fn run(&mut self) -> Result<()> {
-        eprintln!("start: {}", self.ip);
-        for (i, chunk) in self.program[Header::SIZE as usize..].chunks(4).enumerate() {
-            let debug = chunk
-                .iter()
-                .map(|b| format!("{b:02X}"))
-                .collect::<Vec<_>>()
-                .join(" ");
-            let start = i * 4 + Header::SIZE as usize;
-            let end = i * 4 + (Header::SIZE as usize) + 4;
-            let selected = if (start..end).contains(&self.ip) {
-                "> "
-            } else {
-                "  "
-            };
-            eprintln!("{selected}{debug}");
-        }
+        // eprintln!("start: {}", self.ip);
+        // for (i, chunk) in self.program[Header::SIZE as usize..].chunks(4).enumerate() {
+        //     let debug = chunk
+        //         .iter()
+        //         .map(|b| format!("{b:02X}"))
+        //         .collect::<Vec<_>>()
+        //         .join(" ");
+        //     let start = i * 4 + Header::SIZE as usize;
+        //     let end = i * 4 + (Header::SIZE as usize) + 4;
+        //     let selected = if (start..end).contains(&self.ip) {
+        //         "> "
+        //     } else {
+        //         "  "
+        //     };
+        //     eprintln!("{selected}{debug}");
+        // }
         while self.is_running && self.ip < self.program.len() {
             self.run_once()?;
         }
@@ -253,14 +302,14 @@ impl Machine {
     }
 
     fn get_f64(&mut self) -> Result<f64> {
-        let byte8 = self.get_u8()? as u64;
-        let byte7 = self.get_u8()? as u64;
-        let byte6 = self.get_u8()? as u64;
-        let byte5 = self.get_u8()? as u64;
-        let byte4 = self.get_u8()? as u64;
-        let byte3 = self.get_u8()? as u64;
-        let byte2 = self.get_u8()? as u64;
         let byte1 = self.get_u8()? as u64;
+        let byte2 = self.get_u8()? as u64;
+        let byte3 = self.get_u8()? as u64;
+        let byte4 = self.get_u8()? as u64;
+        let byte5 = self.get_u8()? as u64;
+        let byte6 = self.get_u8()? as u64;
+        let byte7 = self.get_u8()? as u64;
+        let byte8 = self.get_u8()? as u64;
         Ok(f64::from_le_bytes([
             byte1 as u8,
             byte2 as u8,
