@@ -1,6 +1,13 @@
 #![allow(dead_code)]
 use crate::vm::OpCode;
 
+pub type LookupTable = std::collections::HashMap<String, Scope>;
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Scope {
+    Global(u32),
+    Local(u32),
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Ir {
     Value(Value),
@@ -8,6 +15,7 @@ pub enum Ir {
     Call(String, Vec<Ir>),
     Return,
     Halt,
+    LoadGlobalVar(String),
 }
 
 impl Ir {
@@ -21,9 +29,10 @@ impl Ir {
             },
             Self::Return => 2,
             Self::Halt => 1,
+            Self::LoadGlobalVar(_) => 1,
         }
     }
-    pub fn to_bytecode(&self, lookup_table: &std::collections::HashMap<String, u32>) -> Vec<u8> {
+    pub fn to_bytecode(&self, lookup_table: &LookupTable) -> Vec<u8> {
         match self {
             Self::Value(v) => v.to_bytecode(lookup_table),
             Self::If(i) => i.to_bytecode(lookup_table),
@@ -52,7 +61,10 @@ impl Ir {
                         .map(|a| a.to_bytecode(lookup_table))
                         .flatten()
                         .collect::<Vec<_>>();
-                    let id = lookup_table.get(name).unwrap();
+                    let id = match lookup_table.get(name).unwrap() {
+                        Scope::Global(id) => *id,
+                        Scope::Local(_) => panic!("cannot call function from local scope"),
+                    };
                     bytes.push(OpCode::Call as u8);
                     bytes.extend(id.to_le_bytes());
                     bytes
@@ -60,6 +72,13 @@ impl Ir {
             },
             Self::Return => vec![OpCode::Rot as u8, OpCode::Return as u8],
             Self::Halt => vec![OpCode::Halt as u8],
+            Self::LoadGlobalVar(_) => {
+                // let id = lookup_table.get(name).unwrap();
+                // let mut bytes = vec![OpCode::LoadGlobalVar as u8];
+                // bytes.extend(id.to_le_bytes());
+                // bytes
+                vec![OpCode::LoadGlobalVar as u8]
+            }
         }
     }
 }
@@ -78,7 +97,7 @@ impl Value {
     /// Return the size of the value in bytes
     pub fn size(&self) -> u32 {
         match self {
-            Self::Id(_) => 1 + 4, // 1 for opcode + 4 for index,
+            Self::Id(..) => 1 + 4, // 1 for opcode + 4 for index,
             Self::U8(_) => 1,
             Self::U32(_) => 4,
             Self::F64(_) => 8,
@@ -86,13 +105,20 @@ impl Value {
             Self::Bool(_) => 1 + 1,                // 1 for opcode + 1 for value
         }
     }
-    pub fn to_bytecode(&self, lookup_table: &std::collections::HashMap<String, u32>) -> Vec<u8> {
+    pub fn to_bytecode(&self, lookup_table: &LookupTable) -> Vec<u8> {
         match self {
-            Self::Id(id) => {
-                let Some(id) = lookup_table.get(id) else {
-                    panic!("unknown id: {id}");
+            Self::Id(name) => {
+                let Some(scope) = lookup_table.get(name) else {
+                    panic!("unknown id: {name}");
                 };
-                let mut bytes = vec![OpCode::GetLocalVar as u8];
+                let mut bytes = match scope {
+                    Scope::Global(_) => vec![OpCode::GetGlobalVar as u8],
+                    Scope::Local(_) => vec![OpCode::GetLocalVar as u8],
+                };
+                let id = match scope {
+                    Scope::Global(id) => *id,
+                    Scope::Local(id) => *id,
+                };
                 bytes.extend(id.to_le_bytes());
                 bytes
             }
@@ -136,22 +162,19 @@ impl Function {
         size
     }
 
-    pub fn to_bytecode(
-        &self,
-        _global_lookup_table: &std::collections::HashMap<String, u32>,
-    ) -> Vec<u8> {
+    pub fn to_bytecode(&self, global_lookup_table: &LookupTable) -> Vec<u8> {
         let mut bytes = vec![];
-        let mut lookup_table = std::collections::HashMap::new();
+        let mut lookup_table = LookupTable::new();
 
         for (i, param) in self.params.iter().enumerate() {
             let id = i as u32;
-            lookup_table.insert(param.clone(), id);
+            lookup_table.insert(param.clone(), Scope::Local(id));
             bytes.push(OpCode::Rot as u8);
             bytes.push(OpCode::LoadLocalVar as u8);
             bytes.extend(id.to_le_bytes());
         }
 
-        let mut table = _global_lookup_table.clone();
+        let mut table = global_lookup_table.clone();
         for (key, value) in lookup_table.iter() {
             table.insert(key.clone(), *value);
         }
@@ -175,7 +198,7 @@ impl If {
         todo!()
     }
 
-    pub fn to_bytecode(&self, lookup_table: &std::collections::HashMap<String, u32>) -> Vec<u8> {
+    pub fn to_bytecode(&self, lookup_table: &LookupTable) -> Vec<u8> {
         todo!()
     }
 }

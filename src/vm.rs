@@ -139,6 +139,7 @@ pub struct Machine {
     is_running: bool,
     stack: Vec<Value>,
     local_var: Vec<Value>,
+    global_var: Vec<Value>,
 }
 
 impl Machine {
@@ -151,6 +152,7 @@ impl Machine {
             is_running: true,
             stack: vec![],
             local_var: vec![],
+            global_var: vec![],
         }
     }
 
@@ -193,15 +195,30 @@ impl Machine {
                 // NOTE: I dont think this LocalVar(index) is used
                 let _ = self.get_u32()? as usize;
                 let Some(value) = self.stack.pop() else {
-                    panic!("expected value on stack for LocalVar")
+                    panic!("expected value on stack for LoadLocalVar")
                 };
                 self.local_var.push(value);
+                Ok(())
+            }
+            OpCode::LoadGlobalVar => {
+                let Some(value) = self.stack.pop() else {
+                    panic!("expected value on stack for LoadGlobalVar")
+                };
+                self.global_var.push(value);
                 Ok(())
             }
             OpCode::GetLocalVar => {
                 let index = self.get_u32()? as usize;
                 let Some(value) = self.local_var.get(index) else {
-                    panic!("expected value on stack for LocalVar")
+                    panic!("expected value on stack for GetLocalVar")
+                };
+                self.stack.push(value.clone());
+                Ok(())
+            }
+            OpCode::GetGlobalVar => {
+                let index = self.get_u32()? as usize;
+                let Some(value) = self.global_var.get(index) else {
+                    panic!("expected value on stack for GetGlobalVar")
                 };
                 self.stack.push(value.clone());
                 Ok(())

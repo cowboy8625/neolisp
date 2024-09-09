@@ -7,7 +7,7 @@ use crate::parser::parser;
 use chumsky::prelude::Parser;
 
 pub use header::Header;
-use ir::{Function, Ir, Value};
+use ir::{Function, Ir, Scope, Value};
 
 fn get_ast(src: &str) -> Result<Vec<Spanned<Expr>>, Vec<String>> {
     match parser().parse(src) {
@@ -23,6 +23,7 @@ pub fn compile(src: &str) -> Result<Vec<u8>, Vec<String>> {
     let ast = get_ast(src)?;
     let mut ir_code = Vec::new();
     let mut func = Vec::new();
+    let scope = Scope::Global;
 
     for spanned in ast.iter() {
         compile_expr(&mut func, &mut ir_code, spanned);
@@ -30,13 +31,33 @@ pub fn compile(src: &str) -> Result<Vec<u8>, Vec<String>> {
 
     let mut func_lookup = std::collections::HashMap::new();
     let mut offset = Header::SIZE;
+
+    {
+        let Some(main) = func.iter_mut().find(|f| f.name == "main") else {
+            panic!("main function not found");
+        };
+        for instruction in ir_code.iter().rev() {
+            main.instruction.insert(0, instruction.clone());
+        }
+    }
+
     for function in func.iter() {
-        func_lookup.insert(function.name.clone(), offset);
+        func_lookup.insert(function.name.clone(), Scope::Global(offset));
         let function_size = function.size();
         offset += function_size;
     }
 
+    let mut global_var_index = 0;
+    for code in ir_code.iter() {
+        if let Ir::LoadGlobalVar(name) = code {
+            func_lookup.insert(name.clone(), Scope::Global(global_var_index));
+            global_var_index += 1;
+        }
+    }
+
+    // eprintln!("{:?}", ir_code);
     // eprintln!("{:#?}", func);
+
     let mut program = Vec::new();
     let mut program_header = Header::new();
 
@@ -45,7 +66,9 @@ pub fn compile(src: &str) -> Result<Vec<u8>, Vec<String>> {
 
         program.extend(bytecode);
         if function.name == "main" {
-            let main_offset = func_lookup.get("main").unwrap();
+            let Some(Scope::Global(main_offset)) = func_lookup.get("main") else {
+                panic!("main function not found");
+            };
             program_header.set_start(*main_offset);
         }
     }
@@ -87,10 +110,25 @@ fn compile_call(func: &mut Vec<Function>, ir_code: &mut Vec<Ir>, s_expr: &[Spann
     ir_code.push(Ir::Call(name.clone(), args));
 }
 
+fn compile_var(func: &mut Vec<Function>, ir_code: &mut Vec<Ir>, s_expr: &[Spanned<Expr>]) {
+    let Some(Spanned {
+        expr: Expr::Symbol(name),
+        ..
+    }) = s_expr.get(1)
+    else {
+        panic!("expected variable name");
+    };
+    for spanned in s_expr.iter().skip(2) {
+        compile_expr(func, ir_code, spanned);
+    }
+    ir_code.push(Ir::LoadGlobalVar(name.to_string()));
+}
+
 fn compile_s_expr(func: &mut Vec<Function>, ir_code: &mut Vec<Ir>, s_expr: &[Spanned<Expr>]) {
     match s_expr.first() {
         Some(spanned) => match &spanned.expr {
             Expr::Symbol(v) if v.as_str() == "fn" => compile_function(func, s_expr),
+            Expr::Symbol(v) if v.as_str() == "var" => compile_var(func, ir_code, s_expr),
             Expr::Symbol(_) => compile_call(func, ir_code, s_expr),
             _ => panic!("expected symbol"),
             // _ => {
@@ -159,7 +197,7 @@ mod tests {
     use pretty_assertions::assert_eq;
     #[test]
     fn test_compiler_intermediate_code() {
-        let src = "(fn add (x y) (+ x y )) (fn main () (print (add 1 2)))";
+        let src = include_str!("../../samples/simple.nl");
         let program = compile(src).unwrap();
 
         assert_eq!(&program[64..], vec![]);
