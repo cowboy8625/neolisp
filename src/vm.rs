@@ -121,7 +121,17 @@ impl std::fmt::Display for Value {
             Self::F64(value) => write!(f, "{value}"),
             Self::String(value) => write!(f, "{value}"),
             Self::Bool(value) => write!(f, "{value}"),
-            Self::List(value) => write!(f, "{value:?}"),
+            Self::List(value) => {
+                write!(
+                    f,
+                    "({})",
+                    value
+                        .iter()
+                        .map(|v| format!("{}", v))
+                        .collect::<Vec<String>>()
+                        .join(" ")
+                )
+            }
         }
     }
 }
