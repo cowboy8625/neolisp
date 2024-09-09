@@ -37,20 +37,11 @@ impl Ir {
             Self::Value(v) => v.to_bytecode(lookup_table),
             Self::If(i) => i.to_bytecode(lookup_table),
             Self::Call(name, args) => match name.as_str() {
-                "list" => {
-                    let mut bytes = args
-                        .iter()
-                        .map(|a| a.to_bytecode(lookup_table))
-                        .flatten()
-                        .collect::<Vec<_>>();
-                    bytes.push(OpCode::CreateList as u8);
-                    bytes.extend((args.len() as u32).to_le_bytes());
-                    bytes
-                }
-                "+" | "print" => {
+                "+" | "print" | "list" => {
                     let opcode = match name.as_str() {
                         "+" => OpCode::AddF64,
                         "print" => OpCode::Print,
+                        "list" => OpCode::CreateList,
                         _ => unreachable!(),
                     };
                     let mut bytes = args
@@ -59,6 +50,7 @@ impl Ir {
                         .flatten()
                         .collect::<Vec<_>>();
                     bytes.push(opcode as u8);
+                    bytes.extend((args.len() as u32).to_le_bytes());
                     bytes
                 }
                 _ => {

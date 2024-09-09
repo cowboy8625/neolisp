@@ -130,7 +130,7 @@ fn compile_s_expr(func: &mut Vec<Function>, ir_code: &mut Vec<Ir>, s_expr: &[Spa
             Expr::Symbol(v) if v.as_str() == "fn" => compile_function(func, s_expr),
             Expr::Symbol(v) if v.as_str() == "var" => compile_var(func, ir_code, s_expr),
             Expr::Symbol(_) => compile_call(func, ir_code, s_expr),
-            _ => panic!("expected symbol"),
+            v => unimplemented!("{:#?}", v),
             // _ => {
             //     for spanned in s_expr.iter() {
             //         compile_expr(func, ir_code, spanned);

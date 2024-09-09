@@ -177,13 +177,15 @@ impl Machine {
             OpCode::Noop => Ok(()),
             OpCode::Halt => Ok(self.shutdown()),
             OpCode::AddF64 => {
-                let Some(Value::F64(left)) = self.stack.pop() else {
-                    panic!("expected f64 on stack")
-                };
-                let Some(Value::F64(right)) = self.stack.pop() else {
-                    panic!("expected f64 on stack")
-                };
-                self.stack.push(Value::F64(left + right));
+                let count = self.get_u32()?;
+                let mut result = 0.;
+                for _ in 0..count {
+                    let Some(Value::F64(value)) = self.stack.pop() else {
+                        panic!("expected value on stack for AddF64")
+                    };
+                    result += value;
+                }
+                self.stack.push(Value::F64(result));
                 Ok(())
             }
             OpCode::PushF64 => {
@@ -191,11 +193,19 @@ impl Machine {
                 self.stack.push(Value::F64(value));
                 Ok(())
             }
+            OpCode::PushString => {
+                let value = self.get_string()?;
+                self.stack.push(Value::String(value));
+                Ok(())
+            }
             OpCode::Print => {
-                let Some(value) = self.stack.pop() else {
-                    panic!("expected value on stack for print")
-                };
-                println!("{value}");
+                let count = self.get_u32()?;
+                for _ in 0..count {
+                    let Some(value) = self.stack.pop() else {
+                        panic!("expected value on stack for print")
+                    };
+                    print!("{value}");
+                }
                 Ok(())
             }
             OpCode::Call => {
@@ -364,6 +374,13 @@ impl Machine {
             byte7 as u8,
             byte8 as u8,
         ]))
+    }
+
+    fn get_string(&mut self) -> Result<String> {
+        let len = self.get_u32()? as usize;
+        let bytes = self.program[self.ip..self.ip + len].to_vec();
+        self.ip += len;
+        Ok(String::from_utf8(bytes)?)
     }
 }
 
