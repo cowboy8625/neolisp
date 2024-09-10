@@ -11,11 +11,6 @@ mod repl;
 mod tests;
 mod vm;
 
-// use crate::environment::Env;
-// use crate::error::print_error;
-// use crate::eval::eval;
-// use crate::parser::parser;
-// use chumsky::prelude::Parser as ChumskyParser;
 use clap::Parser as ClapParser;
 use compiler::{compile, decompile};
 
@@ -36,7 +31,7 @@ fn main() -> anyhow::Result<()> {
         panic!("failed to read file")
     };
 
-    let program = match compile(&src) {
+    let program = match compile(&src, args.test) {
         Ok(program) => program,
         Err(e) => {
             for e in e {

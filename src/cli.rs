@@ -13,6 +13,8 @@ pub struct Cli {
     pub repl: bool,
     #[arg(short='H', long, default_value_t = String::from(HISTORY_PATH))]
     pub history_path: String,
+    #[arg(short = 't', long, default_value_t = false)]
+    pub test: bool,
     pub files: Vec<String>,
 }
 

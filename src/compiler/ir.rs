@@ -16,6 +16,7 @@ pub enum Ir {
     Return,
     Halt,
     LoadGlobalVar(String),
+    BuiltIn(String, Vec<Ir>),
 }
 
 impl Ir {
@@ -23,13 +24,26 @@ impl Ir {
         match self {
             Self::Value(v) => v.size(),
             Self::If(i) => i.size(),
-            Self::Call(name, args) => match name.as_str() {
-                "+" | "print" => 1 + args.iter().map(|a| a.size()).sum::<u32>(),
-                _ => 1 + 4 + args.iter().map(|a| a.size()).sum::<u32>(),
-            },
+            Self::Call(name, args) => 1 + 4 + args.iter().map(|a| a.size()).sum::<u32>(),
             Self::Return => 2,
             Self::Halt => 1,
             Self::LoadGlobalVar(_) => 1,
+            Self::BuiltIn(name, args) => match name.as_str() {
+                "+" => {
+                    let mut count = 1; // opcode
+                    count += 4; // args count
+                    count
+                }
+                _ => {
+                    let mut count = 0;
+                    count += 1; // opcode
+                    count += 4; // args count
+                    count += 4; // name length
+                    count += name.len() as u32; // name
+                    count += args.iter().map(|a| a.size()).sum::<u32>(); // args size
+                    count
+                }
+            },
         }
     }
     pub fn to_bytecode(&self, lookup_table: &LookupTable) -> Vec<u8> {
@@ -37,22 +51,6 @@ impl Ir {
             Self::Value(v) => v.to_bytecode(lookup_table),
             Self::If(i) => i.to_bytecode(lookup_table),
             Self::Call(name, args) => match name.as_str() {
-                "+" | "print" | "list" => {
-                    let opcode = match name.as_str() {
-                        "+" => OpCode::AddF64,
-                        "print" => OpCode::Print,
-                        "list" => OpCode::CreateList,
-                        _ => unreachable!(),
-                    };
-                    let mut bytes = args
-                        .iter()
-                        .map(|a| a.to_bytecode(lookup_table))
-                        .flatten()
-                        .collect::<Vec<_>>();
-                    bytes.push(opcode as u8);
-                    bytes.extend((args.len() as u32).to_le_bytes());
-                    bytes
-                }
                 _ => {
                     let mut bytes = args
                         .iter()
@@ -71,13 +69,41 @@ impl Ir {
             },
             Self::Return => vec![OpCode::Rot as u8, OpCode::Return as u8],
             Self::Halt => vec![OpCode::Halt as u8],
-            Self::LoadGlobalVar(_) => {
-                // let id = lookup_table.get(name).unwrap();
-                // let mut bytes = vec![OpCode::LoadGlobalVar as u8];
-                // bytes.extend(id.to_le_bytes());
-                // bytes
-                vec![OpCode::LoadGlobalVar as u8]
-            }
+            Self::LoadGlobalVar(_) => vec![OpCode::LoadGlobalVar as u8],
+            Self::BuiltIn(name, args) => match name.as_str() {
+                "+" | "print" | "list" => {
+                    let mut bytes = args
+                        .iter()
+                        .map(|a| a.to_bytecode(lookup_table))
+                        .flatten()
+                        .collect::<Vec<_>>();
+                    let op = match name.as_str() {
+                        "+" => OpCode::AddF64,
+                        "print" => OpCode::Print,
+                        "list" => OpCode::CreateList,
+                        _ => unreachable!(),
+                    };
+                    bytes.push(op as u8);
+                    bytes.extend((args.len() as u32).to_le_bytes());
+                    bytes
+                }
+                _ => {
+                    let mut bytes = args
+                        .iter()
+                        .map(|a| a.to_bytecode(lookup_table))
+                        .flatten()
+                        .collect::<Vec<_>>();
+                    let length = name.len() as u32;
+                    bytes.push(OpCode::BuiltIn as u8);
+                    // Args count
+                    bytes.extend((args.len() as u32).to_le_bytes());
+                    // name length
+                    bytes.extend(length.to_le_bytes());
+                    // name
+                    bytes.extend(name.as_bytes());
+                    bytes
+                }
+            },
         }
     }
 }

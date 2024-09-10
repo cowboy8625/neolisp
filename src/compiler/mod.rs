@@ -220,6 +220,7 @@ impl Compiler {
     }
 }
 
+<<<<<<< HEAD
 // pub fn compile_other(src: &str) -> Result<Vec<u8>, Vec<String>> {
 //     let ast = get_ast(src)?;
 //     let mut ir_code = Vec::new();
@@ -403,3 +404,51 @@ impl Compiler {
 //         assert_eq!(&program[64..], vec![]);
 //     }
 // }
+fn compile_test(tests: &mut Vec<String>, ast: &Vec<Spanned<Expr>>) -> Result<Vec<u8>, Vec<String>> {
+    let mut errors = Vec::new();
+    for spanned in ast.iter() {
+        let Spanned { expr, .. } = spanned;
+        let Expr::List(items) = expr else {
+            continue;
+        };
+
+        let Some(Spanned { expr, .. }) = items.first() else {
+            continue;
+        };
+
+        let Expr::Symbol(test) = expr else {
+            continue;
+        };
+
+        if test != "test" {
+            continue;
+        }
+
+        let Some(Spanned {
+            expr: Expr::String(name),
+            ..
+        }) = items.get(1)
+        else {
+            errors.push("expected test name".to_string());
+            continue;
+        };
+
+        let Some(Spanned { expr, .. }) = items.get(2) else {
+            errors.push("expected test body".to_string());
+            continue;
+        };
+
+        let mut ir_code = Vec::new();
+        for item in items.iter().skip(2) {
+            compile_expr(&mut Vec::new(), &mut ir_code, item);
+        }
+        eprintln!("{}: {:#?}", name, ir_code);
+    }
+    if !errors.is_empty() {
+        return Err(errors);
+    }
+
+    eprintln!("tests: {:?}", tests);
+    Ok(vec![])
+}
+
