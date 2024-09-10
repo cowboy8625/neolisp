@@ -17,7 +17,7 @@ mod vm;
 // use crate::parser::parser;
 // use chumsky::prelude::Parser as ChumskyParser;
 use clap::Parser as ClapParser;
-use compiler::compile;
+use compiler::{compile, decompile};
 
 fn main() -> anyhow::Result<()> {
     let args = cli::Cli::parse();
@@ -45,6 +45,22 @@ fn main() -> anyhow::Result<()> {
             return Ok(());
         }
     };
+
+    println!("{:?}", &program[64..]);
+    let (header, instructions) = match decompile(&program) {
+        Ok(result) => result,
+        Err(e) => {
+            println!("{:?}", e.0);
+            for i in e.1 {
+                println!("{:?}", i);
+            }
+            return Ok(());
+        }
+    };
+    println!("{:?}", header);
+    for i in instructions {
+        println!("{:?}", i);
+    }
 
     let mut machine = vm::Machine::new(program);
     machine.run()?;
