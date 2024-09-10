@@ -1,5 +1,5 @@
 ; (var X 1234)
 ; (var Y 4321)
 ; (fn add (x y) (+ x y ))
-; (fn main () (print (list 1 2 3 4)))
-(fn main () (print (+ 1 2 3)))
+; (fn main () (print (list 1 2 3 4) "\n"))
+(fn main () (print (+ 1 2 3) "\n"))

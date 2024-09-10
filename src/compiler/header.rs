@@ -1,10 +1,17 @@
 /// Header is 64 bytes
+#[derive(Debug, Clone, PartialEq)]
 pub struct Header {
     pub magic_number: [u8; 4], // NLVM
     pub version: u32,          // 0
     pub data_section_offset: u32,
     pub code_section_offset: u32,
     pub start: u32,
+}
+
+impl Default for Header {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Header {

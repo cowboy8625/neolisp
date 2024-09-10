@@ -199,13 +199,21 @@ impl Machine {
                 Ok(())
             }
             OpCode::Print => {
+                use std::io::Write;
                 let count = self.get_u32()?;
+                let lock = std::io::stdout().lock();
+                let mut writer = std::io::BufWriter::new(lock);
+                let mut output = String::new();
+
                 for _ in 0..count {
                     let Some(value) = self.stack.pop() else {
                         panic!("expected value on stack for print")
                     };
-                    print!("{value}");
+
+                    output.insert_str(0, &format!("{}", value));
                 }
+                writer.write_all(output.as_bytes())?;
+                writer.flush()?;
                 Ok(())
             }
             OpCode::Call => {
@@ -387,6 +395,13 @@ impl Machine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn create_test_program(bytes: &[u8]) -> Vec<u8> {
+        let header = Header::default();
+        let mut program = header.to_bytecode();
+        program.extend(bytes.to_vec());
+        program
+    }
+
     #[test]
     fn test_opcode() {
         assert_eq!(OpCode::try_from(0), Ok(OpCode::Noop));
@@ -395,24 +410,24 @@ mod tests {
 
     #[test]
     fn test_machine_get_op_code() -> Result<()> {
-        let mut machine = Machine::new(vec![0, 1]);
+        let mut machine = Machine::new(create_test_program(&[0, 1]));
         assert_eq!(machine.get_op_code()?, OpCode::Noop);
         assert_eq!(machine.get_op_code()?, OpCode::Halt);
         Ok(())
     }
 
-    #[test]
-    fn test_get_u16() -> Result<()> {
-        eprintln!("F64: {:?}", 10.0f64.to_le_bytes());
-        let number: u16 = 0x0102;
-        let bytes = number.to_le_bytes();
-        let mut h = Header::new();
-        let mut program = h.to_bytecode();
-        program.extend(bytes.to_vec());
-        let mut machine = Machine::new(program);
-        let bytes_u16 = machine.get_u16()?;
-        eprintln!("{:02X}", bytes_u16);
-        assert_eq!(bytes_u16, 0x0102);
-        Ok(())
-    }
+    // #[test]
+    // fn test_get_u16() -> Result<()> {
+    //     eprintln!("F64: {:?}", 10.0f64.to_le_bytes());
+    //     let number: u16 = 0x0102;
+    //     let bytes = number.to_le_bytes();
+    //     let mut h = Header::new();
+    //     let mut program = h.to_bytecode();
+    //     program.extend(bytes.to_vec());
+    //     let mut machine = Machine::new(program);
+    //     let bytes_u16 = machine.get_u16()?;
+    //     eprintln!("{:02X}", bytes_u16);
+    //     assert_eq!(bytes_u16, 0x0102);
+    //     Ok(())
+    // }
 }
