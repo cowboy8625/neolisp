@@ -1,4 +1,5 @@
 use super::{builtin, Header, OpCode, Value};
+use crate::compiler::decompile;
 use anyhow::Result;
 
 /// Virtual Machine
@@ -55,6 +56,7 @@ impl Machine {
             }
             OpCode::PushF64 => {
                 let value = self.get_f64()?;
+                eprintln!("PushF64 {:.2}", value);
                 self.stack.push(Value::F64(value));
                 Ok(())
             }
@@ -156,23 +158,32 @@ impl Machine {
         }
     }
 
+    fn debug(&self) {
+        eprintln!("---- VM ----");
+        eprintln!("ip: {:02X}", self.ip - Header::SIZE as usize);
+        let instructions = match decompile(&self.program) {
+            Ok((_, instructions)) => instructions,
+            Err((e, instructions)) => {
+                eprintln!("{}", e);
+                instructions
+            }
+        };
+        let mut program_counter = Header::SIZE as usize;
+        for i in instructions {
+            let selected = if self.ip == program_counter {
+                format!("\x1b[31m{:02X} ", program_counter - Header::SIZE as usize)
+            } else if (program_counter..program_counter + i.size() as usize).contains(&self.ip) {
+                format!("\x1b[32m{:02X} ", program_counter - Header::SIZE as usize)
+            } else {
+                format!("{:02X} ", program_counter - Header::SIZE as usize)
+            };
+            eprintln!("{selected}{i}\x1b[0m");
+            program_counter += i.size() as usize;
+        }
+    }
+
     pub fn run(&mut self) -> Result<()> {
-        // eprintln!("start: {}", self.ip);
-        // for (i, chunk) in self.program[Header::SIZE as usize..].chunks(4).enumerate() {
-        //     let debug = chunk
-        //         .iter()
-        //         .map(|b| format!("{b:02X}"))
-        //         .collect::<Vec<_>>()
-        //         .join(" ");
-        //     let start = i * 4 + Header::SIZE as usize;
-        //     let end = i * 4 + (Header::SIZE as usize) + 4;
-        //     let selected = if (start..end).contains(&self.ip) {
-        //         "> "
-        //     } else {
-        //         "  "
-        //     };
-        //     eprintln!("{selected}{debug}");
-        // }
+        self.debug();
         while self.is_running && self.ip < self.program.len() {
             self.run_once()?;
         }

@@ -7,7 +7,7 @@ use crate::ast::{Expr, Spanned};
 use crate::parser::parser;
 use chumsky::prelude::Parser;
 
-pub use decompiler::decompile;
+pub use decompiler::{decompile, decompile_chunk, display_chunk};
 pub use header::Header;
 use ir::{Function, Ir, LookupTable, Scope, Value};
 
@@ -87,16 +87,13 @@ impl Compiler {
     fn compile(mut self, ast: &[Spanned<Expr>]) -> Result<Vec<u8>, Vec<String>> {
         let global_ir_code = self.generate_ir_code(ast);
         self.create_lookup_table(&global_ir_code);
-        for i in global_ir_code.iter() {
-            eprintln!("{:#?}", i.to_bytecode(&self.lookup_table));
-        }
 
         let mut program = Vec::new();
 
-        // eprintln!("{:#?}", self.functions);
         for function in self.functions.iter() {
             let bytecode = function.to_bytecode(&self.lookup_table);
-
+            // eprintln!("Function: {}", function.name);
+            // display_chunk(&bytecode);
             program.extend(bytecode);
             if function.name == "main" {
                 let Some(Scope::Global(main_offset)) = self.lookup_table.get("main") else {
@@ -105,6 +102,7 @@ impl Compiler {
                 self.header.set_start(*main_offset);
             }
         }
+        eprintln!("{:#?}", self.lookup_table);
 
         Ok(vec![self.header.to_bytecode(), program]
             .into_iter()
@@ -216,11 +214,16 @@ impl Compiler {
             self.compile_expr(&mut acc, s);
             acc
         });
-        ir_code.push(Ir::Call(name.clone(), args));
+
+        match name.as_str() {
+            "+" | "print" | "list" | "nth" | "length" => {
+                ir_code.push(Ir::BuiltIn(name.clone(), args))
+            }
+            _ => ir_code.push(Ir::Call(name.clone(), args)),
+        }
     }
 }
 
-<<<<<<< HEAD
 // pub fn compile_other(src: &str) -> Result<Vec<u8>, Vec<String>> {
 //     let ast = get_ast(src)?;
 //     let mut ir_code = Vec::new();
@@ -404,51 +407,181 @@ impl Compiler {
 //         assert_eq!(&program[64..], vec![]);
 //     }
 // }
-fn compile_test(tests: &mut Vec<String>, ast: &Vec<Spanned<Expr>>) -> Result<Vec<u8>, Vec<String>> {
-    let mut errors = Vec::new();
-    for spanned in ast.iter() {
-        let Spanned { expr, .. } = spanned;
-        let Expr::List(items) = expr else {
-            continue;
-        };
+//
+// --------------------------------------------------------------------------
+//
+// fn compile_call(func: &mut Vec<Function>, ir_code: &mut Vec<Ir>, s_expr: &[Spanned<Expr>]) {
+//     let Some(Spanned {
+//         expr: Expr::Symbol(name),
+//         ..
+//     }) = s_expr.get(0)
+//     else {
+//         panic!("expected function name");
+//     };
+//
+//     let args = s_expr.iter().skip(1).fold(Vec::new(), |mut acc, s| {
+//         compile_expr(func, &mut acc, s);
+//         acc
+//     });
+//
+//     match name.as_str() {
+//         "+" | "print" | "list" | "nth" | "length" => ir_code.push(Ir::BuiltIn(name.clone(), args)),
+//         _ => ir_code.push(Ir::Call(name.clone(), args)),
+//     }
+// }
+//
+// fn compile_var(func: &mut Vec<Function>, ir_code: &mut Vec<Ir>, s_expr: &[Spanned<Expr>]) {
+//     let Some(Spanned {
+//         expr: Expr::Symbol(name),
+//         ..
+//     }) = s_expr.get(1)
+//     else {
+//         panic!("expected variable name");
+//     };
+//     for spanned in s_expr.iter().skip(2) {
+//         compile_expr(func, ir_code, spanned);
+//     }
+//     ir_code.push(Ir::LoadGlobalVar(name.to_string()));
+// }
+//
+// fn compile_s_expr(func: &mut Vec<Function>, ir_code: &mut Vec<Ir>, s_expr: &[Spanned<Expr>]) {
+//     match s_expr.first() {
+//         Some(spanned) => match &spanned.expr {
+//             Expr::Symbol(v) if v.as_str() == "fn" => compile_function(func, s_expr),
+//             Expr::Symbol(v) if v.as_str() == "var" => compile_var(func, ir_code, s_expr),
+//             Expr::Symbol(_) => compile_call(func, ir_code, s_expr),
+//             v => unimplemented!("{:#?}", v),
+//             // _ => {
+//             //     for spanned in s_expr.iter() {
+//             //         compile_expr(func, ir_code, spanned);
+//             //     }
+//             // }
+//         },
+//         None => {}
+//     }
+// }
+//
+// fn compile_function(func: &mut Vec<Function>, s_expr: &[Spanned<Expr>]) {
+//     let Some(Spanned {
+//         expr: Expr::Symbol(name),
+//         ..
+//     }) = s_expr.get(1)
+//     else {
+//         panic!("expected function name");
+//     };
+//
+//     let Some(Spanned {
+//         expr: Expr::List(params),
+//         ..
+//     }) = s_expr.get(2)
+//     else {
+//         panic!("expected function params");
+//     };
+//
+//     let params = params
+//         .iter()
+//         .map(|param| match &param.expr {
+//             Expr::Symbol(v) => v.to_string(),
+//             v => panic!("expected function param to be a symbols found {:?}", v),
+//         })
+//         .collect();
+//
+//     let Some(Spanned {
+//         expr: Expr::List(body),
+//         ..
+//     }) = s_expr.get(3)
+//     else {
+//         panic!("expected function body");
+//     };
+//
+//     let mut instruction = Vec::new();
+//     compile_s_expr(func, &mut instruction, body);
+//     if name == "main" {
+//         instruction.push(Ir::Halt);
+//     } else {
+//         instruction.push(Ir::Return);
+//     }
+//
+//     let function = Function {
+//         name: name.to_string(),
+//         params,
+//         instruction,
+//     };
+//
+//     func.push(function);
+// }
+//
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use pretty_assertions::assert_eq;
+//     #[test]
+//     fn test_compiler_intermediate_code() {
+//         let src = include_str!("../../samples/simple.nl");
+//         let program = compile(src).unwrap();
+//
+//         assert_eq!(&program[64..], vec![]);
+//     }
+// }
 
-        let Some(Spanned { expr, .. }) = items.first() else {
-            continue;
-        };
-
-        let Expr::Symbol(test) = expr else {
-            continue;
-        };
-
-        if test != "test" {
-            continue;
-        }
-
-        let Some(Spanned {
-            expr: Expr::String(name),
-            ..
-        }) = items.get(1)
-        else {
-            errors.push("expected test name".to_string());
-            continue;
-        };
-
-        let Some(Spanned { expr, .. }) = items.get(2) else {
-            errors.push("expected test body".to_string());
-            continue;
-        };
-
-        let mut ir_code = Vec::new();
-        for item in items.iter().skip(2) {
-            compile_expr(&mut Vec::new(), &mut ir_code, item);
-        }
-        eprintln!("{}: {:#?}", name, ir_code);
-    }
-    if !errors.is_empty() {
-        return Err(errors);
-    }
-
-    eprintln!("tests: {:?}", tests);
-    Ok(vec![])
-}
-
+// fn compile_test(tests: &mut Vec<String>, ast: &Vec<Spanned<Expr>>) -> Result<Vec<u8>, Vec<String>> {
+//     let mut errors = Vec::new();
+//     for spanned in ast.iter() {
+//         let Spanned { expr, .. } = spanned;
+//         let Expr::List(items) = expr else {
+//             continue;
+//         };
+//
+//         let Some(Spanned { expr, .. }) = items.first() else {
+//             continue;
+//         };
+//
+//         let Expr::Symbol(test) = expr else {
+//             continue;
+//         };
+//
+//         if test != "test" {
+//             continue;
+//         }
+//
+//         let Some(Spanned {
+//             expr: Expr::String(name),
+//             ..
+//         }) = items.get(1)
+//         else {
+//             errors.push("expected test name".to_string());
+//             continue;
+//         };
+//
+//         let Some(Spanned { expr, .. }) = items.get(2) else {
+//             errors.push("expected test body".to_string());
+//             continue;
+//         };
+//
+//         let mut ir_code = Vec::new();
+//         for item in items.iter().skip(2) {
+//             compile_expr(&mut Vec::new(), &mut ir_code, item);
+//         }
+//         eprintln!("{}: {:#?}", name, ir_code);
+//     }
+//     if !errors.is_empty() {
+//         return Err(errors);
+//     }
+//
+//     eprintln!("tests: {:?}", tests);
+//     Ok(vec![])
+// }
+//
+// pub fn compile(src: &str, test: bool) -> Result<Vec<u8>, Vec<String>> {
+//     let ast = get_ast(src)?;
+//     let mut ir_code = Vec::new();
+//     let mut func = Vec::new();
+//     let mut tests = Vec::new();
+//
+//     if test {
+//         return compile_test(&mut tests, &ast);
+//     }
+//
+//     let scope = Scope::Global;
+// >>>>>>> 8325fa0 (start of test)
+//

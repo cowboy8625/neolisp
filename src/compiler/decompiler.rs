@@ -5,18 +5,205 @@ use crate::vm::OpCode;
 pub enum Instruction {
     Noop,
     Halt,
-    AddF64 { count: u32 },
-    PushF64,
-    PushString { length: u32, value: String },
+    AddF64 {
+        count: u32,
+    },
+    PushF64 {
+        value: f64,
+    },
+    PushString {
+        length: u32,
+        value: String,
+    },
     Swap,
     Dup,
     Rot,
-    LoadLocalVar { index: u32 },
-    GetLocalVar { index: u32 },
+    LoadLocalVar {
+        index: u32,
+    },
+    GetLocalVar {
+        index: u32,
+    },
     LoadGlobalVar,
-    GetGlobalVar { index: u32 },
-    Call { index: u32 },
+    GetGlobalVar {
+        index: u32,
+    },
+    Call {
+        index: u32,
+    },
+    Print {
+        count: u32,
+    },
     Return,
+    BuiltIn {
+        count_of_args: u32,
+        name_length: u32,
+        name: String,
+    },
+}
+
+impl Instruction {
+    pub fn size(&self) -> u32 {
+        match self {
+            Self::Noop => 1,
+            Self::Halt => 1,
+            Self::AddF64 { .. } => 1 + 4,
+            Self::PushF64 { .. } => 1 + 8,
+            Self::PushString { length, .. } => 1 + 4 + length,
+            Self::Swap => 1,
+            Self::Dup => 1,
+            Self::Rot => 1,
+            Self::LoadLocalVar { index } => 1 + 4,
+            Self::GetLocalVar { index } => 1 + 4,
+            Self::LoadGlobalVar => 1,
+            Self::GetGlobalVar { index } => 1 + 4,
+            Self::Call { index } => 1 + 4,
+            Self::Print { count } => 1 + 4,
+            Self::Return => 1,
+            Self::BuiltIn {
+                count_of_args,
+                name_length,
+                ..
+            } => 1 + 4 + name_length,
+        }
+    }
+
+    pub fn to_bytecode(&self) -> Vec<u8> {
+        match self {
+            Instruction::Noop => vec![OpCode::Noop as u8],
+            Instruction::Halt => vec![OpCode::Halt as u8],
+            Instruction::AddF64 { count } => {
+                let mut bytes = vec![OpCode::AddF64 as u8];
+                bytes.extend(count.to_le_bytes());
+                bytes
+            }
+            Instruction::PushF64 { value } => {
+                let mut bytes = vec![OpCode::PushF64 as u8];
+                bytes.extend(value.to_le_bytes());
+                bytes
+            }
+            Instruction::PushString { length, value } => {
+                let mut bytes = vec![OpCode::PushString as u8];
+                bytes.extend(length.to_le_bytes());
+                bytes.extend(value.as_bytes());
+                bytes
+            }
+            Instruction::Swap => vec![OpCode::Swap as u8],
+            Instruction::Dup => vec![OpCode::Dup as u8],
+            Instruction::Rot => vec![OpCode::Rot as u8],
+            Instruction::LoadLocalVar { index } => {
+                let mut bytes = vec![OpCode::LoadLocalVar as u8];
+                bytes.extend(index.to_le_bytes());
+                bytes
+            }
+            Instruction::GetLocalVar { index } => {
+                let mut bytes = vec![OpCode::GetLocalVar as u8];
+                bytes.extend(index.to_le_bytes());
+                bytes
+            }
+            Instruction::LoadGlobalVar => vec![OpCode::LoadGlobalVar as u8],
+            Instruction::GetGlobalVar { index } => {
+                let mut bytes = vec![OpCode::GetGlobalVar as u8];
+                bytes.extend(index.to_le_bytes());
+                bytes
+            }
+            Instruction::Call { index } => {
+                let mut bytes = vec![OpCode::Call as u8];
+                bytes.extend(index.to_le_bytes());
+                bytes
+            }
+            Instruction::Print { count } => {
+                let mut bytes = vec![OpCode::Print as u8];
+                bytes.extend(count.to_le_bytes());
+                bytes
+            }
+            Instruction::Return => vec![OpCode::Return as u8],
+            Instruction::BuiltIn {
+                count_of_args,
+                name_length,
+                name,
+            } => {
+                let mut bytes = vec![OpCode::BuiltIn as u8];
+                bytes.extend(count_of_args.to_le_bytes());
+                bytes.extend(name_length.to_le_bytes());
+                bytes.extend(name.as_bytes());
+                bytes
+            }
+        }
+    }
+}
+
+impl std::fmt::Display for Instruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Instruction::Noop => write!(f, "{:02X}: Noop", OpCode::Noop as u8),
+            Instruction::Halt => write!(f, "{:02X}: Halt", OpCode::Halt as u8),
+            Instruction::AddF64 { count } => {
+                write!(f, "{:02X}: AddF64 {:02X}", OpCode::AddF64 as u8, count)
+            }
+            Instruction::PushF64 { value } => {
+                write!(f, "{:02X}: PushF64 {:.2}", OpCode::PushF64 as u8, value)
+            }
+            Instruction::PushString { length, value } => {
+                write!(
+                    f,
+                    "{:02X}: PushString {:02X} {:?}",
+                    OpCode::PushString as u8,
+                    length,
+                    value
+                )
+            }
+            Instruction::Swap => write!(f, "{:02X}: Swap", OpCode::Swap as u8),
+            Instruction::Dup => write!(f, "{:02X}: Dup", OpCode::Dup as u8),
+            Instruction::Rot => write!(f, "{:02X}: Rot", OpCode::Rot as u8),
+            Instruction::LoadLocalVar { index } => {
+                write!(
+                    f,
+                    "{:02X}: LoadLocalVar {:02X}",
+                    OpCode::LoadLocalVar as u8,
+                    index
+                )
+            }
+            Instruction::GetLocalVar { index } => {
+                write!(
+                    f,
+                    "{:02X}: GetLocalVar {:02X}",
+                    OpCode::GetLocalVar as u8,
+                    index
+                )
+            }
+            Instruction::LoadGlobalVar => {
+                write!(f, "{:02X}: LoadGlobalVar", OpCode::LoadGlobalVar as u8)
+            }
+            Instruction::GetGlobalVar { index } => {
+                write!(
+                    f,
+                    "{:02X}: GetGlobalVar {:02X}",
+                    OpCode::GetGlobalVar as u8,
+                    index
+                )
+            }
+            Instruction::Call { index } => {
+                write!(f, "{:02X}: Call {:02X}", OpCode::Call as u8, index)
+            }
+            Instruction::Print { count } => {
+                write!(f, "{:02X}: Print {:02X}", OpCode::Print as u8, count)
+            }
+            Instruction::Return => write!(f, "{:02X}: Return", OpCode::Return as u8),
+            Instruction::BuiltIn {
+                count_of_args,
+                name_length,
+                name,
+            } => write!(
+                f,
+                "{:02X}: BuiltIn {:02X} {:02X} {:?}",
+                OpCode::BuiltIn as u8,
+                count_of_args,
+                name_length,
+                name
+            ),
+        }
+    }
 }
 
 pub fn decompile(bytes: &[u8]) -> Result<(Header, Vec<Instruction>), (String, Vec<Instruction>)> {
@@ -24,85 +211,127 @@ pub fn decompile(bytes: &[u8]) -> Result<(Header, Vec<Instruction>), (String, Ve
     let mut instructions = Vec::new();
     let mut ip = Header::SIZE as usize;
     while ip < bytes.len() {
-        let op = match OpCode::try_from(bytes[ip]) {
-            Ok(op) => op,
-            Err(e) => return Err((e.to_string(), instructions)),
+        let instruction = match get_instructions(&bytes, &mut ip) {
+            Ok(instruction) => instruction,
+            Err(e) => return Err((e, instructions)),
         };
-        match op {
-            OpCode::Noop => {
-                instructions.push(Instruction::Noop);
-                ip += 1;
-            }
-            OpCode::Halt => {
-                instructions.push(Instruction::Halt);
-                ip += 1;
-            }
-            OpCode::AddF64 => {
-                let count = u32::from_le_bytes(bytes[ip + 1..ip + 5].try_into().unwrap());
-                instructions.push(Instruction::AddF64 { count });
-                ip += 5;
-            }
-            OpCode::Sub => todo!(),
-            OpCode::Mul => todo!(),
-            OpCode::Div => todo!(),
-            OpCode::Mod => todo!(),
-            OpCode::Eq => todo!(),
-            OpCode::Gt => todo!(),
-            OpCode::Lt => todo!(),
-            OpCode::Gte => todo!(),
-            OpCode::Lte => todo!(),
-            OpCode::TypeOf => todo!(),
-            OpCode::And => todo!(),
-            OpCode::Or => todo!(),
-            OpCode::Not => todo!(),
-            OpCode::Print => todo!(),
-            OpCode::PushU8 => todo!(),
-            OpCode::PushF64 => {
-                let value = f64::from_le_bytes(bytes[ip + 1..ip + 9].try_into().unwrap());
-                instructions.push(Instruction::PushF64);
-                ip += 9;
-            }
-            OpCode::PushString => todo!(),
-            OpCode::PopF64 => todo!(),
-            OpCode::Swap => {
-                instructions.push(Instruction::Swap);
-                ip += 1;
-            }
-            OpCode::Dup => todo!("Dup is not implemented"),
-            OpCode::Rot => {
-                instructions.push(Instruction::Rot);
-                ip += 1;
-            }
-            OpCode::LoadLocalVar => {
-                let index = u32::from_le_bytes(bytes[ip + 1..ip + 5].try_into().unwrap());
-                instructions.push(Instruction::LoadLocalVar { index });
-                ip += 5;
-            }
-            OpCode::GetLocalVar => {
-                let index = u32::from_le_bytes(bytes[ip + 1..ip + 5].try_into().unwrap());
-                instructions.push(Instruction::GetLocalVar { index });
-                ip += 5;
-            }
-            OpCode::LoadGlobalVar => {
-                instructions.push(Instruction::LoadGlobalVar);
-                ip += 5;
-            }
-            OpCode::GetGlobalVar => {
-                let index = u32::from_le_bytes(bytes[ip + 1..ip + 5].try_into().unwrap());
-                instructions.push(Instruction::GetGlobalVar { index });
-                ip += 5;
-            }
-            OpCode::Call => {
-                let index = u32::from_le_bytes(bytes[ip + 1..ip + 5].try_into().unwrap());
-                instructions.push(Instruction::Call { index });
-                ip += 5;
-            }
-            OpCode::Return => {
-                instructions.push(Instruction::Return);
-                ip += 1;
-            }
-            OpCode::CreateList => todo!(),
-        }
+        instructions.push(instruction);
     }
     Ok((header, instructions))
+}
+
+pub fn decompile_chunk(bytes: &[u8]) -> Result<Vec<Instruction>, (String, Vec<Instruction>)> {
+    let mut instructions = Vec::new();
+    let mut ip = 0;
+    while ip < bytes.len() {
+        let instruction = match get_instructions(&bytes, &mut ip) {
+            Ok(instruction) => instruction,
+            Err(e) => return Err((e, instructions)),
+        };
+        instructions.push(instruction);
+    }
+    Ok(instructions)
+}
+
+fn get_instructions(bytes: &[u8], ip: &mut usize) -> Result<Instruction, String> {
+    let op = match OpCode::try_from(bytes[*ip]) {
+        Ok(op) => op,
+        Err(e) => return Err(e.to_string()),
+    };
+
+    Ok(match op {
+        OpCode::Noop => {
+            *ip += 1;
+            Instruction::Noop
+        }
+        OpCode::Halt => {
+            *ip += 1;
+            Instruction::Halt
+        }
+        OpCode::AddF64 => {
+            let count = u32::from_le_bytes(bytes[*ip + 1..*ip + 5].try_into().unwrap());
+            *ip += 5;
+            Instruction::AddF64 { count }
+        }
+        OpCode::Sub => todo!(),
+        OpCode::Mul => todo!(),
+        OpCode::Div => todo!(),
+        OpCode::Mod => todo!(),
+        OpCode::Eq => todo!(),
+        OpCode::Gt => todo!(),
+        OpCode::Lt => todo!(),
+        OpCode::Gte => todo!(),
+        OpCode::Lte => todo!(),
+        OpCode::TypeOf => todo!(),
+        OpCode::And => todo!(),
+        OpCode::Or => todo!(),
+        OpCode::Not => todo!(),
+        OpCode::Print => {
+            let count = u32::from_le_bytes(bytes[*ip + 1..*ip + 5].try_into().unwrap());
+            *ip += 5;
+            Instruction::Print { count }
+        }
+        OpCode::PushU8 => todo!(),
+        OpCode::PushF64 => {
+            let value = f64::from_le_bytes(bytes[*ip + 1..*ip + 9].try_into().unwrap());
+            *ip += 9;
+            Instruction::PushF64 { value }
+        }
+        OpCode::PushString => todo!(),
+        OpCode::PopF64 => todo!(),
+        OpCode::Swap => {
+            *ip += 1;
+            Instruction::Swap
+        }
+        OpCode::Dup => todo!("Dup is not implemented"),
+        OpCode::Rot => {
+            *ip += 1;
+            Instruction::Rot
+        }
+        OpCode::LoadLocalVar => {
+            let index = u32::from_le_bytes(bytes[*ip + 1..*ip + 5].try_into().unwrap());
+            *ip += 5;
+            Instruction::LoadLocalVar { index }
+        }
+        OpCode::GetLocalVar => {
+            let index = u32::from_le_bytes(bytes[*ip + 1..*ip + 5].try_into().unwrap());
+            *ip += 5;
+            Instruction::GetLocalVar { index }
+        }
+        OpCode::LoadGlobalVar => {
+            *ip += 1;
+            Instruction::LoadGlobalVar
+        }
+        OpCode::GetGlobalVar => {
+            let index = u32::from_le_bytes(bytes[*ip + 1..*ip + 5].try_into().unwrap());
+            *ip += 5;
+            Instruction::GetGlobalVar { index }
+        }
+        OpCode::Call => {
+            let index = u32::from_le_bytes(bytes[*ip + 1..*ip + 5].try_into().unwrap());
+            *ip += 5;
+            Instruction::Call { index }
+        }
+        OpCode::Return => {
+            *ip += 1;
+            Instruction::Return
+        }
+        OpCode::CreateList => todo!(),
+        OpCode::BuiltIn => todo!("BuiltIn is not implemented"),
+    })
+}
+
+pub fn display_chunk(bytes: &[u8]) {
+    let instructions = match decompile_chunk(&bytes) {
+        Ok(result) => result,
+        Err((e, result)) => {
+            println!("{:?}", e);
+            result
+        }
+    };
+
+    for i in instructions {
+        eprintln!("{}", i);
+        // eprintln!("{:?}", i.to_bytecode());
+    }
 }

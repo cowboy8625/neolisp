@@ -1,3 +1,5 @@
+// TODO: Maybe worth futher transformation of ir before bytecode is generated or
+// TODO: See if using the instructions in the decompiler is better
 mod ast;
 mod builtins;
 mod cli;
@@ -12,7 +14,7 @@ mod tests;
 mod vm;
 
 use clap::Parser as ClapParser;
-use compiler::{compile, decompile};
+use compiler::compile;
 
 fn main() -> anyhow::Result<()> {
     let args = cli::Cli::parse();
@@ -31,7 +33,7 @@ fn main() -> anyhow::Result<()> {
         panic!("failed to read file")
     };
 
-    let program = match compile(&src, args.test) {
+    let program = match compile(&src) {
         Ok(program) => program,
         Err(e) => {
             for e in e {
@@ -41,23 +43,16 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
-    println!("{:?}", &program[64..]);
-    let (header, instructions) = match decompile(&program) {
-        Ok(result) => result,
-        Err(e) => {
-            println!("{:?}", e.0);
-            for i in e.1 {
-                println!("{:?}", i);
-            }
-            return Ok(());
-        }
-    };
-    println!("{:?}", header);
-    for i in instructions {
-        println!("{:?}", i);
-    }
+    let binary_name = filename.split('.').collect::<Vec<&str>>()[0];
+    std::fs::write(binary_name, program.clone())?;
 
     let mut machine = vm::Machine::new(program);
     machine.run()?;
     Ok(())
+}
+
+#[test]
+fn test_c() {
+    let src = "(fn add (a b) (+ a b))";
+    // TODO: Check if the size count is correct for Instructions
 }
