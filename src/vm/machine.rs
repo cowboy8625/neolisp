@@ -56,7 +56,6 @@ impl Machine {
             }
             OpCode::PushF64 => {
                 let value = self.get_f64()?;
-                eprintln!("PushF64 {:.2}", value);
                 self.stack.push(Value::F64(value));
                 Ok(())
             }
@@ -183,7 +182,7 @@ impl Machine {
     }
 
     pub fn run(&mut self) -> Result<()> {
-        self.debug();
+        // self.debug();
         while self.is_running && self.ip < self.program.len() {
             self.run_once()?;
         }

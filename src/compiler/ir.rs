@@ -29,8 +29,9 @@ impl Ir {
             Self::Halt => 1,
             Self::LoadGlobalVar(_) => 1,
             Self::BuiltIn(name, args) => match name.as_str() {
-                "+" => {
-                    let mut count = 1; // opcode
+                "+" | "print" => {
+                    let mut count = args.iter().map(|a| a.size()).sum::<u32>(); // args size
+                    count += 1; // opcode
                     count += 4; // args count
                     count
                 }
@@ -225,5 +226,39 @@ impl If {
 
     pub fn to_bytecode(&self, lookup_table: &LookupTable) -> Vec<u8> {
         todo!()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_value_size() {
+        assert_eq!(Value::Id("a".to_string()).size(), 1 + 4);
+        assert_eq!(Value::U8(1).size(), 1);
+        assert_eq!(Value::U32(1).size(), 4);
+        assert_eq!(Value::F64(1.0).size(), 8);
+        assert_eq!(Value::String("a".to_string()).size(), 4 + 1);
+        assert_eq!(Value::Bool(true).size(), 1 + 1);
+    }
+
+    #[test]
+    fn test_ir_size() {
+        // assert_eq!(Ir::Value(Value));
+        // assert_eq!(Ir::If(If));
+        assert_eq!(Ir::Call("add".to_string(), Vec::new()).size(), 1 + 4);
+        assert_eq!(Ir::Return.size(), 2);
+        assert_eq!(Ir::Halt.size(), 1);
+        assert_eq!(Ir::LoadGlobalVar("X".to_string()).size(), 1);
+
+        let mut lookup_table = LookupTable::new();
+        lookup_table.insert("x".to_string(), Scope::Local(0));
+
+        let name = "add".to_string();
+        let ircode = Ir::BuiltIn(name.clone(), vec![Ir::Value(Value::Id("x".to_string()))]);
+        let bytes = ircode.to_bytecode(&lookup_table);
+
+        assert_eq!(ircode.size(), bytes.len() as u32);
     }
 }

@@ -50,9 +50,3 @@ fn main() -> anyhow::Result<()> {
     machine.run()?;
     Ok(())
 }
-
-#[test]
-fn test_c() {
-    let src = "(fn add (a b) (+ a b))";
-    // TODO: Check if the size count is correct for Instructions
-}
