@@ -116,8 +116,8 @@ impl Compiler {
 
         for function in self.functions.iter() {
             let bytecode = function.to_bytecode(&self.lookup_table);
-            eprintln!("Function: {}", function.name);
-            display_chunk(&bytecode);
+            // eprintln!("Function: {}", function.name);
+            // display_chunk(&bytecode);
             debug_assert_eq!(
                 bytecode.len() as u32,
                 function.size(),
@@ -273,12 +273,20 @@ mod tests {
     #[test]
     fn test_compile_chunk() {
         // TODO: Check if the size count is correct for Instructions
-        let src = "(fn add (a b) (+ a b))";
-        let (globals, functions) = compile_to_instructions(src).unwrap();
+        let src = r#"
+(var X 1234)
+(var Y 4321)
+(fn add (x y) (+ x y ))
+(fn main () (print (add X Y)))
+"#;
+        let (globals, mut functions) = compile_to_instructions(src).unwrap();
+        for global in globals {
+            functions[1].instruction.insert(0, global);
+        }
         eprintln!(
             "Add Function IR {}:\n{:#?}",
-            functions[0].size(),
-            functions[0]
+            functions[1].size(),
+            functions[1]
         );
         let bytes = compile_chunk(src).unwrap();
         eprintln!("length: {}\n{:#?}", bytes.len(), bytes);

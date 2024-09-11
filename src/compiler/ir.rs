@@ -126,9 +126,9 @@ impl Value {
             Self::Id(..) => 1 + 4, // 1 for opcode + 4 for index,
             Self::U8(_) => 1,
             Self::U32(_) => 4,
-            Self::F64(_) => 8,
+            Self::F64(_) => 1 + 8, // 1 for opcode + 8 for value
             Self::String(v) => 4 + v.len() as u32, // 4 bytes for length and then the string
-            Self::Bool(_) => 1 + 1,                // 1 for opcode + 1 for value
+            Self::Bool(_) => 1 + 1, // 1 for opcode + 1 for value
         }
     }
     pub fn to_bytecode(&self, lookup_table: &LookupTable) -> Vec<u8> {
