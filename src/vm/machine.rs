@@ -156,6 +156,14 @@ impl Machine {
                 Ok(())
             }
             OpCode::BuiltIn => self.builtins(),
+            OpCode::LoadTest => {
+                let name = self.get_string()?;
+                let address = self.get_u32()? as usize;
+                self.stack.push(Value::U32(self.ip as u32));
+                self.stack.push(Value::String(name));
+                self.ip = address;
+                Ok(())
+            }
             op => unimplemented!("{:?}", op),
         }
     }
@@ -276,6 +284,7 @@ impl Machine {
         match name.as_str() {
             "nth" => builtin::nth(self, count)?,
             "length" => builtin::length(self, count)?,
+            "assert-eq" => builtin::nlvm_assert_eq(self, count)?,
             _ => unimplemented!("{}", name),
         }
         Ok(())

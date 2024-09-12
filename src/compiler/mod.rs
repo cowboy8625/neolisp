@@ -233,6 +233,7 @@ impl Compiler {
         for spanned in s_expr.iter().skip(2) {
             self.compile_expr(&mut ir_code, spanned);
         }
+        ir_code.push(Ir::Return);
 
         self.tests.push(Test {
             name,
