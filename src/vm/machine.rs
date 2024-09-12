@@ -59,6 +59,18 @@ impl Machine {
                 self.stack.push(Value::F64(result));
                 Ok(())
             }
+            OpCode::Eq => {
+                // TODO: Fix
+                let count = self.get_u32()?;
+                let all = self.stack.split_off(self.stack.len() - count as usize);
+                let start = all.first().expect("expected value on stack for Eq").clone();
+                let mut result = false;
+                for value in all.iter() {
+                    result = value == &start;
+                }
+                self.stack.push(Value::Bool(result));
+                Ok(())
+            }
             OpCode::PushF64 => {
                 let value = self.get_f64()?;
                 self.stack.push(Value::F64(value));
