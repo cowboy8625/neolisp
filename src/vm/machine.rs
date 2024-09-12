@@ -23,10 +23,11 @@ pub struct Machine {
     stack: Vec<Value>,
     local_var: Vec<Value>,
     global_var: Vec<Value>,
+    decompile: bool,
 }
 
 impl Machine {
-    pub fn new(program: Vec<u8>) -> Self {
+    pub fn new(program: Vec<u8>, decompile: bool) -> Self {
         debug_assert!(program.len() > Header::SIZE as usize);
         let program_header = Header::from(&program[0..Header::SIZE as usize]);
         Self {
@@ -36,6 +37,7 @@ impl Machine {
             stack: vec![],
             local_var: vec![],
             global_var: vec![],
+            decompile,
         }
     }
 
@@ -193,7 +195,9 @@ impl Machine {
     }
 
     pub fn run(&mut self) -> Result<()> {
-        // self.debug();
+        if self.decompile {
+            self.debug();
+        }
         while self.is_running && self.ip < self.program.len() {
             self.run_once()?;
         }
@@ -319,7 +323,7 @@ mod tests {
 
     #[test]
     fn test_machine_get_op_code() -> Result<()> {
-        let mut machine = Machine::new(create_test_program(&[0, 1]));
+        let mut machine = Machine::new(create_test_program(&[0, 1]), false);
         assert_eq!(machine.get_op_code()?, OpCode::Noop);
         assert_eq!(machine.get_op_code()?, OpCode::Halt);
         Ok(())

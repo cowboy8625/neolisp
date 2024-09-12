@@ -8,6 +8,9 @@ pub enum Instruction {
     AddF64 {
         count: u32,
     },
+    Eq {
+        count: u32,
+    },
     PushF64 {
         value: f64,
     },
@@ -53,6 +56,7 @@ impl Instruction {
             Self::Noop => 1,
             Self::Halt => 1,
             Self::AddF64 { .. } => 1 + 4,
+            Self::Eq { .. } => 1 + 4,
             Self::PushF64 { .. } => 1 + 8,
             Self::PushString { length, .. } => 1 + 4 + length,
             Self::Swap => 1,
@@ -82,6 +86,11 @@ impl Instruction {
             Instruction::Halt => vec![OpCode::Halt as u8],
             Instruction::AddF64 { count } => {
                 let mut bytes = vec![OpCode::AddF64 as u8];
+                bytes.extend(count.to_le_bytes());
+                bytes
+            }
+            Instruction::Eq { count } => {
+                let mut bytes = vec![OpCode::Eq as u8];
                 bytes.extend(count.to_le_bytes());
                 bytes
             }
@@ -159,6 +168,9 @@ impl std::fmt::Display for Instruction {
             Instruction::Halt => write!(f, "{:02X}: Halt", OpCode::Halt as u8),
             Instruction::AddF64 { count } => {
                 write!(f, "{:02X}: AddF64 {:02X}", OpCode::AddF64 as u8, count)
+            }
+            Instruction::Eq { count } => {
+                write!(f, "{:02X}: Eq {:02X}", OpCode::Eq as u8, count)
             }
             Instruction::PushF64 { value } => {
                 write!(f, "{:02X}: PushF64 {:.2}", OpCode::PushF64 as u8, value)
@@ -293,7 +305,11 @@ fn get_instructions(bytes: &[u8], ip: &mut usize) -> Result<Instruction, String>
         OpCode::Mul => todo!(),
         OpCode::Div => todo!(),
         OpCode::Mod => todo!(),
-        OpCode::Eq => todo!(),
+        OpCode::Eq => {
+            let count = u32::from_le_bytes(bytes[*ip + 1..*ip + 5].try_into().unwrap());
+            *ip += 5;
+            Instruction::Eq { count }
+        }
         OpCode::Gt => todo!(),
         OpCode::Lt => todo!(),
         OpCode::Gte => todo!(),

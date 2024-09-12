@@ -30,7 +30,7 @@ impl Ir {
             Self::Halt => 1,
             Self::LoadGlobalVar(_) => 1,
             Self::BuiltIn(name, args) => match name.as_str() {
-                "+" | "print" => {
+                "=" | "+" | "print" => {
                     let mut count = args.iter().map(|a| a.size()).sum::<u32>(); // args size
                     count += 1; // opcode
                     count += 4; // args count
@@ -79,13 +79,14 @@ impl Ir {
             Self::Halt => vec![OpCode::Halt as u8],
             Self::LoadGlobalVar(_) => vec![OpCode::LoadGlobalVar as u8],
             Self::BuiltIn(name, args) => match name.as_str() {
-                "+" | "print" | "list" => {
+                "=" | "+" | "print" | "list" => {
                     let mut bytes = args
                         .iter()
                         .map(|a| a.to_bytecode(lookup_table))
                         .flatten()
                         .collect::<Vec<_>>();
                     let op = match name.as_str() {
+                        "=" => OpCode::Eq,
                         "+" => OpCode::AddF64,
                         "print" => OpCode::Print,
                         "list" => OpCode::CreateList,

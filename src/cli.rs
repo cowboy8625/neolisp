@@ -15,6 +15,8 @@ pub struct Cli {
     pub history_path: String,
     #[arg(short = 't', long, default_value_t = false)]
     pub test: bool,
+    #[arg(short = 'd', long, default_value_t = false)]
+    pub decompile: bool,
     pub files: Vec<String>,
 }
 

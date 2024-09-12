@@ -321,7 +321,7 @@ impl Compiler {
         });
 
         match name.as_str() {
-            "+" | "print" | "list" | "nth" | "length" | "assert-eq" => {
+            "=" | "+" | "print" | "list" | "nth" | "length" | "assert-eq" => {
                 ir_code.push(Ir::BuiltIn(name.clone(), args))
             }
             _ => ir_code.push(Ir::Call(name.clone(), args)),

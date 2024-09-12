@@ -46,7 +46,7 @@ fn main() -> anyhow::Result<()> {
     let binary_name = filename.split('.').collect::<Vec<&str>>()[0];
     std::fs::write(binary_name, program.clone())?;
 
-    let mut machine = vm::Machine::new(program);
+    let mut machine = vm::Machine::new(program, args.decompile);
     machine.run()?;
     Ok(())
 }
