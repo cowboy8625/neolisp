@@ -43,13 +43,23 @@ pub fn nlvm_assert_eq(machine: &mut Machine, count: u32) -> Result<()> {
         anyhow::bail!("expected a value on stack for assert-eq");
     };
 
+    let mut failed = false;
+    let mut message = String::new();
     for _ in 0..count - 1 {
         let Some(value) = machine.pop() else {
             anyhow::bail!("expected a value on stack for assert-eq");
         };
-        if result != value {
-            anyhow::bail!("assert-eq failed expected {} got {}", result, value);
+        failed = result != value;
+        if failed {
+            message = format!("assert-eq failed expected {} got {}", result, value);
+            break;
         }
+    }
+    if failed {
+        if let Some(Value::String(result)) = machine.pop() {
+            eprintln!("TEST: {}", result);
+        }
+        anyhow::bail!(message);
     }
 
     Ok(())

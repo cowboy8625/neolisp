@@ -153,6 +153,7 @@ impl Compiler {
 
         for function in self.functions.iter() {
             let bytecode = function.to_bytecode(&self.lookup_table);
+            // display_chunk(&bytecode);
             debug_assert_eq!(
                 bytecode.len() as u32,
                 function.size(),

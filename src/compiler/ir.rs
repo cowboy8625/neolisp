@@ -142,7 +142,7 @@ impl Value {
             Self::U8(_) => 1,
             Self::U32(_) => 4,
             Self::F64(_) => 1 + 8, // 1 for opcode + 8 for value
-            Self::String(v) => 4 + v.len() as u32, // 4 bytes for length and then the string
+            Self::String(v) => 1 + 4 + v.len() as u32, // 4 bytes for length and then the string
             Self::Bool(_) => 1 + 1, // 1 for opcode + 1 for value
         }
     }

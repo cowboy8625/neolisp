@@ -313,7 +313,14 @@ fn get_instructions(bytes: &[u8], ip: &mut usize) -> Result<Instruction, String>
             *ip += 9;
             Instruction::PushF64 { value }
         }
-        OpCode::PushString => todo!(),
+        OpCode::PushString => {
+            *ip += 1;
+            let length = u32::from_le_bytes(bytes[*ip..*ip + 4].try_into().unwrap());
+            *ip += 4;
+            let value = String::from_utf8(bytes[*ip..*ip + length as usize].to_vec()).unwrap();
+            *ip += length as usize;
+            Instruction::PushString { length, value }
+        }
         OpCode::PopF64 => todo!(),
         OpCode::Swap => {
             *ip += 1;
