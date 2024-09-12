@@ -17,6 +17,7 @@ pub enum Ir {
     Halt,
     LoadGlobalVar(String),
     BuiltIn(String, Vec<Ir>),
+    LoadTest(String, u32),
 }
 
 impl Ir {
@@ -36,8 +37,7 @@ impl Ir {
                     count
                 }
                 _ => {
-                    let mut count = 0;
-                    count += 1; // opcode
+                    let mut count = 1; // opcode
                     count += 4; // args count
                     count += 4; // name length
                     count += name.len() as u32; // name
@@ -45,6 +45,13 @@ impl Ir {
                     count
                 }
             },
+            Self::LoadTest(name, _) => {
+                let mut count = 1; // opcode
+                count += 4; // name length
+                count += name.len() as u32; // name
+                count += 4; // index
+                count
+            }
         }
     }
     pub fn to_bytecode(&self, lookup_table: &LookupTable) -> Vec<u8> {
@@ -105,6 +112,14 @@ impl Ir {
                     bytes
                 }
             },
+            Self::LoadTest(name, index) => {
+                let mut bytes = vec![OpCode::LoadTest as u8];
+                let length = name.len() as u32;
+                bytes.extend(length.to_le_bytes());
+                bytes.extend(name.as_bytes());
+                bytes.extend(index.to_le_bytes());
+                bytes
+            }
         }
     }
 }
@@ -208,6 +223,34 @@ impl Function {
             bytes.extend(instruction.to_bytecode(&table));
         }
 
+        bytes
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Test {
+    pub name: String,
+    pub instruction: Vec<Ir>,
+}
+
+impl Test {
+    pub fn call_size(&self) -> u32 {
+        Ir::LoadTest(self.name.clone(), 0).size()
+    }
+
+    pub fn size(&self) -> u32 {
+        let mut size = 0;
+        for instruction in self.instruction.iter() {
+            size += instruction.size();
+        }
+        size
+    }
+
+    pub fn to_bytecode(&self, lookup_table: &LookupTable) -> Vec<u8> {
+        let mut bytes = vec![];
+        for instruction in self.instruction.iter() {
+            bytes.extend(instruction.to_bytecode(lookup_table));
+        }
         bytes
     }
 }

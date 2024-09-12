@@ -1,6 +1,9 @@
 use super::{builtin, Header, OpCode, Value};
 use crate::compiler::decompile;
 use anyhow::Result;
+const RED: &str = "\x1b[31m";
+const GREEN: &str = "\x1b[32m";
+const RESET: &str = "\x1b[0m";
 
 /// Virtual Machine
 ///
@@ -170,13 +173,13 @@ impl Machine {
         let mut program_counter = Header::SIZE as usize;
         for i in instructions {
             let selected = if self.ip == program_counter {
-                format!("\x1b[31m{:02X} ", program_counter - Header::SIZE as usize)
+                format!("{GREEN}{:02X} ", program_counter - Header::SIZE as usize)
             } else if (program_counter..program_counter + i.size() as usize).contains(&self.ip) {
-                format!("\x1b[32m{:02X} ", program_counter - Header::SIZE as usize)
+                format!("{RED}{:02X} ", program_counter - Header::SIZE as usize)
             } else {
                 format!("{:02X} ", program_counter - Header::SIZE as usize)
             };
-            eprintln!("{selected}{i}\x1b[0m");
+            eprintln!("{selected}{i}{RESET}");
             program_counter += i.size() as usize;
         }
     }

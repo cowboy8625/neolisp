@@ -9,7 +9,7 @@ use chumsky::prelude::Parser;
 
 pub use decompiler::{decompile, decompile_chunk, display_chunk};
 pub use header::Header;
-use ir::{Function, Ir, LookupTable, Scope, Value};
+use ir::{Function, Ir, LookupTable, Scope, Test, Value};
 
 pub fn compile(src: &str) -> Result<Vec<u8>, Vec<String>> {
     let ast = get_ast(src)?;
@@ -49,7 +49,9 @@ fn get_ast(src: &str) -> Result<Vec<Spanned<Expr>>, Vec<String>> {
 struct Compiler {
     header: Option<Header>,
     functions: Vec<Function>,
+    tests: Vec<Test>,
     lookup_table: LookupTable,
+    test_lookup_table: Vec<(String, u32)>,
     offset: u32,
 }
 
@@ -58,7 +60,9 @@ impl Default for Compiler {
         Self {
             header: Some(Header::default()),
             functions: Vec::new(),
+            tests: Vec::new(),
             lookup_table: LookupTable::new(),
+            test_lookup_table: Vec::new(),
             offset: Header::SIZE,
         }
     }
@@ -75,11 +79,25 @@ impl Compiler {
     }
 
     fn create_lookup_table(&mut self, global_ir_code: &[Ir]) {
+        for test in self.tests.iter() {
+            self.lookup_table
+                .insert(test.name.clone(), Scope::Global(self.offset));
+            self.test_lookup_table
+                .push((test.name.clone(), self.offset));
+            self.offset += test.size();
+        }
+
         for function in self.functions.iter() {
             self.lookup_table
                 .insert(function.name.clone(), Scope::Global(self.offset));
-            let function_size = function.size();
-            self.offset += function_size;
+            let test_offset = if function.name == "main" {
+                self.tests
+                    .iter()
+                    .fold(0, |acc, test| acc + test.call_size())
+            } else {
+                0
+            };
+            self.offset += function.size() + test_offset;
         }
 
         let mut global_var_index = 0;
@@ -98,26 +116,43 @@ impl Compiler {
             self.compile_expr(&mut global_ir_code, spanned);
         }
 
+        global_ir_code
+    }
+
+    fn append_ir_code_to_main(&mut self, ir_code: &mut Vec<Ir>) {
+        for (name, value) in self.test_lookup_table.iter() {
+            ir_code.push(Ir::LoadTest(name.clone(), *value));
+        }
+
         if self.header.is_some() {
             let Some(main) = self.functions.iter_mut().find(|f| f.name == "main") else {
                 panic!("main function not found");
             };
-            for instruction in global_ir_code.iter().rev() {
+            for instruction in ir_code.iter().rev() {
                 main.instruction.insert(0, instruction.clone());
             }
         }
-        global_ir_code
     }
 
     fn compile(mut self, ast: &[Spanned<Expr>]) -> Result<Vec<u8>, Vec<String>> {
-        let global_ir_code = self.generate_ir_code(ast);
+        let mut global_ir_code = self.generate_ir_code(ast);
         self.create_lookup_table(&global_ir_code);
+        self.append_ir_code_to_main(&mut global_ir_code);
         let mut program = Vec::new();
+
+        for test in self.tests.iter() {
+            let bytecode = test.to_bytecode(&self.lookup_table);
+            debug_assert_eq!(
+                bytecode.len() as u32,
+                test.size(),
+                "test {} size does not match its bytecode size",
+                test.name
+            );
+            program.extend(bytecode);
+        }
 
         for function in self.functions.iter() {
             let bytecode = function.to_bytecode(&self.lookup_table);
-            // eprintln!("Function: {}", function.name);
-            // display_chunk(&bytecode);
             debug_assert_eq!(
                 bytecode.len() as u32,
                 function.size(),
@@ -173,11 +208,36 @@ impl Compiler {
             Some(spanned) => match &spanned.expr {
                 Expr::Symbol(v) if v.as_str() == "fn" => self.compile_function(s_expr),
                 Expr::Symbol(v) if v.as_str() == "var" => self.compile_var(ir_code, s_expr),
+                Expr::Symbol(v) if v.as_str() == "test" => self.compile_test(s_expr),
                 Expr::Symbol(_) => self.compile_call(ir_code, s_expr),
                 v => unimplemented!("{:#?}", v),
             },
             None => {}
         }
+    }
+
+    fn compile_test(&mut self, s_expr: &[Spanned<Expr>]) {
+        let Some(Spanned { expr, .. }) = s_expr.get(1) else {
+            panic!("expected test name");
+        };
+        let name = match expr {
+            Expr::Symbol(v) => v.to_string(),
+            Expr::String(v) => v.to_string(),
+            _ => panic!(
+                "expected test name either a string or symbol found {:?}",
+                expr
+            ),
+        };
+
+        let mut ir_code = Vec::new();
+        for spanned in s_expr.iter().skip(2) {
+            self.compile_expr(&mut ir_code, spanned);
+        }
+
+        self.tests.push(Test {
+            name,
+            instruction: ir_code,
+        });
     }
 
     fn compile_function(&mut self, s_expr: &[Spanned<Expr>]) {
@@ -259,7 +319,7 @@ impl Compiler {
         });
 
         match name.as_str() {
-            "+" | "print" | "list" | "nth" | "length" => {
+            "+" | "print" | "list" | "nth" | "length" | "assert-eq" => {
                 ir_code.push(Ir::BuiltIn(name.clone(), args))
             }
             _ => ir_code.push(Ir::Call(name.clone(), args)),

@@ -68,6 +68,7 @@ pub enum OpCode {
     // name length
     // name
     BuiltIn,
+    LoadTest,
 }
 
 impl TryFrom<u8> for OpCode {
@@ -106,6 +107,7 @@ impl TryFrom<u8> for OpCode {
             0x1D => Ok(Self::Return),
             0x1E => Ok(Self::CreateList),
             0x1F => Ok(Self::BuiltIn),
+            0x20 => Ok(Self::LoadTest),
             _ => Err(format!("unknown opcode: {value}")),
         }
     }

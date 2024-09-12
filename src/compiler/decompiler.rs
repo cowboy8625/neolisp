@@ -40,6 +40,11 @@ pub enum Instruction {
         name_length: u32,
         name: String,
     },
+    LoadTest {
+        name_length: u32,
+        name: String,
+        index: u32,
+    },
 }
 
 impl Instruction {
@@ -64,7 +69,10 @@ impl Instruction {
                 count_of_args,
                 name_length,
                 ..
-            } => 1 + 4 + name_length,
+            } => 1 + 4 + 4 + name_length,
+            Self::LoadTest {
+                name_length, name, ..
+            } => 1 + 4 + name_length + 4,
         }
     }
 
@@ -127,6 +135,17 @@ impl Instruction {
                 bytes.extend(count_of_args.to_le_bytes());
                 bytes.extend(name_length.to_le_bytes());
                 bytes.extend(name.as_bytes());
+                bytes
+            }
+            Instruction::LoadTest {
+                name_length,
+                name,
+                index,
+            } => {
+                let mut bytes = vec![OpCode::LoadTest as u8];
+                bytes.extend(name_length.to_le_bytes());
+                bytes.extend(name.as_bytes());
+                bytes.extend(index.to_le_bytes());
                 bytes
             }
         }
@@ -202,6 +221,20 @@ impl std::fmt::Display for Instruction {
                 name_length,
                 name
             ),
+            Instruction::LoadTest {
+                name_length,
+                name,
+                index,
+            } => {
+                write!(
+                    f,
+                    "{:02X}: LoadTest {:02X} {:?} {:02X}",
+                    OpCode::LoadTest as u8,
+                    name_length,
+                    name,
+                    index
+                )
+            }
         }
     }
 }
@@ -215,8 +248,10 @@ pub fn decompile(bytes: &[u8]) -> Result<(Header, Vec<Instruction>), (String, Ve
             Ok(instruction) => instruction,
             Err(e) => return Err((e, instructions)),
         };
+        // eprintln!("{:02X} {:?}", instruction.size(), instruction);
         instructions.push(instruction);
     }
+    debug_assert_eq!(ip, bytes.len());
     Ok((header, instructions))
 }
 
@@ -230,6 +265,7 @@ pub fn decompile_chunk(bytes: &[u8]) -> Result<Vec<Instruction>, (String, Vec<In
         };
         instructions.push(instruction);
     }
+    debug_assert_eq!(ip, bytes.len());
     Ok(instructions)
 }
 
@@ -317,7 +353,34 @@ fn get_instructions(bytes: &[u8], ip: &mut usize) -> Result<Instruction, String>
             Instruction::Return
         }
         OpCode::CreateList => todo!(),
-        OpCode::BuiltIn => todo!("BuiltIn is not implemented"),
+        OpCode::BuiltIn => {
+            *ip += 1;
+            let count_of_args = u32::from_le_bytes(bytes[*ip..*ip + 4].try_into().unwrap());
+            *ip += 4;
+            let name_length = u32::from_le_bytes(bytes[*ip..*ip + 4].try_into().unwrap());
+            *ip += 4;
+            let name = String::from_utf8(bytes[*ip..*ip + name_length as usize].to_vec()).unwrap();
+            *ip += name_length as usize;
+            Instruction::BuiltIn {
+                count_of_args,
+                name_length,
+                name,
+            }
+        }
+        OpCode::LoadTest => {
+            *ip += 1;
+            let name_length = u32::from_le_bytes(bytes[*ip..*ip + 4].try_into().unwrap());
+            *ip += 4;
+            let name = String::from_utf8(bytes[*ip..*ip + name_length as usize].to_vec()).unwrap();
+            *ip += name_length as usize;
+            let index = u32::from_le_bytes(bytes[*ip..*ip + 4].try_into().unwrap());
+            *ip += 4;
+            Instruction::LoadTest {
+                name_length,
+                name,
+                index,
+            }
+        }
     })
 }
 
