@@ -52,7 +52,6 @@
   (let
     ((identifier '()))
     (do
-    ; TODO: I think the loop is wrong here and not stopping on false but running once tomany times
       (loop (or (> 0 (length input)) (is-identifier? (car input)))
         (do
           (var identifier (append identifier (list (car input))))

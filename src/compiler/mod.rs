@@ -1,3 +1,4 @@
+// TODO: Error Reporting using `ariadne`
 #![allow(dead_code)]
 #![allow(unused)]
 mod decompiler;
@@ -212,7 +213,7 @@ impl Compiler {
                 Expr::Symbol(v) if v.as_str() == "test" => self.compile_test(s_expr),
                 Expr::Symbol(v) if v.as_str() == "if" => self.compile_if(ir_code, s_expr),
                 Expr::Symbol(_) => self.compile_call(ir_code, s_expr),
-                v => unimplemented!("{:#?}", v),
+                v => unimplemented!("{:?}: {:#?}", spanned.span, v),
             },
             None => {}
         }
@@ -365,7 +366,6 @@ mod tests {
     use super::*;
     #[test]
     fn test_compile_chunk() {
-        // TODO: Check if the size count is correct for Instructions
         let src = r#"
 (var X 1234)
 (var Y 4321)

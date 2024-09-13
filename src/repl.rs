@@ -44,11 +44,6 @@ pub fn run(args: Cli) -> Result<()> {
     }
 
     loop {
-        // TODO: get editor mode and show different prompt based on it
-        // OR just use my own prompt made for snow lang
-        // OR just wait and remake one in neolisp once self hosted.
-        // Probably not a great idea to go to far in rust cause we will
-        // need to remake it in neolisp.
         let input = rl.readline("> ")?;
 
         if input.is_empty() {

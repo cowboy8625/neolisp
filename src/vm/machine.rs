@@ -60,7 +60,6 @@ impl Machine {
                 Ok(())
             }
             OpCode::Eq => {
-                // TODO: Fix
                 let count = self.get_u32()?;
                 let all = self.stack.split_off(self.stack.len() - count as usize);
                 let start = all.first().expect("expected value on stack for Eq").clone();

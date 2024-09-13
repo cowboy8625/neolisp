@@ -1,5 +1,3 @@
-// TODO: Maybe worth futher transformation of ir before bytecode is generated or
-// TODO: See if using the instructions in the decompiler is better
 mod ast;
 mod builtins;
 mod cli;
