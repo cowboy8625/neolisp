@@ -79,7 +79,7 @@ impl Ir {
             Self::Halt => vec![OpCode::Halt as u8],
             Self::LoadGlobalVar(_) => vec![OpCode::LoadGlobalVar as u8],
             Self::BuiltIn(name, args) => match name.as_str() {
-                "=" | "+" | "print" | "list" => {
+                "=" | "+" | "print" => {
                     let mut bytes = args
                         .iter()
                         .map(|a| a.to_bytecode(lookup_table))
@@ -89,7 +89,6 @@ impl Ir {
                         "=" => OpCode::Eq,
                         "+" => OpCode::AddF64,
                         "print" => OpCode::Print,
-                        "list" => OpCode::CreateList,
                         _ => unreachable!(),
                     };
                     bytes.push(op as u8);

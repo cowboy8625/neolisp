@@ -63,8 +63,6 @@ pub enum OpCode {
     Call,
     Return,
 
-    /// List manipulation
-    CreateList,
     /// count of args
     /// name length
     /// name
@@ -110,11 +108,10 @@ impl TryFrom<u8> for OpCode {
             0x1C => Ok(Self::GetGlobalVar),
             0x1D => Ok(Self::Call),
             0x1E => Ok(Self::Return),
-            0x1F => Ok(Self::CreateList),
-            0x20 => Ok(Self::BuiltIn),
-            0x21 => Ok(Self::LoadTest),
-            0x22 => Ok(Self::JumpIfFalse),
-            0x23 => Ok(Self::JumpForward),
+            0x1F => Ok(Self::BuiltIn),
+            0x20 => Ok(Self::LoadTest),
+            0x21 => Ok(Self::JumpIfFalse),
+            0x22 => Ok(Self::JumpForward),
             _ => Err(format!("unknown opcode: {value}")),
         }
     }

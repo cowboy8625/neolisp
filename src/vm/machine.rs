@@ -167,18 +167,6 @@ impl Machine {
                 self.local_var.clear();
                 Ok(())
             }
-            OpCode::CreateList => {
-                let mut items = Vec::new();
-                let count = self.get_u32()?;
-                for _ in (0..count) {
-                    let Some(item) = self.stack.pop() else {
-                        panic!("expected value on stack for CreateList")
-                    };
-                    items.insert(0, item);
-                }
-                self.stack.push(Value::List(items));
-                Ok(())
-            }
             OpCode::BuiltIn => self.builtins(),
             OpCode::LoadTest => {
                 let name = self.get_string()?;
@@ -323,6 +311,7 @@ impl Machine {
             "nth" => builtin::nth(self, count)?,
             "length" => builtin::length(self, count)?,
             "assert-eq" => builtin::nlvm_assert_eq(self, count)?,
+            "list" => builtin::list(self, count)?,
             _ => unimplemented!("{}", name),
         }
         Ok(())

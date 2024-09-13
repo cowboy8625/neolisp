@@ -1,4 +1,4 @@
 (fn main ()
 	(if (= 321 321)
-		(print "true\n")
-		(print "false\n")))
+		(print (list 1 2 3))
+		(print (list 3 2 1))))

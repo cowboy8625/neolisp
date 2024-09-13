@@ -444,7 +444,6 @@ fn get_instructions(bytes: &[u8], ip: &mut usize) -> Result<Instruction, String>
             *ip += 1;
             Instruction::Return
         }
-        OpCode::CreateList => todo!(),
         OpCode::BuiltIn => {
             *ip += 1;
             let count_of_args = u32::from_le_bytes(bytes[*ip..*ip + 4].try_into().unwrap());

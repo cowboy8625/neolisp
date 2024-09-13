@@ -64,3 +64,14 @@ pub fn nlvm_assert_eq(machine: &mut Machine, count: u32) -> Result<()> {
 
     Ok(())
 }
+pub fn list(machine: &mut Machine, count: u32) -> Result<()> {
+    let mut items = Vec::new();
+    for _ in (0..count) {
+        let Some(item) = machine.pop() else {
+            panic!("expected value on stack for CreateList")
+        };
+        items.insert(0, item);
+    }
+    machine.push(Value::List(items));
+    Ok(())
+}
