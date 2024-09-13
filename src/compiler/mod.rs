@@ -9,7 +9,7 @@ use chumsky::prelude::Parser;
 
 pub use decompiler::{decompile, decompile_chunk, display_chunk};
 pub use header::Header;
-use ir::{Function, Ir, LookupTable, Scope, Test, Value};
+use ir::{Function, If, Ir, LookupTable, Scope, Test, Value};
 
 pub fn compile(src: &str) -> Result<Vec<u8>, Vec<String>> {
     let ast = get_ast(src)?;
@@ -210,11 +210,42 @@ impl Compiler {
                 Expr::Symbol(v) if v.as_str() == "fn" => self.compile_function(s_expr),
                 Expr::Symbol(v) if v.as_str() == "var" => self.compile_var(ir_code, s_expr),
                 Expr::Symbol(v) if v.as_str() == "test" => self.compile_test(s_expr),
+                Expr::Symbol(v) if v.as_str() == "if" => self.compile_if(ir_code, s_expr),
                 Expr::Symbol(_) => self.compile_call(ir_code, s_expr),
                 v => unimplemented!("{:#?}", v),
             },
             None => {}
         }
+    }
+
+    fn compile_if(&mut self, ir_code: &mut Vec<Ir>, s_expr: &[Spanned<Expr>]) {
+        if (s_expr.len() != 4) {
+            panic!("expected if condition, then expression and else expression");
+        }
+        let Some(condition) = s_expr.get(1) else {
+            panic!("expected if condition");
+        };
+
+        let Some(then_expr) = s_expr.get(2) else {
+            panic!("expected if then expression");
+        };
+
+        let Some(else_expr) = s_expr.get(3) else {
+            panic!("expected if else expression");
+        };
+
+        let mut condition_ir = Vec::new();
+        self.compile_expr(&mut condition_ir, &condition);
+        let mut then_ir = Vec::new();
+        self.compile_expr(&mut then_ir, &then_expr);
+        let mut else_ir = Vec::new();
+        self.compile_expr(&mut else_ir, &else_expr);
+
+        ir_code.push(Ir::If(If {
+            condition: condition_ir,
+            then_block: then_ir,
+            else_block: else_ir,
+        }));
     }
 
     fn compile_test(&mut self, s_expr: &[Spanned<Expr>]) {

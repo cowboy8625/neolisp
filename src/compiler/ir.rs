@@ -258,18 +258,58 @@ impl Test {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct If {
-    pub condition: Value,
-    pub if_block: Vec<Ir>,
+    pub condition: Vec<Ir>,
+    pub then_block: Vec<Ir>,
     pub else_block: Vec<Ir>,
 }
 
 impl If {
+    pub fn size_of_condition(&self) -> u32 {
+        self.condition.iter().fold(0, |acc, ir| acc + ir.size())
+    }
+
+    pub fn size_of_then_block(&self) -> u32 {
+        self.then_block.iter().fold(0, |acc, ir| acc + ir.size())
+        // for OpCode::Jump
+        + 1
+        // for offset
+        + 4
+    }
+
+    pub fn size_of_else_block(&self) -> u32 {
+        self.else_block.iter().fold(0, |acc, ir| acc + ir.size())
+    }
+
     pub fn size(&self) -> u32 {
-        todo!()
+        let mut size =
+            self.size_of_condition() + self.size_of_then_block() + self.size_of_else_block();
+        size += 1; // for OpCode::JumpIfFalse
+        size += 4; // for offset
+        size
     }
 
     pub fn to_bytecode(&self, lookup_table: &LookupTable) -> Vec<u8> {
-        todo!()
+        let mut bytes = vec![];
+        for instruction in self.condition.iter() {
+            bytes.extend(instruction.to_bytecode(lookup_table));
+        }
+
+        bytes.push(OpCode::JumpIfFalse as u8);
+        let offset = self.size_of_then_block();
+        bytes.extend(offset.to_le_bytes());
+
+        for instruction in self.then_block.iter() {
+            bytes.extend(instruction.to_bytecode(lookup_table));
+        }
+
+        bytes.push(OpCode::JumpForward as u8);
+        let offset = self.size_of_else_block();
+        bytes.extend(offset.to_le_bytes());
+
+        for instruction in self.else_block.iter() {
+            bytes.extend(instruction.to_bytecode(lookup_table));
+        }
+        bytes
     }
 }
 
@@ -278,12 +318,31 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_value_if() {
+        let value = Ir::If(If {
+            condition: vec![Ir::BuiltIn(
+                "=".to_string(),
+                vec![Ir::Value(Value::F64(123.0)), Ir::Value(Value::F64(321.0))],
+            )],
+            then_block: vec![Ir::BuiltIn(
+                "print".to_string(),
+                vec![Ir::Value(Value::String("true\n".to_string()))],
+            )],
+            else_block: vec![Ir::BuiltIn(
+                "print".to_string(),
+                vec![Ir::Value(Value::String("false\n".to_string()))],
+            )],
+        });
+        assert_eq!(value.size(), 1);
+    }
+
+    #[test]
     fn test_value_size() {
         assert_eq!(Value::Id("a".to_string()).size(), 1 + 4);
         assert_eq!(Value::U8(1).size(), 1);
         assert_eq!(Value::U32(1).size(), 4);
-        assert_eq!(Value::F64(1.0).size(), 8);
-        assert_eq!(Value::String("a".to_string()).size(), 4 + 1);
+        assert_eq!(Value::F64(1.0).size(), 9);
+        assert_eq!(Value::String("a".to_string()).size(), 1 + 4 + 1);
         assert_eq!(Value::Bool(true).size(), 1 + 1);
     }
 

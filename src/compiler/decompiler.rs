@@ -54,6 +54,12 @@ pub enum Instruction {
         name: String,
         index: u32,
     },
+    JumpIfFalse {
+        offset: u32,
+    },
+    JumpForward {
+        offset: u32,
+    },
 }
 
 impl Instruction {
@@ -85,6 +91,8 @@ impl Instruction {
             Self::LoadTest {
                 name_length, name, ..
             } => 1 + 4 + name_length + 4,
+            Self::JumpIfFalse { offset } => 1 + 4,
+            Self::JumpForward { offset } => 1 + 4,
         }
     }
 
@@ -173,6 +181,16 @@ impl Instruction {
                 bytes.extend(name_length.to_le_bytes());
                 bytes.extend(name.as_bytes());
                 bytes.extend(index.to_le_bytes());
+                bytes
+            }
+            Instruction::JumpIfFalse { offset } => {
+                let mut bytes = vec![OpCode::JumpIfFalse as u8];
+                bytes.extend(offset.to_le_bytes());
+                bytes
+            }
+            Instruction::JumpForward { offset } => {
+                let mut bytes = vec![OpCode::JumpForward as u8];
+                bytes.extend(offset.to_le_bytes());
                 bytes
             }
         }
@@ -269,6 +287,22 @@ impl std::fmt::Display for Instruction {
                     name_length,
                     name,
                     index
+                )
+            }
+            Instruction::JumpIfFalse { offset } => {
+                write!(
+                    f,
+                    "{:02X}: JumpIfFalse {:02X}",
+                    OpCode::JumpIfFalse as u8,
+                    offset
+                )
+            }
+            Instruction::JumpForward { offset } => {
+                write!(
+                    f,
+                    "{:02X}: JumpForward {:02X}",
+                    OpCode::JumpForward as u8,
+                    offset
                 )
             }
         }
@@ -438,6 +472,18 @@ fn get_instructions(bytes: &[u8], ip: &mut usize) -> Result<Instruction, String>
                 name,
                 index,
             }
+        }
+        OpCode::JumpIfFalse => {
+            *ip += 1;
+            let offset = u32::from_le_bytes(bytes[*ip..*ip + 4].try_into().unwrap());
+            *ip += 4;
+            Instruction::JumpIfFalse { offset }
+        }
+        OpCode::JumpForward => {
+            *ip += 1;
+            let offset = u32::from_le_bytes(bytes[*ip..*ip + 4].try_into().unwrap());
+            *ip += 4;
+            Instruction::JumpForward { offset }
         }
     })
 }

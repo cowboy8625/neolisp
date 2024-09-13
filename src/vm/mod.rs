@@ -63,13 +63,16 @@ pub enum OpCode {
     Call,
     Return,
 
-    // List manipulation
+    /// List manipulation
     CreateList,
-    // count of args
-    // name length
-    // name
+    /// count of args
+    /// name length
+    /// name
     BuiltIn,
     LoadTest,
+    /// Followed by Index
+    JumpIfFalse,
+    JumpForward,
 }
 
 impl TryFrom<u8> for OpCode {
@@ -110,6 +113,8 @@ impl TryFrom<u8> for OpCode {
             0x1F => Ok(Self::CreateList),
             0x20 => Ok(Self::BuiltIn),
             0x21 => Ok(Self::LoadTest),
+            0x22 => Ok(Self::JumpIfFalse),
+            0x23 => Ok(Self::JumpForward),
             _ => Err(format!("unknown opcode: {value}")),
         }
     }

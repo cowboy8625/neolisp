@@ -188,6 +188,18 @@ impl Machine {
                 self.ip = address;
                 Ok(())
             }
+            OpCode::JumpIfFalse => {
+                let jump_offset = self.get_u32()? as usize;
+                if self.stack.pop() == Some(Value::Bool(false)) {
+                    self.ip += jump_offset;
+                }
+                Ok(())
+            }
+            OpCode::JumpForward => {
+                let jump_offset = self.get_u32()? as usize;
+                self.ip += jump_offset;
+                Ok(())
+            }
             op => unimplemented!("{:?}", op),
         }
     }
