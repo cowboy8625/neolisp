@@ -71,6 +71,16 @@ impl Machine {
                 self.stack.push(Value::Bool(result));
                 Ok(())
             }
+            OpCode::PushBool => {
+                let value = self.get_u8()?;
+                self.stack.push(Value::Bool(value != 0));
+                Ok(())
+            }
+            OpCode::PushU8 => {
+                let value = self.get_u8()?;
+                self.stack.push(Value::U8(value));
+                Ok(())
+            }
             OpCode::PushF64 => {
                 let value = self.get_f64()?;
                 self.stack.push(Value::F64(value));

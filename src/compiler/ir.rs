@@ -177,7 +177,7 @@ impl Value {
                 bytes.extend(value.as_bytes());
                 bytes
             }
-            Self::Bool(value) => vec![OpCode::PushU8 as u8, *value as u8],
+            Self::Bool(value) => vec![OpCode::PushBool as u8, *value as u8],
         }
     }
 }

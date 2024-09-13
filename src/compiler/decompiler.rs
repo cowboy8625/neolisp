@@ -11,6 +11,12 @@ pub enum Instruction {
     Eq {
         count: u32,
     },
+    PushBool {
+        value: bool,
+    },
+    PushU8 {
+        value: u8,
+    },
     PushF64 {
         value: f64,
     },
@@ -57,6 +63,8 @@ impl Instruction {
             Self::Halt => 1,
             Self::AddF64 { .. } => 1 + 4,
             Self::Eq { .. } => 1 + 4,
+            Self::PushBool { .. } => 1 + 1,
+            Self::PushU8 { .. } => 1 + 1,
             Self::PushF64 { .. } => 1 + 8,
             Self::PushString { length, .. } => 1 + 4 + length,
             Self::Swap => 1,
@@ -92,6 +100,16 @@ impl Instruction {
             Instruction::Eq { count } => {
                 let mut bytes = vec![OpCode::Eq as u8];
                 bytes.extend(count.to_le_bytes());
+                bytes
+            }
+            Instruction::PushBool { value } => {
+                let mut bytes = vec![OpCode::PushBool as u8];
+                bytes.extend((*value as u8).to_le_bytes());
+                bytes
+            }
+            Instruction::PushU8 { value } => {
+                let mut bytes = vec![OpCode::PushU8 as u8];
+                bytes.extend(value.to_le_bytes());
                 bytes
             }
             Instruction::PushF64 { value } => {
@@ -171,6 +189,12 @@ impl std::fmt::Display for Instruction {
             }
             Instruction::Eq { count } => {
                 write!(f, "{:02X}: Eq {:02X}", OpCode::Eq as u8, count)
+            }
+            Instruction::PushBool { value } => {
+                write!(f, "{:02X}: PushBool {}", OpCode::PushBool as u8, value)
+            }
+            Instruction::PushU8 { value } => {
+                write!(f, "{:02X}: PushU8 {:02X}", OpCode::PushU8 as u8, value)
             }
             Instruction::PushF64 { value } => {
                 write!(f, "{:02X}: PushF64 {:.2}", OpCode::PushF64 as u8, value)
@@ -323,7 +347,18 @@ fn get_instructions(bytes: &[u8], ip: &mut usize) -> Result<Instruction, String>
             *ip += 5;
             Instruction::Print { count }
         }
-        OpCode::PushU8 => todo!(),
+        OpCode::PushBool => {
+            *ip += 1;
+            let value = u8::from_le_bytes(bytes[*ip..*ip + 1].try_into().unwrap());
+            *ip += 1;
+            Instruction::PushBool { value: value != 0 }
+        }
+        OpCode::PushU8 => {
+            *ip += 1;
+            let value = u8::from_le_bytes(bytes[*ip..*ip + 1].try_into().unwrap());
+            *ip += 1;
+            Instruction::PushU8 { value }
+        }
         OpCode::PushF64 => {
             let value = f64::from_le_bytes(bytes[*ip + 1..*ip + 9].try_into().unwrap());
             *ip += 9;
