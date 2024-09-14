@@ -10,7 +10,9 @@ use chumsky::prelude::Parser;
 
 pub use decompiler::{decompile, decompile_chunk, display_chunk};
 pub use header::Header;
-use ir::{Function, If, Ir, LookupTable, Scope, Test, Value};
+use ir::{Function, If, Ir, LookupTable, Operator, Scope, Test, Value};
+
+const OPERATORS: &[&str] = &["+", "="];
 
 pub fn compile(src: &str) -> Result<Vec<u8>, Vec<String>> {
     let ast = get_ast(src)?;
@@ -212,11 +214,27 @@ impl Compiler {
                 Expr::Symbol(v) if v.as_str() == "var" => self.compile_var(ir_code, s_expr),
                 Expr::Symbol(v) if v.as_str() == "test" => self.compile_test(s_expr),
                 Expr::Symbol(v) if v.as_str() == "if" => self.compile_if(ir_code, s_expr),
+                Expr::Symbol(v) if OPERATORS.contains(&v.as_str()) => {
+                    self.compile_operator(ir_code, s_expr, v.as_str())
+                }
                 Expr::Symbol(_) => self.compile_call(ir_code, s_expr),
                 v => unimplemented!("{:?}: {:#?}", spanned.span, v),
             },
             None => {}
         }
+    }
+
+    fn compile_operator(
+        &mut self,
+        ir_code: &mut Vec<Ir>,
+        s_expr: &[Spanned<Expr>],
+        operator: &str,
+    ) {
+        let mut args = Vec::new();
+        for spanned in s_expr.iter().skip(1) {
+            self.compile_expr(&mut args, spanned);
+        }
+        ir_code.push(Ir::Operator(Operator::from(operator), args));
     }
 
     fn compile_if(&mut self, ir_code: &mut Vec<Ir>, s_expr: &[Spanned<Expr>]) {
@@ -353,7 +371,7 @@ impl Compiler {
         });
 
         match name.as_str() {
-            "=" | "+" | "print" | "list" | "nth" | "length" | "assert-eq" => {
+            "print" | "list" | "nth" | "length" | "assert-eq" => {
                 ir_code.push(Ir::BuiltIn(name.clone(), args))
             }
             _ => ir_code.push(Ir::Call(name.clone(), args)),

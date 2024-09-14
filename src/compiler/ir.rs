@@ -8,9 +8,39 @@ pub enum Scope {
     Local(u32),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Operator {
+    Add,
+    Eq,
+}
+
+impl From<&str> for Operator {
+    fn from(s: &str) -> Self {
+        match s {
+            "+" => Self::Add,
+            "=" => Self::Eq,
+            _ => unreachable!(),
+        }
+    }
+}
+
+impl Operator {
+    pub fn size(&self) -> u32 {
+        1
+    }
+
+    pub fn to_bytecode(&self) -> u8 {
+        match self {
+            Self::Add => OpCode::AddF64 as u8,
+            Self::Eq => OpCode::Eq as u8,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Ir {
     Value(Value),
+    Operator(Operator, Vec<Ir>),
     If(If),
     Call(String, Vec<Ir>),
     Return,
@@ -24,6 +54,7 @@ impl Ir {
     pub fn size(&self) -> u32 {
         match self {
             Self::Value(v) => v.size(),
+            Self::Operator(op, args) => op.size() + 4 + args.iter().map(|a| a.size()).sum::<u32>(),
             Self::If(i) => i.size(),
             Self::Call(name, args) => 1 + 4 + args.iter().map(|a| a.size()).sum::<u32>(),
             Self::Return => 2,
@@ -57,6 +88,16 @@ impl Ir {
     pub fn to_bytecode(&self, lookup_table: &LookupTable) -> Vec<u8> {
         match self {
             Self::Value(v) => v.to_bytecode(lookup_table),
+            Self::Operator(op, args) => {
+                let mut bytes = args
+                    .iter()
+                    .map(|a| a.to_bytecode(lookup_table))
+                    .flatten()
+                    .collect::<Vec<_>>();
+                bytes.push(op.to_bytecode());
+                bytes.extend((args.len() as u32).to_le_bytes());
+                bytes
+            }
             Self::If(i) => i.to_bytecode(lookup_table),
             Self::Call(name, args) => match name.as_str() {
                 _ => {
@@ -79,15 +120,13 @@ impl Ir {
             Self::Halt => vec![OpCode::Halt as u8],
             Self::LoadGlobalVar(_) => vec![OpCode::LoadGlobalVar as u8],
             Self::BuiltIn(name, args) => match name.as_str() {
-                "=" | "+" | "print" => {
+                "print" => {
                     let mut bytes = args
                         .iter()
                         .map(|a| a.to_bytecode(lookup_table))
                         .flatten()
                         .collect::<Vec<_>>();
                     let op = match name.as_str() {
-                        "=" => OpCode::Eq,
-                        "+" => OpCode::AddF64,
                         "print" => OpCode::Print,
                         _ => unreachable!(),
                     };
