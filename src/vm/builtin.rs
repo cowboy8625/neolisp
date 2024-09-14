@@ -101,3 +101,18 @@ pub fn list(machine: &mut Machine, count: u32) -> Result<()> {
     machine.push(Value::List(items));
     Ok(())
 }
+
+pub fn cons(machine: &mut Machine, count: u32) -> Result<()> {
+    if count != 2 {
+        anyhow::bail!("cons only support 2 args");
+    }
+    let Some(Value::List(mut list)) = machine.pop() else {
+        panic!("expected a List on stack for cons")
+    };
+    let Some(item) = machine.pop() else {
+        panic!("expected value on stack for cons")
+    };
+    list.insert(0, item);
+    machine.push(Value::List(list));
+    Ok(())
+}

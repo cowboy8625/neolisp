@@ -13,6 +13,7 @@ pub use header::Header;
 use ir::{Function, If, Ir, LookupTable, Operator, Scope, Test, Value};
 
 const OPERATORS: &[&str] = &["+", "="];
+const BUILTINS: &[&str] = &["print", "nth", "length", "assert-eq", "list", "cons"];
 
 pub fn compile(src: &str) -> Result<Vec<u8>, Vec<String>> {
     let ast = get_ast(src)?;
@@ -370,12 +371,11 @@ impl Compiler {
             acc
         });
 
-        match name.as_str() {
-            "print" | "list" | "nth" | "length" | "assert-eq" => {
-                ir_code.push(Ir::BuiltIn(name.clone(), args))
-            }
-            _ => ir_code.push(Ir::Call(name.clone(), args)),
+        if BUILTINS.contains(&name.as_str()) {
+            ir_code.push(Ir::BuiltIn(name.clone(), args));
+            return;
         }
+        ir_code.push(Ir::Call(name.clone(), args))
     }
 }
 
