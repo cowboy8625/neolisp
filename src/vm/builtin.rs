@@ -116,3 +116,16 @@ pub fn cons(machine: &mut Machine, count: u32) -> Result<()> {
     machine.push(Value::List(list));
     Ok(())
 }
+
+pub fn car(machine: &mut Machine, count: u32) -> Result<()> {
+    if count != 1 {
+        anyhow::bail!("car only support 2 args");
+    }
+    let Some(Value::List(mut list)) = machine.pop() else {
+        panic!("expected a List on stack for car")
+    };
+    let item = list.first().cloned().unwrap_or(Value::Bool(false));
+
+    machine.push(item);
+    Ok(())
+}

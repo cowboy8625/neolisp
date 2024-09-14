@@ -13,7 +13,7 @@ pub use header::Header;
 use ir::{Function, If, Ir, LookupTable, Operator, Scope, Test, Value};
 
 const OPERATORS: &[&str] = &["+", "="];
-const BUILTINS: &[&str] = &["print", "nth", "length", "assert-eq", "list", "cons"];
+const BUILTINS: &[&str] = &["print", "nth", "length", "assert-eq", "list", "cons", "car"];
 
 pub fn compile(src: &str) -> Result<Vec<u8>, Vec<String>> {
     let ast = get_ast(src)?;

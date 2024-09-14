@@ -295,6 +295,7 @@ impl Machine {
             "assert-eq" => builtin::nlvm_assert_eq(self, count)?,
             "list" => builtin::list(self, count)?,
             "cons" => builtin::cons(self, count)?,
+            "car" => builtin::car(self, count)?,
             _ => unimplemented!("{}", name),
         }
         Ok(())
