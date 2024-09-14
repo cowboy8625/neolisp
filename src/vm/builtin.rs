@@ -1,6 +1,32 @@
 use super::Machine;
 use super::Value;
 use anyhow::Result;
+use std::io::Write;
+
+pub fn nlvm_print(machine: &mut Machine, count: u32) -> Result<()> {
+    let lock = std::io::stdout().lock();
+    let mut writer = std::io::BufWriter::new(lock);
+    let mut output = String::new();
+
+    let mut items = Vec::new();
+    for i in 0..count {
+        let Some(value) = machine.pop() else {
+            panic!("expected value on stack for print")
+        };
+        output.insert_str(0, &format!("{}", value));
+        if i == count - 1 {
+            items.push(value);
+        }
+    }
+    writer.write_all(output.as_bytes())?;
+    writer.flush()?;
+
+    for items in items.into_iter().rev() {
+        machine.push(items);
+    }
+
+    Ok(())
+}
 
 pub fn nth(machine: &mut Machine, count: u32) -> Result<()> {
     // (nth list index)

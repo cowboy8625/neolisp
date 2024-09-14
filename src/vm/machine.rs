@@ -90,24 +90,6 @@ impl Machine {
                 self.stack.push(Value::String(value));
                 Ok(())
             }
-            OpCode::Print => {
-                use std::io::Write;
-                let count = self.get_u32()?;
-                let lock = std::io::stdout().lock();
-                let mut writer = std::io::BufWriter::new(lock);
-                let mut output = String::new();
-
-                for _ in 0..count {
-                    let Some(value) = self.stack.pop() else {
-                        panic!("expected value on stack for print")
-                    };
-
-                    output.insert_str(0, &format!("{}", value));
-                }
-                writer.write_all(output.as_bytes())?;
-                writer.flush()?;
-                Ok(())
-            }
             OpCode::Call => {
                 let address = self.get_u32()? as usize;
                 self.stack.push(Value::U32(self.ip as u32));
@@ -307,6 +289,7 @@ impl Machine {
         let count = self.get_u32()?;
         let name = self.get_string()?;
         match name.as_str() {
+            "print" => builtin::nlvm_print(self, count)?,
             "nth" => builtin::nth(self, count)?,
             "length" => builtin::length(self, count)?,
             "assert-eq" => builtin::nlvm_assert_eq(self, count)?,

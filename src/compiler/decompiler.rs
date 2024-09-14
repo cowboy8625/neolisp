@@ -40,9 +40,6 @@ pub enum Instruction {
     Call {
         index: u32,
     },
-    Print {
-        count: u32,
-    },
     Return,
     BuiltIn {
         count_of_args: u32,
@@ -81,7 +78,6 @@ impl Instruction {
             Self::LoadGlobalVar => 1,
             Self::GetGlobalVar { index } => 1 + 4,
             Self::Call { index } => 1 + 4,
-            Self::Print { count } => 1 + 4,
             Self::Return => 1,
             Self::BuiltIn {
                 count_of_args,
@@ -153,11 +149,6 @@ impl Instruction {
             Instruction::Call { index } => {
                 let mut bytes = vec![OpCode::Call as u8];
                 bytes.extend(index.to_le_bytes());
-                bytes
-            }
-            Instruction::Print { count } => {
-                let mut bytes = vec![OpCode::Print as u8];
-                bytes.extend(count.to_le_bytes());
                 bytes
             }
             Instruction::Return => vec![OpCode::Return as u8],
@@ -258,9 +249,6 @@ impl std::fmt::Display for Instruction {
             }
             Instruction::Call { index } => {
                 write!(f, "{:02X}: Call {:02X}", OpCode::Call as u8, index)
-            }
-            Instruction::Print { count } => {
-                write!(f, "{:02X}: Print {:02X}", OpCode::Print as u8, count)
             }
             Instruction::Return => write!(f, "{:02X}: Return", OpCode::Return as u8),
             Instruction::BuiltIn {
@@ -376,11 +364,6 @@ fn get_instructions(bytes: &[u8], ip: &mut usize) -> Result<Instruction, String>
         OpCode::And => todo!(),
         OpCode::Or => todo!(),
         OpCode::Not => todo!(),
-        OpCode::Print => {
-            let count = u32::from_le_bytes(bytes[*ip + 1..*ip + 5].try_into().unwrap());
-            *ip += 5;
-            Instruction::Print { count }
-        }
         OpCode::PushBool => {
             *ip += 1;
             let value = u8::from_le_bytes(bytes[*ip..*ip + 1].try_into().unwrap());

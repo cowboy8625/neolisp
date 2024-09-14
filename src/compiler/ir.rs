@@ -60,22 +60,14 @@ impl Ir {
             Self::Return => 2,
             Self::Halt => 1,
             Self::LoadGlobalVar(_) => 1,
-            Self::BuiltIn(name, args) => match name.as_str() {
-                "=" | "+" | "print" => {
-                    let mut count = args.iter().map(|a| a.size()).sum::<u32>(); // args size
-                    count += 1; // opcode
-                    count += 4; // args count
-                    count
-                }
-                _ => {
-                    let mut count = 1; // opcode
-                    count += 4; // args count
-                    count += 4; // name length
-                    count += name.len() as u32; // name
-                    count += args.iter().map(|a| a.size()).sum::<u32>(); // args size
-                    count
-                }
-            },
+            Self::BuiltIn(name, args) => {
+                let mut count = 1; // opcode
+                count += 4; // args count
+                count += 4; // name length
+                count += name.len() as u32; // name
+                count += args.iter().map(|a| a.size()).sum::<u32>(); // args size
+                count
+            }
             Self::LoadTest(name, _) => {
                 let mut count = 1; // opcode
                 count += 4; // name length
@@ -119,38 +111,22 @@ impl Ir {
             Self::Return => vec![OpCode::Rot as u8, OpCode::Return as u8],
             Self::Halt => vec![OpCode::Halt as u8],
             Self::LoadGlobalVar(_) => vec![OpCode::LoadGlobalVar as u8],
-            Self::BuiltIn(name, args) => match name.as_str() {
-                "print" => {
-                    let mut bytes = args
-                        .iter()
-                        .map(|a| a.to_bytecode(lookup_table))
-                        .flatten()
-                        .collect::<Vec<_>>();
-                    let op = match name.as_str() {
-                        "print" => OpCode::Print,
-                        _ => unreachable!(),
-                    };
-                    bytes.push(op as u8);
-                    bytes.extend((args.len() as u32).to_le_bytes());
-                    bytes
-                }
-                _ => {
-                    let mut bytes = args
-                        .iter()
-                        .map(|a| a.to_bytecode(lookup_table))
-                        .flatten()
-                        .collect::<Vec<_>>();
-                    let length = name.len() as u32;
-                    bytes.push(OpCode::BuiltIn as u8);
-                    // Args count
-                    bytes.extend((args.len() as u32).to_le_bytes());
-                    // name length
-                    bytes.extend(length.to_le_bytes());
-                    // name
-                    bytes.extend(name.as_bytes());
-                    bytes
-                }
-            },
+            Self::BuiltIn(name, args) => {
+                let mut bytes = args
+                    .iter()
+                    .map(|a| a.to_bytecode(lookup_table))
+                    .flatten()
+                    .collect::<Vec<_>>();
+                let length = name.len() as u32;
+                bytes.push(OpCode::BuiltIn as u8);
+                // Args count
+                bytes.extend((args.len() as u32).to_le_bytes());
+                // name length
+                bytes.extend(length.to_le_bytes());
+                // name
+                bytes.extend(name.as_bytes());
+                bytes
+            }
             Self::LoadTest(name, index) => {
                 let mut bytes = vec![OpCode::LoadTest as u8];
                 let length = name.len() as u32;
