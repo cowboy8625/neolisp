@@ -44,6 +44,32 @@ fn main() -> anyhow::Result<()> {
     let binary_name = filename.split('.').collect::<Vec<&str>>()[0];
     std::fs::write(binary_name, program.clone())?;
 
+    if args.decompile {
+        let binary_name = filename.split('.').collect::<Vec<&str>>()[0];
+        let (header, decompiled_program) = match compiler::decompile(&program) {
+            Ok(result) => result,
+            Err((msg, e)) => {
+                eprintln!("{msg}");
+                for e in e {
+                    eprintln!("{:?}", e);
+                }
+                return Ok(());
+            }
+        };
+        std::fs::write(
+            format!("{binary_name}.xxd"),
+            format!(
+                "{:?}\n{}",
+                header,
+                decompiled_program
+                    .into_iter()
+                    .map(|i| format!("{i}\n"))
+                    .collect::<String>()
+            )
+            .as_bytes(),
+        )?;
+    }
+
     let mut machine = vm::Machine::new(program, args.decompile);
     machine.run()?;
     Ok(())

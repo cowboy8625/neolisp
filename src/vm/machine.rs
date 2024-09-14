@@ -1,5 +1,5 @@
 use super::{builtin, Header, OpCode, Value};
-use crate::compiler::decompile;
+use crate::compiler::{decompile, display_chunk};
 use anyhow::Result;
 const RED: &str = "\x1b[31m";
 const GREEN: &str = "\x1b[32m";
@@ -169,8 +169,29 @@ impl Machine {
                 self.ip += jump_offset;
                 Ok(())
             }
-            op => unimplemented!("{:?}", op),
+            OpCode::LoadLambda => {
+                let count = self.get_u32()? as usize;
+                self.stack.push(Value::Lambda(self.ip as u32));
+                self.ip += count;
+                Ok(())
+            }
+            OpCode::CallLambda => {
+                let count = self.get_u32()? as usize;
+                self.bring_to_top_of_stack(count + 1);
+                let Some(Value::Lambda(address)) = self.stack.pop() else {
+                    panic!("expected value on stack for CallLambda")
+                };
+                self.stack.push(Value::U32(self.ip as u32));
+                self.ip = address as usize;
+                Ok(())
+            }
+            op => unimplemented!("opcode: {:?}\n{:02X}\n{:#?}", op, self.ip, self.stack),
         }
+    }
+
+    fn bring_to_top_of_stack(&mut self, count: usize) {
+        let length = self.stack.len();
+        self.stack[length - count..].rotate_left(1);
     }
 
     fn debug(&self) {

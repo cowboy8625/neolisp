@@ -48,6 +48,8 @@ pub enum Ir {
     LoadGlobalVar(String),
     BuiltIn(String, Vec<Ir>),
     LoadTest(String, u32),
+    Lambda(Lambda),
+    CallLambda(Vec<Ir>),
 }
 
 impl Ir {
@@ -75,6 +77,8 @@ impl Ir {
                 count += 4; // index
                 count
             }
+            Self::Lambda(lambda) => lambda.size(),
+            Self::CallLambda(args) => 1 + 4 + args.iter().map(|a| a.size()).sum::<u32>(),
         }
     }
     pub fn to_bytecode(&self, lookup_table: &LookupTable) -> Vec<u8> {
@@ -120,7 +124,11 @@ impl Ir {
                 let length = name.len() as u32;
                 bytes.push(OpCode::BuiltIn as u8);
                 // Args count
-                bytes.extend((args.len() as u32).to_le_bytes());
+                let count = args
+                    .iter()
+                    .filter(|a| !matches!(a, Self::Lambda(_)))
+                    .count() as u32;
+                bytes.extend(count.to_le_bytes());
                 // name length
                 bytes.extend(length.to_le_bytes());
                 // name
@@ -133,6 +141,17 @@ impl Ir {
                 bytes.extend(length.to_le_bytes());
                 bytes.extend(name.as_bytes());
                 bytes.extend(index.to_le_bytes());
+                bytes
+            }
+            Self::Lambda(lambda) => lambda.to_bytecode(lookup_table),
+            Self::CallLambda(args) => {
+                let mut bytes = args
+                    .iter()
+                    .map(|a| a.to_bytecode(lookup_table))
+                    .flatten()
+                    .collect::<Vec<_>>();
+                bytes.push(OpCode::CallLambda as u8);
+                bytes.extend((args.len() as u32).to_le_bytes());
                 bytes
             }
         }
@@ -266,6 +285,60 @@ impl Test {
         for instruction in self.instruction.iter() {
             bytes.extend(instruction.to_bytecode(lookup_table));
         }
+        bytes
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Lambda {
+    pub params: Vec<String>,
+    pub body: Vec<Ir>,
+}
+
+impl Lambda {
+    pub fn size(&self) -> u32 {
+        let mut size = 1; // for opcode LoadLambda
+        size += 4; // 4 bytes for the bytes count
+
+        let params_length = self.params.len() as u32;
+
+        let mut opcodes = 1; // OpCode::Rot
+        opcodes += 1; // OpCode::LoadLocalVar
+        opcodes += 4; // index for LoadLocalVar
+
+        size += params_length * opcodes;
+
+        let body_size = self.body.iter().fold(0, |acc, ir| acc + ir.size());
+
+        size += body_size;
+
+        size
+    }
+
+    pub fn to_bytecode(&self, global_lookup_table: &LookupTable) -> Vec<u8> {
+        let mut bytes = vec![];
+        let mut lookup_table = LookupTable::new();
+
+        bytes.push(OpCode::LoadLambda as u8);
+        let size = (self.size() - 1 - 4).to_le_bytes();
+        bytes.extend(size);
+
+        for (i, param) in self.params.iter().enumerate() {
+            let id = i as u32;
+            lookup_table.insert(param.clone(), Scope::Local(id));
+            bytes.push(OpCode::Rot as u8);
+            bytes.push(OpCode::LoadLocalVar as u8);
+            bytes.extend(id.to_le_bytes());
+        }
+
+        let mut table = global_lookup_table.clone();
+        for (key, value) in lookup_table.iter() {
+            table.insert(key.clone(), *value);
+        }
+        for instruction in self.body.iter() {
+            bytes.extend(instruction.to_bytecode(&table));
+        }
+
         bytes
     }
 }

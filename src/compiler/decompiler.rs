@@ -57,6 +57,12 @@ pub enum Instruction {
     JumpForward {
         offset: u32,
     },
+    LoadLambda {
+        byte_count: u32,
+    },
+    CallLambda {
+        arg_count: u32,
+    },
 }
 
 impl Instruction {
@@ -73,22 +79,18 @@ impl Instruction {
             Self::Swap => 1,
             Self::Dup => 1,
             Self::Rot => 1,
-            Self::LoadLocalVar { index } => 1 + 4,
-            Self::GetLocalVar { index } => 1 + 4,
+            Self::LoadLocalVar { .. } => 1 + 4,
+            Self::GetLocalVar { .. } => 1 + 4,
             Self::LoadGlobalVar => 1,
-            Self::GetGlobalVar { index } => 1 + 4,
-            Self::Call { index } => 1 + 4,
+            Self::GetGlobalVar { .. } => 1 + 4,
+            Self::Call { .. } => 1 + 4,
             Self::Return => 1,
-            Self::BuiltIn {
-                count_of_args,
-                name_length,
-                ..
-            } => 1 + 4 + 4 + name_length,
-            Self::LoadTest {
-                name_length, name, ..
-            } => 1 + 4 + name_length + 4,
-            Self::JumpIfFalse { offset } => 1 + 4,
-            Self::JumpForward { offset } => 1 + 4,
+            Self::BuiltIn { name_length, .. } => 1 + 4 + 4 + name_length,
+            Self::LoadTest { name_length, .. } => 1 + 4 + name_length + 4,
+            Self::JumpIfFalse { .. } => 1 + 4,
+            Self::JumpForward { .. } => 1 + 4,
+            Self::LoadLambda { .. } => 1 + 4,
+            Self::CallLambda { .. } => 1 + 4,
         }
     }
 
@@ -184,6 +186,16 @@ impl Instruction {
                 bytes.extend(offset.to_le_bytes());
                 bytes
             }
+            Instruction::LoadLambda { byte_count } => {
+                let mut bytes = vec![OpCode::LoadLambda as u8];
+                bytes.extend(byte_count.to_le_bytes());
+                bytes
+            }
+            Instruction::CallLambda { arg_count } => {
+                let mut bytes = vec![OpCode::CallLambda as u8];
+                bytes.extend(arg_count.to_le_bytes());
+                bytes
+            }
         }
     }
 }
@@ -191,77 +203,153 @@ impl Instruction {
 impl std::fmt::Display for Instruction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Instruction::Noop => write!(f, "{:02X}: Noop", OpCode::Noop as u8),
-            Instruction::Halt => write!(f, "{:02X}: Halt", OpCode::Halt as u8),
+            Instruction::Noop => write!(
+                f,
+                "{:02X}: Noop, size: {:02X}",
+                OpCode::Noop as u8,
+                self.size()
+            ),
+            Instruction::Halt => write!(
+                f,
+                "{:02X}: Halt, size: {:02X}",
+                OpCode::Halt as u8,
+                self.size()
+            ),
             Instruction::AddF64 { count } => {
-                write!(f, "{:02X}: AddF64 {:02X}", OpCode::AddF64 as u8, count)
+                write!(
+                    f,
+                    "{:02X}: AddF64 {:02X}, size: {:02X}",
+                    OpCode::AddF64 as u8,
+                    count,
+                    self.size()
+                )
             }
             Instruction::Eq { count } => {
-                write!(f, "{:02X}: Eq {:02X}", OpCode::Eq as u8, count)
+                write!(
+                    f,
+                    "{:02X}: Eq {:02X}, size: {:02X}",
+                    OpCode::Eq as u8,
+                    count,
+                    self.size()
+                )
             }
             Instruction::PushBool { value } => {
-                write!(f, "{:02X}: PushBool {}", OpCode::PushBool as u8, value)
+                write!(
+                    f,
+                    "{:02X}: PushBool {}, size: {:02X}",
+                    OpCode::PushBool as u8,
+                    value,
+                    self.size()
+                )
             }
             Instruction::PushU8 { value } => {
-                write!(f, "{:02X}: PushU8 {:02X}", OpCode::PushU8 as u8, value)
+                write!(
+                    f,
+                    "{:02X}: PushU8 {:02X}, size: {:02X}",
+                    OpCode::PushU8 as u8,
+                    value,
+                    self.size()
+                )
             }
             Instruction::PushF64 { value } => {
-                write!(f, "{:02X}: PushF64 {:.2}", OpCode::PushF64 as u8, value)
+                write!(
+                    f,
+                    "{:02X}: PushF64 {:.2}, size: {:02X}",
+                    OpCode::PushF64 as u8,
+                    value,
+                    self.size()
+                )
             }
             Instruction::PushString { length, value } => {
                 write!(
                     f,
-                    "{:02X}: PushString {:02X} {:?}",
+                    "{:02X}: PushString {:02X} {:?}, size: {:02X}",
                     OpCode::PushString as u8,
                     length,
-                    value
+                    value,
+                    self.size(),
                 )
             }
-            Instruction::Swap => write!(f, "{:02X}: Swap", OpCode::Swap as u8),
-            Instruction::Dup => write!(f, "{:02X}: Dup", OpCode::Dup as u8),
-            Instruction::Rot => write!(f, "{:02X}: Rot", OpCode::Rot as u8),
+            Instruction::Swap => write!(
+                f,
+                "{:02X}: Swap, size: {:02X}",
+                OpCode::Swap as u8,
+                self.size()
+            ),
+            Instruction::Dup => write!(
+                f,
+                "{:02X}: Dup, size: {:02X}",
+                OpCode::Dup as u8,
+                self.size()
+            ),
+            Instruction::Rot => write!(
+                f,
+                "{:02X}: Rot, size: {:02X}",
+                OpCode::Rot as u8,
+                self.size()
+            ),
             Instruction::LoadLocalVar { index } => {
                 write!(
                     f,
-                    "{:02X}: LoadLocalVar {:02X}",
+                    "{:02X}: LoadLocalVar {:02X}, size: {:02X}",
                     OpCode::LoadLocalVar as u8,
-                    index
+                    index,
+                    self.size(),
                 )
             }
             Instruction::GetLocalVar { index } => {
                 write!(
                     f,
-                    "{:02X}: GetLocalVar {:02X}",
+                    "{:02X}: GetLocalVar {:02X}, size: {:02X}",
                     OpCode::GetLocalVar as u8,
-                    index
+                    index,
+                    self.size(),
                 )
             }
             Instruction::LoadGlobalVar => {
-                write!(f, "{:02X}: LoadGlobalVar", OpCode::LoadGlobalVar as u8)
+                write!(
+                    f,
+                    "{:02X}: LoadGlobalVar, size: {:02X}",
+                    OpCode::LoadGlobalVar as u8,
+                    self.size()
+                )
             }
             Instruction::GetGlobalVar { index } => {
                 write!(
                     f,
-                    "{:02X}: GetGlobalVar {:02X}",
+                    "{:02X}: GetGlobalVar {:02X}, size: {:02X}",
                     OpCode::GetGlobalVar as u8,
-                    index
+                    index,
+                    self.size(),
                 )
             }
             Instruction::Call { index } => {
-                write!(f, "{:02X}: Call {:02X}", OpCode::Call as u8, index)
+                write!(
+                    f,
+                    "{:02X}: Call {:02X}, size: {:02X}",
+                    OpCode::Call as u8,
+                    index,
+                    self.size()
+                )
             }
-            Instruction::Return => write!(f, "{:02X}: Return", OpCode::Return as u8),
+            Instruction::Return => write!(
+                f,
+                "{:02X}: Return, size: {:02X}",
+                OpCode::Return as u8,
+                self.size()
+            ),
             Instruction::BuiltIn {
                 count_of_args,
                 name_length,
                 name,
             } => write!(
                 f,
-                "{:02X}: BuiltIn {:02X} {:02X} {:?}",
+                "{:02X}: BuiltIn {:02X} {:02X} {:?}, size: {:02X}",
                 OpCode::BuiltIn as u8,
                 count_of_args,
                 name_length,
-                name
+                name,
+                self.size(),
             ),
             Instruction::LoadTest {
                 name_length,
@@ -270,27 +358,48 @@ impl std::fmt::Display for Instruction {
             } => {
                 write!(
                     f,
-                    "{:02X}: LoadTest {:02X} {:?} {:02X}",
+                    "{:02X}: LoadTest {:02X} {:?} {:02X}, size: {:02X}",
                     OpCode::LoadTest as u8,
                     name_length,
                     name,
-                    index
+                    index,
+                    self.size(),
                 )
             }
             Instruction::JumpIfFalse { offset } => {
                 write!(
                     f,
-                    "{:02X}: JumpIfFalse {:02X}",
+                    "{:02X}: JumpIfFalse {:02X}, size: {:02X}",
                     OpCode::JumpIfFalse as u8,
-                    offset
+                    offset,
+                    self.size(),
                 )
             }
             Instruction::JumpForward { offset } => {
                 write!(
                     f,
-                    "{:02X}: JumpForward {:02X}",
+                    "{:02X}: JumpForward {:02X}, size: {:02X}",
                     OpCode::JumpForward as u8,
-                    offset
+                    offset,
+                    self.size(),
+                )
+            }
+            Instruction::LoadLambda { byte_count } => {
+                write!(
+                    f,
+                    "{:02X}: LoadLambda {:02X}, size: {:02X}",
+                    OpCode::LoadLambda as u8,
+                    byte_count,
+                    self.size(),
+                )
+            }
+            Instruction::CallLambda { arg_count } => {
+                write!(
+                    f,
+                    "{:02X}: CallLambda {:02X}, size: {:02X}",
+                    OpCode::CallLambda as u8,
+                    arg_count,
+                    self.size(),
                 )
             }
         }
@@ -466,6 +575,18 @@ fn get_instructions(bytes: &[u8], ip: &mut usize) -> Result<Instruction, String>
             let offset = u32::from_le_bytes(bytes[*ip..*ip + 4].try_into().unwrap());
             *ip += 4;
             Instruction::JumpForward { offset }
+        }
+        OpCode::LoadLambda => {
+            *ip += 1;
+            let byte_count = u32::from_le_bytes(bytes[*ip..*ip + 4].try_into().unwrap());
+            *ip += 4;
+            Instruction::LoadLambda { byte_count }
+        }
+        OpCode::CallLambda => {
+            *ip += 1;
+            let arg_count = u32::from_le_bytes(bytes[*ip..*ip + 4].try_into().unwrap());
+            *ip += 4;
+            Instruction::CallLambda { arg_count }
         }
     })
 }
