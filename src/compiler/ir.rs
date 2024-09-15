@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+// use crate::symbol_table::SymbolTable;
 use crate::vm::OpCode;
 
 pub type LookupTable = std::collections::HashMap<String, Scope>;

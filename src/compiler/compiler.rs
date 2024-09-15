@@ -1,6 +1,7 @@
 use super::ir::{Function, If, Ir, Lambda, LookupTable, Operator, Scope, Test, Value};
 use super::Header;
 use crate::ast::{Expr, Spanned};
+use crate::symbol_table::{SymbolTable, SymbolWalker};
 use crate::vm::OpCode;
 
 const OPERATORS: &[&str] = &["+", "="];
@@ -13,6 +14,7 @@ pub(crate) struct Compiler {
     pub tests: Vec<Test>,
     pub lookup_table: LookupTable,
     pub test_lookup_table: Vec<(String, u32)>,
+    pub symbol_table: SymbolTable,
     pub offset: u32,
 }
 
@@ -25,6 +27,7 @@ impl Default for Compiler {
             lookup_table: LookupTable::new(),
             test_lookup_table: Vec::new(),
             offset: Header::SIZE,
+            symbol_table: SymbolTable::default(),
         }
     }
 }
@@ -40,6 +43,8 @@ impl Compiler {
     }
 
     pub fn compile(mut self, ast: &[Spanned<Expr>]) -> Result<Vec<u8>, Vec<String>> {
+        // TODO: Handle errors
+        self.symbol_table = SymbolWalker::default().walk(&ast).unwrap();
         let mut global_ir_code = self.generate_ir_code(ast);
         self.create_lookup_table(&global_ir_code);
         self.append_ir_code_to_main(&mut global_ir_code);
@@ -109,6 +114,10 @@ impl Compiler {
                 .insert(test.name.clone(), Scope::Global(self.offset));
             self.test_lookup_table
                 .push((test.name.clone(), self.offset));
+            let Some(symbol) = self.symbol_table.get_mut(&test.name) else {
+                panic!("test `{}` not found", test.name);
+            };
+            symbol.location = Some(self.offset);
             self.offset += test.size();
         }
 
@@ -122,14 +131,25 @@ impl Compiler {
             } else {
                 0
             };
+
+            let Some(symbol) = self.symbol_table.get_mut(&function.name) else {
+                panic!("function `{}` not found", function.name);
+            };
+            symbol.location = Some(self.offset);
+
             self.offset += function.size() + test_offset;
         }
 
         let mut global_var_index = 0;
         for code in global_ir_code.iter() {
-            if let Ir::LoadGlobalVar(name) = code {
+            if let Ir::LoadGlobalVar(name) = &code {
                 self.lookup_table
                     .insert(name.clone(), Scope::Global(global_var_index));
+
+                let Some(symbol) = self.symbol_table.get_mut(name) else {
+                    panic!("global variable `{}` not found", name);
+                };
+                symbol.location = Some(self.offset);
                 global_var_index += 1;
             }
         }
