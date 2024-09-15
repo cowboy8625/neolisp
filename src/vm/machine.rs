@@ -5,6 +5,15 @@ const RED: &str = "\x1b[31m";
 const GREEN: &str = "\x1b[32m";
 const RESET: &str = "\x1b[0m";
 
+#[derive(Debug, Default)]
+enum DebugMode {
+    #[default]
+    Off,
+    Pause,
+    Step,
+    Continue,
+}
+
 /// Virtual Machine
 ///
 /// Stack based virtual machine for evaluating LISP code
@@ -15,7 +24,7 @@ const RESET: &str = "\x1b[0m";
 /// let mut vm = vm::Machine::new(program);
 /// vm.run();
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Machine {
     program: Vec<u8>,
     ip: usize,
@@ -24,6 +33,8 @@ pub struct Machine {
     local_var: Vec<Value>,
     global_var: Vec<Value>,
     decompile: bool,
+    breakpoints: Vec<usize>,
+    debug_mode: DebugMode,
 }
 
 impl Machine {
@@ -34,16 +45,81 @@ impl Machine {
             program,
             ip: program_header.start as usize,
             is_running: true,
-            stack: vec![],
-            local_var: vec![],
-            global_var: vec![],
             decompile,
+            ..Default::default()
+        }
+    }
+    pub fn add_breakpoint(&mut self, ip: usize) {
+        self.breakpoints.push(ip);
+    }
+
+    fn debugger(&mut self) {
+        use std::io::Write;
+        let mut input = String::new();
+        let mut result = Vec::new();
+        while input.is_empty() {
+            print!("{RED}debugger> {RESET}");
+            std::io::stdout().flush().unwrap();
+            std::io::stdin().read_line(&mut input).unwrap();
+            result = input.trim().split(' ').collect::<Vec<_>>();
+        }
+        match result[0] {
+            "d" | "display" => self.debug(),
+            "h" | "help" => {
+                println!("h help");
+                // println!("b breakpoint");
+                println!("c continue");
+                println!("n next");
+                // println!("r run");
+                println!("q quit");
+            }
+            "ps" | "print-stack" => {
+                for (i, item) in self.stack.iter().rev().enumerate() {
+                    println!("{i}: {item}");
+                }
+            }
+            "p" | "print" if result.len() == 2 => {
+                let Ok(stack_index) = result[1].parse::<usize>() else {
+                    println!("print <index> not {RED}{}{RESET}", result[1]);
+                    return;
+                };
+
+                if stack_index >= self.stack.len() {
+                    println!(
+                        "The stack size is {} but your index is out of range {}",
+                        self.stack.len(),
+                        stack_index
+                    );
+                    return;
+                }
+
+                let item = &self.stack[self.stack.len() - 1 - stack_index];
+                println!("{item}");
+            }
+            "p" | "print" => eprintln!("print <index>"),
+            "c" | "continue" => self.debug_mode = DebugMode::Continue,
+            "n" | "next" => self.debug_mode = DebugMode::Step,
+            "q" | "quit" => self.shutdown(),
+            _ => println!("{RED}unknown command{RESET} {input}"),
         }
     }
 
     pub fn run_once(&mut self) -> Result<()> {
+        match self.debug_mode {
+            DebugMode::Off if self.breakpoints.contains(&self.ip) => {
+                self.debug_mode = DebugMode::Pause;
+                return Ok(());
+            }
+            DebugMode::Pause => {
+                self.debugger();
+                return Ok(());
+            }
+            DebugMode::Step => self.debug_mode = DebugMode::Pause,
+            _ => (),
+        }
+
         let op = self.get_op_code()?;
-        // eprintln!("OpCode::{op:?} {:02X}", op as u8);
+
         match op {
             OpCode::Noop => Ok(()),
             OpCode::Halt => Ok(self.shutdown()),
@@ -177,6 +253,7 @@ impl Machine {
             }
             OpCode::CallLambda => {
                 let count = self.get_u32()? as usize;
+                println!("count: {}", count);
                 self.bring_to_top_of_stack(count + 1);
                 let Some(Value::Lambda(address)) = self.stack.pop() else {
                     panic!("expected value on stack for CallLambda")
@@ -195,8 +272,13 @@ impl Machine {
     }
 
     fn debug(&self) {
-        eprintln!("---- VM ----");
-        eprintln!("ip: {:02X}", self.ip - Header::SIZE as usize);
+        eprintln!(
+            "ip: {0}{1:02X} {1}, {2:02X} {2}{3}",
+            GREEN,
+            self.ip,
+            self.ip.saturating_sub(Header::SIZE as usize),
+            RESET
+        );
         let instructions = match decompile(&self.program) {
             Ok((_, instructions)) => instructions,
             Err((e, instructions)) => {
@@ -213,7 +295,12 @@ impl Machine {
             } else {
                 format!("{:02X} ", program_counter - Header::SIZE as usize)
             };
-            eprintln!("{selected}{i}{RESET}");
+            let breakpoint = if self.breakpoints.contains(&program_counter) {
+                "🔴".to_string()
+            } else {
+                "  ".to_string()
+            };
+            eprintln!("{breakpoint}{selected}{i}{RESET}");
             program_counter += i.size() as usize;
         }
     }

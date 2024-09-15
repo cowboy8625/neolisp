@@ -2,6 +2,7 @@
 use crate::vm::OpCode;
 
 pub type LookupTable = std::collections::HashMap<String, Scope>;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {
     Global(u32),
@@ -58,6 +59,7 @@ impl Ir {
             Self::Value(v) => v.size(),
             Self::Operator(op, args) => op.size() + 4 + args.iter().map(|a| a.size()).sum::<u32>(),
             Self::If(i) => i.size(),
+            // NOTE: CallLambda is the same
             Self::Call(name, args) => 1 + 4 + args.iter().map(|a| a.size()).sum::<u32>(),
             Self::Return => 2,
             Self::Halt => 1,
@@ -78,6 +80,7 @@ impl Ir {
                 count
             }
             Self::Lambda(lambda) => lambda.size(),
+            // NOTE: Call is the same
             Self::CallLambda(args) => 1 + 4 + args.iter().map(|a| a.size()).sum::<u32>(),
         }
     }

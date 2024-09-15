@@ -28,7 +28,7 @@ impl std::fmt::Display for Value {
                         .join(" ")
                 )
             }
-            Self::Lambda(_) => write!(f, "<lambda>"),
+            Self::Lambda(index) => write!(f, "<lambda {index}>"),
         }
     }
 }

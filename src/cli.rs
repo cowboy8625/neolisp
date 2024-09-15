@@ -1,4 +1,4 @@
-use clap::{Parser, ValueEnum};
+use clap::{Parser, ValueEnum, ValueHint};
 #[cfg(windows)]
 const HISTORY_PATH: &str = "%TEMP%.history";
 #[cfg(unix)]
@@ -17,6 +17,8 @@ pub struct Cli {
     pub test: bool,
     #[arg(short = 'd', long, default_value_t = false)]
     pub decompile: bool,
+    #[arg(long, help = "IP address to break on", value_delimiter = ',', value_hint = ValueHint::Other)]
+    pub breakpoints: Vec<usize>,
     pub files: Vec<String>,
 }
 
