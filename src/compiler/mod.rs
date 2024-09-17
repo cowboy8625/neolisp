@@ -5,8 +5,10 @@ mod compiler;
 mod decompiler;
 mod header;
 mod ir;
+use super::{BUILTINS, OPERATORS};
 use crate::ast::{Expr, Spanned};
 use crate::parser::parser;
+use crate::symbol_table::SymbolTable;
 use chumsky::prelude::Parser;
 
 use compiler::Compiler;
@@ -33,7 +35,7 @@ pub fn compile_chunk(src: &str) -> Result<Vec<u8>, Vec<String>> {
 pub fn compile_to_instructions(src: &str) -> Result<(Vec<Ir>, Vec<Function>), Vec<String>> {
     let ast = get_ast(src)?;
     let mut compiler = Compiler::new(None);
-    let instructions = compiler.generate_ir_code(&ast);
+    let instructions = compiler.generate_ir_code(&SymbolTable::new(), &ast);
 
     Ok((instructions, compiler.functions))
 }

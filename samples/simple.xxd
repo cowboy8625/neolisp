@@ -1,0 +1,15 @@
+Header { magic_number: [78, 76, 86, 77], version: 0, data_section_offset: 64, code_section_offset: 64, start: 93 }
+17: Rot, size: 01
+18: LoadLocalVar 00, size: 05
+17: Rot, size: 01
+18: LoadLocalVar 01, size: 05
+19: GetLocalVar 00, size: 05
+19: GetLocalVar 01, size: 05
+02: AddF64 02, size: 05
+17: Rot, size: 01
+1D: Return, size: 01
+12: PushF64 123.00, size: 09
+12: PushF64 321.00, size: 09
+1C: Call 40, size: 05
+1E: BuiltIn 01 05 "print", size: 0E
+01: Halt, size: 01

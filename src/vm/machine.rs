@@ -253,7 +253,6 @@ impl Machine {
             }
             OpCode::CallLambda => {
                 let count = self.get_u32()? as usize;
-                println!("count: {}", count);
                 self.bring_to_top_of_stack(count + 1);
                 let Some(Value::Lambda(address)) = self.stack.pop() else {
                     panic!("expected value on stack for CallLambda")
@@ -268,7 +267,7 @@ impl Machine {
 
     fn bring_to_top_of_stack(&mut self, count: usize) {
         let length = self.stack.len();
-        self.stack[length - count..].rotate_left(1);
+        self.stack[length - count..].rotate_left(count);
     }
 
     fn debug(&self) {
