@@ -47,6 +47,7 @@ impl Compiler {
         self.create_lookup_table(&mut symbol_table, &global_ir_code);
         self.append_ir_code_to_main(&mut global_ir_code);
         let mut program = Vec::new();
+        // eprintln!("{:#?}", symbol_table);
 
         for test in self.tests.iter() {
             let bytecode = test.to_bytecode(&mut symbol_table);
@@ -243,17 +244,16 @@ impl Compiler {
             };
             params.push(v.clone());
         }
+
+        let id = self.lambda_counter;
+        self.lambda_counter += 1;
+
         let mut body = Vec::new();
         for spanned in s_expr.iter().skip(2) {
             self.compile_expr(symbol_table, &mut body, spanned);
         }
         body.push(Ir::Return);
-        ir_code.push(Ir::Lambda(Lambda {
-            params,
-            body,
-            id: self.lambda_counter,
-        }));
-        self.lambda_counter += 1;
+        ir_code.push(Ir::Lambda(Lambda { params, body, id }));
     }
 
     fn compile_operator(

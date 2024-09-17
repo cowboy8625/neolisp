@@ -30,7 +30,7 @@ impl SymbolTable {
     /// Exit the current scope (pops the top scope off the stack)
     pub fn exit_new_scope(&mut self, current_function: Option<&str>) {
         let Some(scope) = self.scope_stack.pop() else {
-            panic!("No current scope");
+            panic!("No current scope for {}", current_function.unwrap_or("N/A"));
         };
         // If exiting a function, store the scope in `function_scopes`
         if let Some(func_name) = current_function {
@@ -40,7 +40,7 @@ impl SymbolTable {
 
     pub fn enter_scope(&mut self, name: &str) {
         let Some(scope) = self.function_scopes.get(name) else {
-            panic!("No current scope");
+            panic!("Can not enter scope {name} as it does not exist");
         };
         self.scope_stack.push(scope.clone());
     }
@@ -89,7 +89,7 @@ impl SymbolTable {
             // Insert into the top scope (local)
             self.scope_stack
                 .last_mut()
-                .expect("No current scope")
+                .expect("No current scope to insert into")
                 .insert(name, symbol);
         }
     }
@@ -226,16 +226,16 @@ impl SymbolWalker {
             Expr::Symbol(name) if KEYWORDS.contains(&name.as_str()) => {}
             Expr::Symbol(name) if OPERATORS.contains(&name.as_str()) => {}
             Expr::Symbol(name) if BUILTINS.contains(&name.as_str()) => {}
-            Expr::Symbol(name) if self.is_in_lambda => {
-                let symbol = Symbol {
-                    name: name.clone(),
-                    symbol_type: SymbolType::Dynamic,
-                    kind: SymbolKind::Variable,
-                    scope: self.current_scope,
-                    ..Default::default()
-                };
-                table.insert(name.clone(), symbol);
-            }
+            // Expr::Symbol(name) if self.is_in_lambda => {
+            //     let symbol = Symbol {
+            //         name: name.clone(),
+            //         symbol_type: SymbolType::Dynamic,
+            //         kind: SymbolKind::Variable,
+            //         scope: self.current_scope,
+            //         ..Default::default()
+            //     };
+            //     table.insert(name.clone(), symbol);
+            // }
             Expr::Symbol(name) => {
                 if table.lookup(name.as_str()).is_some() {
                     return;
@@ -311,9 +311,10 @@ impl SymbolWalker {
         self.current_scope = Scope::Function;
 
         let name = format!("lambda_{}", self.lambda_counter);
-        // Create a new symbol table
+        self.lambda_counter += 1;
 
         table.enter_new_scope();
+
         // Parameters of the function
         let Some(params_element) = elements.get(1) else {
             self.errors.push(ErrorKind::MissingFnParams(span.clone()));
@@ -351,16 +352,14 @@ impl SymbolWalker {
                 .push(ErrorKind::MissingFnBody(params_element.span.clone()));
             return;
         };
-        let Expr::List(body) = &body_element.expr else {
+        let Expr::List(_) = &body_element.expr else {
             self.errors
                 .push(ErrorKind::ExpectedFnBodyToBeList(body_element.clone()));
             return;
         };
 
         // Handle the body
-        for element in body.iter() {
-            self.walk_expr(table, element);
-        }
+        self.walk_expr(table, body_element);
 
         let symbol = Symbol {
             name: name.clone(),
@@ -372,7 +371,9 @@ impl SymbolWalker {
         };
 
         table.insert(name.clone(), symbol);
+        eprintln!("B: {:#?}", table);
         table.exit_new_scope(Some(&name));
+        eprintln!("A: {:#?}", table);
     }
 
     fn walk_var(&mut self, table: &mut SymbolTable, elements: &[Spanned<Expr>], span: &Span) {
@@ -410,7 +411,6 @@ impl SymbolWalker {
         self.walk_expr(table, body_element);
 
         if self.is_in_lambda {
-            self.lambda_counter += 1;
             self.is_in_lambda = false;
         }
 

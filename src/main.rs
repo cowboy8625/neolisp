@@ -46,8 +46,8 @@ fn main() -> anyhow::Result<()> {
         }
     };
 
-    let binary_name = filename.split('.').collect::<Vec<&str>>()[0];
-    std::fs::write(binary_name, program.clone())?;
+    // let binary_name = filename.split('.').collect::<Vec<&str>>()[0];
+    // std::fs::write(binary_name, program.clone())?;
 
     if args.decompile {
         let binary_name = filename.split('.').collect::<Vec<&str>>()[0];
