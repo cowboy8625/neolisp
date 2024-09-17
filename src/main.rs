@@ -77,7 +77,7 @@ fn main() -> anyhow::Result<()> {
 
     let mut machine = vm::Machine::new(program, args.decompile);
     for i in args.breakpoints {
-        machine.add_breakpoint(i);
+        machine.add_breakpoint(i + 64);
     }
     machine.run()?;
 

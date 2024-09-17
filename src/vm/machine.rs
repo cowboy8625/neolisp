@@ -66,12 +66,14 @@ impl Machine {
         match result[0] {
             "d" | "display" => self.debug(),
             "h" | "help" => {
-                println!("h help");
-                // println!("b breakpoint");
-                println!("c continue");
-                println!("n next");
+                println!("h  help");
+                println!("ps print-stack");
+                println!("p  print <index>");
+                println!("b  breakpoint <ip>");
+                println!("c  continue");
+                println!("n  next");
                 // println!("r run");
-                println!("q quit");
+                println!("q  quit");
             }
             "ps" | "print-stack" => {
                 for (i, item) in self.stack.iter().rev().enumerate() {
@@ -95,6 +97,13 @@ impl Machine {
 
                 let item = &self.stack[self.stack.len() - 1 - stack_index];
                 println!("{item}");
+            }
+            "b" | "breakpoint" if result.len() == 2 => {
+                let Ok(ip) = result[1].parse::<usize>() else {
+                    println!("breakpoint <ip> not {RED}{}{RESET}", result[1]);
+                    return;
+                };
+                self.add_breakpoint(ip);
             }
             "p" | "print" => eprintln!("print <index>"),
             "c" | "continue" => self.debug_mode = DebugMode::Continue,

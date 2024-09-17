@@ -371,9 +371,7 @@ impl SymbolWalker {
         };
 
         table.insert(name.clone(), symbol);
-        eprintln!("B: {:#?}", table);
         table.exit_new_scope(Some(&name));
-        eprintln!("A: {:#?}", table);
     }
 
     fn walk_var(&mut self, table: &mut SymbolTable, elements: &[Spanned<Expr>], span: &Span) {

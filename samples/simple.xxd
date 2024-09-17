@@ -1,0 +1,21 @@
+Header { magic_number: [78, 76, 86, 77], version: 0, data_section_offset: 64, code_section_offset: 64, start: 64 }
+22: LoadLambda 24, size: 05
+17: Rot, size: 01
+18: LoadLocalVar 00, size: 05
+22: LoadLambda 17, size: 05
+17: Rot, size: 01
+18: LoadLocalVar 00, size: 05
+19: GetLocalVar 00, size: 05
+19: GetLocalVar 00, size: 05
+02: AddF64 02, size: 05
+17: Rot, size: 01
+1D: Return, size: 01
+17: Rot, size: 01
+1D: Return, size: 01
+1A: LoadGlobalVar, size: 01
+12: PushF64 123.00, size: 09
+1B: GetGlobalVar 00, size: 05
+23: CallLambda 01, size: 05
+13: PushString 01 "\n", size: 06
+1E: BuiltIn 02 05 "print", size: 0E
+01: Halt, size: 01
