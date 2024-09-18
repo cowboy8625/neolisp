@@ -1,4 +1,6 @@
-use super::ir::{CompiledIr, Function, If, Ir, Operator, Test, Value, Var};
+#![allow(dead_code)]
+#![allow(unused)]
+use super::ir::{CompiledIr, Function, If, Ir, Lambda, Operator, Test, Value, Var};
 use super::{BUILTINS, OPERATORS};
 use crate::ast::{Expr, Spanned};
 use crate::symbol_table::SymbolTable;
@@ -6,6 +8,7 @@ use crate::symbol_table::SymbolTable;
 #[derive(Debug)]
 pub struct Compiler {
     functions: Vec<Function>,
+    lambdas: Vec<Lambda>,
     vars: Vec<Var>,
     tests: Vec<Test>,
     symbol_table: SymbolTable,
@@ -16,6 +19,7 @@ impl Compiler {
     pub fn new(symbol_table: SymbolTable) -> Self {
         Self {
             functions: Vec::new(),
+            lambdas: Vec::new(),
             vars: Vec::new(),
             tests: Vec::new(),
             symbol_table,
@@ -32,6 +36,7 @@ impl Compiler {
 
         Ok(vec![
             CompiledIr::Functions(self.functions),
+            CompiledIr::Lambdas(self.lambdas),
             CompiledIr::Tests(self.tests),
             CompiledIr::GlobalVar(self.vars),
         ])
@@ -170,10 +175,17 @@ impl Compiler {
         }
         body.push(Ir::Return);
         let name = format!("lambda_{}", id);
-        self.functions.push(Function {
+
+        let captured: Vec<String> = get_variables(&body)
+            .into_iter()
+            .filter(|v| !params.contains(v))
+            .collect();
+
+        self.lambdas.push(Lambda {
             name: name.to_string(),
             params: params.clone(),
             instruction: body,
+            captured,
         });
         ir_code.push(Ir::LoadLambda(name));
     }
@@ -276,4 +288,48 @@ impl Compiler {
             else_block: else_ir,
         }));
     }
+}
+
+fn get_variables(ir_code: &[Ir]) -> Vec<String> {
+    let mut variables = Vec::new();
+    fn visit(ir_code: &Ir, variables: &mut Vec<String>) {
+        match ir_code {
+            Ir::LoadGlobalVar(name) => variables.push(name.clone()),
+            Ir::Operator(_, args) => {
+                let v = get_variables(&args);
+                variables.extend(v);
+            }
+            Ir::Value(value) => match value {
+                Value::Id(name) => variables.push(name.clone()),
+                _ => {}
+            },
+            Ir::If(r#if) => {
+                let v = get_variables(&r#if.condition);
+                variables.extend(v);
+                let v = get_variables(&r#if.then_block);
+                variables.extend(v);
+                let v = get_variables(&r#if.else_block);
+                variables.extend(v);
+            }
+            Ir::BuiltIn(name, args) => {
+                variables.push(name.clone());
+                let v = get_variables(&args);
+                variables.extend(v);
+            }
+            Ir::Call(name, args) => {
+                variables.push(name.clone());
+                let v = get_variables(&args);
+                variables.extend(v);
+            }
+            Ir::LoadTest(_, _) => todo!(),
+            Ir::LoadLambda(name) => variables.push(name.clone()),
+            Ir::Return => {} // nothing to do with Return
+            Ir::Halt => {}   // nothing to do with Halt
+        }
+    }
+
+    for ir in ir_code.iter() {
+        visit(ir, &mut variables);
+    }
+    variables
 }

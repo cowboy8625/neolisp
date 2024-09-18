@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+#![allow(unused)]
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Operator {
     Add,
@@ -17,6 +20,7 @@ impl From<&str> for Operator {
 #[derive(Debug, Clone, PartialEq)]
 pub enum CompiledIr {
     Functions(Vec<Function>),
+    Lambdas(Vec<Lambda>),
     Tests(Vec<Test>),
     GlobalVar(Vec<Var>),
 }
@@ -57,6 +61,14 @@ pub struct Function {
     pub name: String,
     pub params: Vec<String>,
     pub instruction: Vec<Ir>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Lambda {
+    pub name: String,
+    pub params: Vec<String>,
+    pub instruction: Vec<Ir>,
+    pub captured: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

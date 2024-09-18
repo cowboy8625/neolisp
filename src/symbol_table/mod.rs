@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+#![allow(unused)]
 #[cfg(test)]
 mod test;
 
