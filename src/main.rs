@@ -5,6 +5,7 @@ mod compiler;
 mod environment;
 mod error;
 mod eval;
+mod ir_generator;
 mod parser;
 mod repl;
 mod symbol_table;

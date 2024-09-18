@@ -44,7 +44,6 @@ pub enum Ir {
     BuiltIn(String, Vec<Ir>),
     LoadTest(String, u32),
     Lambda(Lambda),
-    CallLambda(Vec<Ir>),
 }
 
 impl Ir {
@@ -53,11 +52,17 @@ impl Ir {
             Self::Value(v) => v.size(),
             Self::Operator(op, args) => op.size() + 4 + args.iter().map(|a| a.size()).sum::<u32>(),
             Self::If(i) => i.size(),
-            // NOTE: CallLambda is the same
             Self::Call(symbol_type, name, args) => {
-                1 + 4
-                    + args.iter().map(|a| a.size()).sum::<u32>()
-                    + if matches!(symbol_type, SymbolKind::Lambda) {
+                // opcode Call
+                1 +
+                // args count or address
+                4 +
+                // is_lambda
+                1 +
+                // args size
+                args.iter().map(|a| a.size()).sum::<u32>() +
+                // name length
+                if matches!(symbol_type, SymbolKind::Lambda) {
                         5
                     } else {
                         0
@@ -82,8 +87,6 @@ impl Ir {
                 count
             }
             Self::Lambda(lambda) => lambda.size(),
-            // NOTE: Call is the same
-            Self::CallLambda(args) => 1 + 4 + args.iter().map(|a| a.size()).sum::<u32>(),
         }
     }
     pub fn to_bytecode(&self, symbol_table: &mut SymbolTable) -> Vec<u8> {
@@ -108,7 +111,7 @@ impl Ir {
                         .flatten()
                         .collect::<Vec<_>>();
                     let Some(symbol) = symbol_table.lookup(name) else {
-                        panic!("function `{name}` not found")
+                        panic!("function `{name}` not found {symbol_table:#?}")
                     };
                     match &symbol.kind {
                         SymbolKind::Function => {
@@ -117,18 +120,24 @@ impl Ir {
                             };
                             bytes.push(OpCode::Call as u8);
                             bytes.extend(id.to_le_bytes());
+                            // is_lambda
+                            bytes.push(false as u8);
                         }
                         SymbolKind::Lambda if symbol.scope == Scope::Global => {
                             bytes.push(OpCode::GetGlobalVar as u8);
                             bytes.extend(symbol.location.unwrap().to_le_bytes());
-                            bytes.push(OpCode::CallLambda as u8);
+                            bytes.push(OpCode::Call as u8);
                             bytes.extend((args.len() as u32).to_le_bytes());
+                            // is_lambda
+                            bytes.push(true as u8);
                         }
                         SymbolKind::Lambda if symbol.scope == Scope::Function => {
                             bytes.push(OpCode::GetLocalVar as u8);
                             bytes.extend(symbol.location.unwrap().to_le_bytes());
-                            bytes.push(OpCode::CallLambda as u8);
+                            bytes.push(OpCode::Call as u8);
                             bytes.extend((args.len() as u32).to_le_bytes());
+                            // is_lambda
+                            bytes.push(true as u8);
                         }
                         item => unreachable!("Calling {name} of kind {item:?}"),
                     };
@@ -167,17 +176,6 @@ impl Ir {
                 bytes
             }
             Self::Lambda(lambda) => lambda.to_bytecode(symbol_table),
-            Self::CallLambda(args) => {
-                unreachable!("Lambda Should have been created");
-                // let mut bytes = args
-                //     .iter()
-                //     .map(|a| a.to_bytecode(lookup_table))
-                //     .flatten()
-                //     .collect::<Vec<_>>();
-                // bytes.push(OpCode::CallLambda as u8);
-                // bytes.extend((args.len() as u32).to_le_bytes());
-                // bytes
-            }
         }
     }
 }

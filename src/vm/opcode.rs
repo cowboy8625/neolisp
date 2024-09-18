@@ -49,19 +49,23 @@ pub enum OpCode {
     /// Get a value on to the global variable stack
     GetGlobalVar,
 
+    /// Call <address:u32> <is-lambda:u8>
     Call,
+    /// No args
     Return,
 
-    /// count of args
-    /// name length
-    /// name
+    /// BuiltIn <count-of-args:u32> <name-length:u32> <name:[u8]>
     BuiltIn,
     LoadTest,
-    /// Followed by Index
+    /// JumpIfFalse <offset:u32>
+    /// offset is relative to the next instruction
     JumpIfFalse,
+    /// JumpForward <offset:u32>
+    /// offset is relative to the next instruction
     JumpForward,
+    /// LoadLambda <byte-count:u32>
+    /// byte-count is the number of bytes in the lambda to jump over
     LoadLambda,
-    CallLambda,
 }
 
 impl TryFrom<u8> for OpCode {
@@ -103,7 +107,6 @@ impl TryFrom<u8> for OpCode {
             0x20 => Ok(Self::JumpIfFalse),
             0x21 => Ok(Self::JumpForward),
             0x22 => Ok(Self::LoadLambda),
-            0x23 => Ok(Self::CallLambda),
             _ => Err(format!("unknown opcode: {value}")),
         }
     }

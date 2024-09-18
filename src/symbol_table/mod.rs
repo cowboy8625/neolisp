@@ -311,6 +311,7 @@ impl SymbolWalker {
         self.current_scope = Scope::Function;
 
         let name = format!("lambda_{}", self.lambda_counter);
+        eprintln!("symbol table: {}", name);
         self.lambda_counter += 1;
 
         table.enter_new_scope();

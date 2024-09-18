@@ -177,8 +177,21 @@ impl Machine {
             }
             OpCode::Call => {
                 let address = self.get_u32()? as usize;
-                self.stack.push(Value::U32(self.ip as u32));
-                self.ip = address;
+                let is_lambda = self.get_u8()? != 0;
+
+                if is_lambda {
+                    // if is_lambda then address is count of args
+                    let count = address;
+                    self.bring_to_top_of_stack(count + 1);
+                    let Some(Value::Lambda(address)) = self.stack.pop() else {
+                        panic!("expected value on stack for CallLambda")
+                    };
+                    self.stack.push(Value::U32(self.ip as u32));
+                    self.ip = address as usize;
+                } else {
+                    self.stack.push(Value::U32(self.ip as u32));
+                    self.ip = address;
+                }
                 Ok(())
             }
 
@@ -258,16 +271,6 @@ impl Machine {
                 let count = self.get_u32()? as usize;
                 self.stack.push(Value::Lambda(self.ip as u32));
                 self.ip += count;
-                Ok(())
-            }
-            OpCode::CallLambda => {
-                let count = self.get_u32()? as usize;
-                self.bring_to_top_of_stack(count + 1);
-                let Some(Value::Lambda(address)) = self.stack.pop() else {
-                    panic!("expected value on stack for CallLambda")
-                };
-                self.stack.push(Value::U32(self.ip as u32));
-                self.ip = address as usize;
                 Ok(())
             }
             op => unimplemented!("opcode: {:?}\n{:02X}\n{:#?}", op, self.ip, self.stack),
