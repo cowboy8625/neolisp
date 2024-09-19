@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 #![allow(unused)]
-use super::ir::{CompiledIr, Function, If, Ir, Lambda, Operator, Test, Value, Var};
+use super::hir::{CompiledHir, Function, Hir, If, Lambda, Operator, Test, Value, Var};
 use super::{BUILTINS, OPERATORS};
 use crate::ast::{Expr, Spanned};
 use crate::symbol_table::SymbolTable;
@@ -27,7 +27,7 @@ impl Compiler {
         }
     }
 
-    pub fn compile(mut self, ast: &[Spanned<Expr>]) -> Result<Vec<CompiledIr>, Vec<String>> {
+    pub fn compile(mut self, ast: &[Spanned<Expr>]) -> Result<Vec<CompiledHir>, Vec<String>> {
         let mut global_ir_code = Vec::new();
 
         for spanned in ast {
@@ -35,19 +35,19 @@ impl Compiler {
         }
 
         Ok(vec![
-            CompiledIr::Functions(self.functions),
-            CompiledIr::Lambdas(self.lambdas),
-            CompiledIr::Tests(self.tests),
-            CompiledIr::GlobalVar(self.vars),
+            CompiledHir::Functions(self.functions),
+            CompiledHir::Lambdas(self.lambdas),
+            CompiledHir::Tests(self.tests),
+            CompiledHir::GlobalVar(self.vars),
         ])
     }
 
-    fn compile_expr(&mut self, ir_code: &mut Vec<Ir>, spanned: &Spanned<Expr>) {
+    fn compile_expr(&mut self, ir_code: &mut Vec<Hir>, spanned: &Spanned<Expr>) {
         match &spanned.expr {
-            Expr::Bool(v) => ir_code.push(Ir::Value(Value::Bool(*v))),
-            Expr::String(v) => ir_code.push(Ir::Value(Value::String(v.clone()))),
-            Expr::Symbol(v) => ir_code.push(Ir::Value(Value::Id(v.clone()))),
-            Expr::Number(v) => ir_code.push(Ir::Value(Value::F64(*v))),
+            Expr::Bool(v) => ir_code.push(Hir::Value(Value::Bool(*v))),
+            Expr::String(v) => ir_code.push(Hir::Value(Value::String(v.clone()))),
+            Expr::Symbol(v) => ir_code.push(Hir::Value(Value::Id(v.clone()))),
+            Expr::Number(v) => ir_code.push(Hir::Value(Value::F64(*v))),
             Expr::List(v) => self.compile_s_expr(ir_code, v),
             Expr::Builtin(_, _) => unreachable!(),
             Expr::Func(_) => unreachable!(),
@@ -55,7 +55,7 @@ impl Compiler {
         }
     }
 
-    fn compile_s_expr(&mut self, ir_code: &mut Vec<Ir>, s_expr: &[Spanned<Expr>]) {
+    fn compile_s_expr(&mut self, ir_code: &mut Vec<Hir>, s_expr: &[Spanned<Expr>]) {
         match s_expr.first() {
             Some(spanned) => match &spanned.expr {
                 Expr::Symbol(v) if v.as_str() == "fn" => self.compile_function(s_expr),
@@ -77,7 +77,7 @@ impl Compiler {
                 //
                 //     // let name = format!("lambda_{}", self.lambda_counter - 1);
                 //     // eprintln!("{}", name);
-                //     // ir_code.push(Ir::Call(symbol_table::SymbolKind::Lambda, name, args))
+                //     // ir_code.push(Hir::Call(symbol_table::SymbolKind::Lambda, name, args))
                 // }
                 _ => self.compile_expr(ir_code, spanned),
             },
@@ -87,7 +87,7 @@ impl Compiler {
 
     fn compile_operator(
         &mut self,
-        ir_code: &mut Vec<Ir>,
+        ir_code: &mut Vec<Hir>,
         s_expr: &[Spanned<Expr>],
         operator: &str,
     ) {
@@ -95,7 +95,7 @@ impl Compiler {
         for spanned in s_expr.iter().skip(1) {
             self.compile_expr(&mut args, spanned);
         }
-        ir_code.push(Ir::Operator(Operator::from(operator), args));
+        ir_code.push(Hir::Operator(Operator::from(operator), args));
     }
 
     fn compile_function(&mut self, s_expr: &[Spanned<Expr>]) {
@@ -134,21 +134,21 @@ impl Compiler {
         let mut instruction = Vec::new();
         self.compile_s_expr(&mut instruction, body);
         if name == "main" {
-            instruction.push(Ir::Halt);
+            instruction.push(Hir::Halt);
         } else {
-            instruction.push(Ir::Return);
+            instruction.push(Hir::Return);
         }
 
         let function = Function {
             name: name.to_string(),
             params,
-            instruction,
+            body: instruction,
         };
 
         self.functions.push(function);
     }
 
-    fn compile_lambda(&mut self, ir_code: &mut Vec<Ir>, s_expr: &[Spanned<Expr>]) {
+    fn compile_lambda(&mut self, ir_code: &mut Vec<Hir>, s_expr: &[Spanned<Expr>]) {
         debug_assert_eq!(s_expr.len(), 3, "expected lambda expression {s_expr:#?}");
         let Some(Spanned {
             expr: Expr::List(params_expr),
@@ -173,7 +173,7 @@ impl Compiler {
         for spanned in s_expr.iter().skip(2) {
             self.compile_expr(&mut body, spanned);
         }
-        body.push(Ir::Return);
+        body.push(Hir::Return);
         let name = format!("lambda_{}", id);
 
         let captured: Vec<String> = get_variables(&body)
@@ -187,7 +187,7 @@ impl Compiler {
             instruction: body,
             captured,
         });
-        ir_code.push(Ir::LoadLambda(name));
+        ir_code.push(Hir::LoadLambda(name));
     }
 
     fn compile_test(&mut self, s_expr: &[Spanned<Expr>]) {
@@ -207,7 +207,7 @@ impl Compiler {
         for spanned in s_expr.iter().skip(2) {
             self.compile_expr(&mut ir_code, spanned);
         }
-        ir_code.push(Ir::Return);
+        ir_code.push(Hir::Return);
 
         self.tests.push(Test {
             name,
@@ -227,7 +227,7 @@ impl Compiler {
         for spanned in s_expr.iter().skip(2) {
             self.compile_expr(&mut instruction, spanned);
         }
-        instruction.push(Ir::LoadGlobalVar(name.to_string()));
+        instruction.push(Hir::LoadGlobalVar(name.to_string()));
 
         self.vars.push(Var {
             name: name.to_string(),
@@ -235,7 +235,7 @@ impl Compiler {
         });
     }
 
-    fn compile_call(&mut self, ir_code: &mut Vec<Ir>, s_expr: &[Spanned<Expr>]) {
+    fn compile_call(&mut self, ir_code: &mut Vec<Hir>, s_expr: &[Spanned<Expr>]) {
         let Some(Spanned {
             expr: Expr::Symbol(name),
             ..
@@ -250,16 +250,16 @@ impl Compiler {
         });
 
         if BUILTINS.contains(&name.as_str()) {
-            ir_code.push(Ir::BuiltIn(name.clone(), args));
+            ir_code.push(Hir::BuiltIn(name.clone(), args));
             return;
         }
         let Some(symbol) = self.symbol_table.lookup(name) else {
             panic!("function `{name}` not found")
         };
-        ir_code.push(Ir::Call(name.clone(), args))
+        ir_code.push(Hir::Call(name.clone(), args))
     }
 
-    fn compile_if(&mut self, ir_code: &mut Vec<Ir>, s_expr: &[Spanned<Expr>]) {
+    fn compile_if(&mut self, ir_code: &mut Vec<Hir>, s_expr: &[Spanned<Expr>]) {
         if s_expr.len() != 4 {
             panic!("expected if condition, then expression and else expression");
         }
@@ -282,7 +282,7 @@ impl Compiler {
         let mut else_ir = Vec::new();
         self.compile_expr(&mut else_ir, &else_expr);
 
-        ir_code.push(Ir::If(If {
+        ir_code.push(Hir::If(If {
             condition: condition_ir,
             then_block: then_ir,
             else_block: else_ir,
@@ -290,20 +290,20 @@ impl Compiler {
     }
 }
 
-fn get_variables(ir_code: &[Ir]) -> Vec<String> {
+fn get_variables(ir_code: &[Hir]) -> Vec<String> {
     let mut variables = Vec::new();
-    fn visit(ir_code: &Ir, variables: &mut Vec<String>) {
+    fn visit(ir_code: &Hir, variables: &mut Vec<String>) {
         match ir_code {
-            Ir::LoadGlobalVar(name) => variables.push(name.clone()),
-            Ir::Operator(_, args) => {
+            Hir::LoadGlobalVar(name) => variables.push(name.clone()),
+            Hir::Operator(_, args) => {
                 let v = get_variables(&args);
                 variables.extend(v);
             }
-            Ir::Value(value) => match value {
+            Hir::Value(value) => match value {
                 Value::Id(name) => variables.push(name.clone()),
                 _ => {}
             },
-            Ir::If(r#if) => {
+            Hir::If(r#if) => {
                 let v = get_variables(&r#if.condition);
                 variables.extend(v);
                 let v = get_variables(&r#if.then_block);
@@ -311,20 +311,20 @@ fn get_variables(ir_code: &[Ir]) -> Vec<String> {
                 let v = get_variables(&r#if.else_block);
                 variables.extend(v);
             }
-            Ir::BuiltIn(name, args) => {
+            Hir::BuiltIn(name, args) => {
                 variables.push(name.clone());
                 let v = get_variables(&args);
                 variables.extend(v);
             }
-            Ir::Call(name, args) => {
+            Hir::Call(name, args) => {
                 variables.push(name.clone());
                 let v = get_variables(&args);
                 variables.extend(v);
             }
-            Ir::LoadTest(_, _) => todo!(),
-            Ir::LoadLambda(name) => variables.push(name.clone()),
-            Ir::Return => {} // nothing to do with Return
-            Ir::Halt => {}   // nothing to do with Halt
+            Hir::LoadTest(_, _) => todo!(),
+            Hir::LoadLambda(name) => variables.push(name.clone()),
+            Hir::Return => {} // nothing to do with Return
+            Hir::Halt => {}   // nothing to do with Halt
         }
     }
 

@@ -5,12 +5,14 @@ mod compiler;
 mod environment;
 mod error;
 mod eval;
-mod ir_generator;
+// mod hir_generator;
+// mod lir_generator;
 mod parser;
 mod repl;
 mod symbol_table;
 #[cfg(test)]
 mod tests;
+mod type_checker;
 mod vm;
 
 const OPERATORS: &[&str] = &["+", "="];

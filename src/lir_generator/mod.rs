@@ -1,5 +1,8 @@
+#![allow(dead_code)]
+#![allow(unused)]
+
 mod compiler;
-mod ir;
+mod lir;
 #[cfg(test)]
 mod test;
 

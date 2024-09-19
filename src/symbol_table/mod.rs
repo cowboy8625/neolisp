@@ -7,7 +7,7 @@ use super::{BUILTINS, KEYWORDS, OPERATORS};
 use crate::ast::{Expr, Span, Spanned};
 use std::collections::HashMap;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SymbolTable {
     global_scope: HashMap<String, Symbol>, // Permanent global scope
     function_scopes: HashMap<String, HashMap<String, Symbol>>, // Persistent function scopes
@@ -160,10 +160,10 @@ pub struct Errors {
 pub enum SymbolType {
     #[default]
     Dynamic,
-    // Bool,
-    // Int,
-    // Float,
-    // String,
+    Bool,
+    Int,
+    Float,
+    String,
     Function(Vec<SymbolType>, Box<SymbolType>), // (params, return type)
 }
 

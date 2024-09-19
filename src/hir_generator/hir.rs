@@ -18,7 +18,7 @@ impl From<&str> for Operator {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum CompiledIr {
+pub enum CompiledHir {
     Functions(Vec<Function>),
     Lambdas(Vec<Lambda>),
     Tests(Vec<Test>),
@@ -26,14 +26,14 @@ pub enum CompiledIr {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Ir {
+pub enum Hir {
     Return,
     Halt,
-    Operator(Operator, Vec<Ir>),
+    Operator(Operator, Vec<Hir>),
     Value(Value),
     If(If),
-    BuiltIn(String, Vec<Ir>),
-    Call(String, Vec<Ir>),
+    BuiltIn(String, Vec<Hir>),
+    Call(String, Vec<Hir>),
     LoadGlobalVar(String),
     LoadTest(String, u32),
     LoadLambda(String),
@@ -51,34 +51,34 @@ pub enum Value {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct If {
-    pub condition: Vec<Ir>,
-    pub then_block: Vec<Ir>,
-    pub else_block: Vec<Ir>,
+    pub condition: Vec<Hir>,
+    pub then_block: Vec<Hir>,
+    pub else_block: Vec<Hir>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
     pub name: String,
     pub params: Vec<String>,
-    pub instruction: Vec<Ir>,
+    pub body: Vec<Hir>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Lambda {
     pub name: String,
     pub params: Vec<String>,
-    pub instruction: Vec<Ir>,
+    pub instruction: Vec<Hir>,
     pub captured: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Test {
     pub name: String,
-    pub instruction: Vec<Ir>,
+    pub instruction: Vec<Hir>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Var {
     pub name: String,
-    pub instruction: Vec<Ir>,
+    pub instruction: Vec<Hir>,
 }
