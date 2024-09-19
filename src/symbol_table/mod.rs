@@ -155,7 +155,6 @@ pub struct Errors {
     pub errors: Vec<ErrorKind>,
 }
 
-/// Represents the type of a symbol (could be extended to include more complex types)
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum SymbolType {
     #[default]
@@ -167,7 +166,6 @@ pub enum SymbolType {
     Function(Vec<SymbolType>, Box<SymbolType>), // (params, return type)
 }
 
-/// Represents the kind of a symbol (variable, function, etc.)
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum SymbolKind {
     #[default]
@@ -178,7 +176,6 @@ pub enum SymbolKind {
     // Constant,
 }
 
-/// Represents the scope of a symbol
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum Scope {
     #[default]
@@ -188,7 +185,6 @@ pub enum Scope {
     // Block(u32),
 }
 
-/// Metadata for a symbol in the lookup table
 #[derive(Debug, Clone, Default)]
 pub struct Symbol {
     pub name: String,
@@ -238,12 +234,12 @@ impl SymbolWalker {
             //     };
             //     table.insert(name.clone(), symbol);
             // }
-            Expr::Symbol(name) => {
-                if table.lookup(name.as_str()).is_some() {
-                    return;
+            Expr::Symbol(name) => match table.lookup(name.as_str()) {
+                Some(symbol) => {
+                    eprintln!("{symbol:#?}");
                 }
-                self.errors.push(ErrorKind::Unimplemented(spanned.clone()));
-            }
+                None => self.errors.push(ErrorKind::Unimplemented(spanned.clone())),
+            },
             Expr::List(elements) if starts_with(elements, "var") => {
                 self.walk_var(table, elements, &spanned.span);
                 self.current_scope = Scope::Global;

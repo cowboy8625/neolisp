@@ -129,8 +129,8 @@ impl Compiler {
                 let Some(symbol) = self.symbol_table.lookup(name) else {
                     panic!("Variable `{}` is not defined", name);
                 };
-                let ty = symbol.ty;
-                lir_code.push(Lir::Push { ty }),
+                // let ty = symbol.symbol_type;
+                // lir_code.push(Lir::Push { ty });
             }
             Value::U8(_) => todo!(),
             Value::U32(_) => todo!(),

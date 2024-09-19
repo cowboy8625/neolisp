@@ -1,12 +1,27 @@
 #![allow(dead_code)]
 #![allow(unused)]
 
+use crate::symbol_table::SymbolType;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
     Int,
     Float,
     String(u32),
     Bool,
+}
+
+impl From<SymbolType> for Type {
+    fn from(symbol_kind: SymbolType) -> Self {
+        match symbol_kind {
+            SymbolType::Dynamic => unreachable!("I dont know what to do with a `Dynamic` type"),
+            SymbolType::Bool => Type::Bool,
+            SymbolType::Int => Type::Int,
+            SymbolType::Float => Type::Float,
+            SymbolType::String => Type::String(0),
+            SymbolType::Function(_, _) => todo!(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
