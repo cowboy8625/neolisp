@@ -46,7 +46,27 @@ impl Compiler {
                 CompiledHir::GlobalVar(vars) => self.compile_vars(vars),
             }
         }
-        Ok(vec![])
+
+        let mut instructions = Vec::new();
+
+        let Some(main_symbol) = self.symbol_table.lookup("main") else {
+            panic!("Function `main` is not defined");
+        };
+
+        let Some(location) = main_symbol.location else {
+            panic!("Function `main` location has not been set");
+        };
+
+        instructions.push(Instruction::StartAt(location as usize));
+        for function in self.functions.into_iter() {
+            instructions.extend(function.instructions);
+        }
+
+        for lambda in self.lambdas.into_iter() {
+            instructions.extend(lambda.instructions);
+        }
+
+        Ok(instructions)
     }
 
     fn compile_functions(&mut self, functions: &[HirFunction]) {
@@ -91,6 +111,12 @@ impl Compiler {
 
         self.symbol_table.exit_scope();
 
+        let location = self
+            .functions
+            .iter()
+            .fold(0, |acc, f| acc + f.instructions.len() as u32)
+            + 1;
+        self.symbol_table.set_location(Some(&name), &name, location);
         self.functions.push(Function {
             name: name.clone(),
             instructions: local_instruction,
@@ -136,7 +162,10 @@ impl Compiler {
 
     fn compile_hir(&self, instructions: &mut Vec<Instruction>, hir: &Hir) {
         match hir {
-            Hir::Return => instructions.push(Instruction::Return),
+            Hir::Return => {
+                instructions.push(Instruction::Rot);
+                instructions.push(Instruction::Return);
+            }
             Hir::Halt => instructions.push(Instruction::Halt),
             Hir::Operator(op, args) => match op {
                 Operator::Add => {
@@ -164,8 +193,19 @@ impl Compiler {
                 for arg in args {
                     self.compile_hir(instructions, arg);
                 }
+                let Some(symbol) = self.symbol_table.lookup(name) else {
+                    panic!("Function `{}` is not defined", name);
+                };
+
+                let Some(location) = symbol.location else {
+                    instructions.push(Instruction::Call(
+                        Callee::UnSetFunctionLocation(name.clone()),
+                        args.len() as u8,
+                    ));
+                    return;
+                };
                 instructions.push(Instruction::Call(
-                    Callee::UnSetFunctionLocation(name.clone()),
+                    Callee::Function(location as usize),
                     args.len() as u8,
                 ));
             }

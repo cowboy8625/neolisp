@@ -9,6 +9,7 @@ use pretty_assertions::assert_eq;
 fn test_generate_instructions_code() {
     let src = r#"
 ; (var add (lambda (x) (lambda (y) (+ x y))))
+
 (fn add (x y) (+ x y))
 (fn main () (print (add 123 321)))
 "#;

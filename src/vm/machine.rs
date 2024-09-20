@@ -28,12 +28,10 @@ impl Machine {
     }
 
     pub fn run_once(&mut self) {
-        eprintln!("ip: {}", self.ip);
         let Some(instruction) = &self.program.get(self.ip) else {
             panic!("ip out of bounds")
         };
         self.ip += 1;
-        eprintln!("{:#?}", instruction);
         match instruction {
             Instruction::StartAt(address) => self.ip = *address as usize,
             Instruction::Noop => {}
@@ -55,7 +53,6 @@ impl Machine {
                 let Some(left) = self.stack.pop() else {
                     panic!("expected value on stack for Add")
                 };
-                eprintln!("{:?} + {:?} = ", left, right);
                 match (left, right) {
                     (Value::I32(left), Value::I32(right)) => {
                         self.stack.push(Value::I32(left + right));

@@ -79,32 +79,11 @@ fn main() -> anyhow::Result<()> {
     // }
 
     let program = compile(&src)?;
-    // use vm::Callee;
-    // use vm::Instruction as Ins;
-    // use vm::Value;
-    // let program = vec![
-    //     Ins::StartAt(10),
-    //     Ins::Rot,
-    //     Ins::PopIntoLocalStack,
-    //     Ins::Rot,
-    //     Ins::PopIntoLocalStack,
-    //     Ins::LoadLocal(0),
-    //     Ins::LoadLocal(1),
-    //     Ins::Add,
-    //     Ins::Rot,
-    //     Ins::Return,
-    //     Ins::Push(Value::I32(123)),
-    //     Ins::Push(Value::I32(321)),
-    //     Ins::Call(Callee::Function(1), 2),
-    //     Ins::Halt,
-    // ];
     let mut machine = vm::Machine::new(program);
     for i in args.breakpoints {
         machine.add_breakpoint(i);
     }
     machine.run();
-
-    println!("{:?}", machine.stack);
 
     Ok(())
 }
