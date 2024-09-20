@@ -69,9 +69,9 @@ impl Compiler {
                 Expr::Symbol(_) => self.compile_call(ir_code, s_expr),
                 // Expr::List(items) if matches!(items.first(), Some(Spanned { expr: Expr::Symbol(v), .. }) if v.as_str() == "lambda") =>
                 // {
-                //     self.compile_expr(symbol_table, ir_code, &spanned);
+                //     self.compile_expr(ir_code, &spanned);
                 //     let args = s_expr.iter().skip(1).fold(Vec::new(), |mut acc, s| {
-                //         self.compile_expr(symbol_table, &mut acc, s);
+                //         self.compile_expr(&mut acc, s);
                 //         acc
                 //     });
                 //
@@ -132,7 +132,9 @@ impl Compiler {
         };
 
         let mut instruction = Vec::new();
+
         self.compile_s_expr(&mut instruction, body);
+
         if name == "main" {
             instruction.push(Hir::Halt);
         } else {
@@ -244,10 +246,10 @@ impl Compiler {
             panic!("expected function name");
         };
 
-        let args = s_expr.iter().skip(1).fold(Vec::new(), |mut acc, s| {
-            self.compile_expr(&mut acc, s);
-            acc
-        });
+        let mut args = Vec::new();
+        for spanned in s_expr.iter().skip(1) {
+            self.compile_expr(&mut args, spanned);
+        }
 
         if BUILTINS.contains(&name.as_str()) {
             ir_code.push(Hir::BuiltIn(name.clone(), args));

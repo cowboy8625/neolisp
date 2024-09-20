@@ -1,13 +1,7 @@
-#![allow(dead_code)]
-#![allow(unused)]
 mod builtin;
+mod instruction;
 mod machine;
-mod opcode;
 mod value;
-use std::fmt::Arguments;
-
-use crate::compiler::Header;
-use anyhow::Result;
+pub use instruction::{Callee, Instruction};
 pub use machine::Machine;
-pub use opcode::OpCode;
 pub use value::Value;

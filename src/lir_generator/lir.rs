@@ -2,6 +2,7 @@
 #![allow(unused)]
 
 use crate::symbol_table::SymbolType;
+use crate::vm::value::Value;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Type {
@@ -31,9 +32,9 @@ pub enum Lir {
     Rot,
     Return,
     Halt,
-    Add { ty: Type, count: u32 },
-    Push { ty: Type },
-    Pop { ty: Type },
+    Add { count: u32 },
+    Push { value: Value },
+    LoadLocalValue { index: u32 },
     Call { address: u32, is_lambda: bool },
     BuiltIn { arg_count: u32, name: String },
     CallTest { address: u32 },

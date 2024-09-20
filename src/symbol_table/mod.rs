@@ -170,6 +170,7 @@ pub enum SymbolType {
 pub enum SymbolKind {
     #[default]
     Variable,
+    Parameter(usize),
     Function,
     Test,
     Lambda,
@@ -235,9 +236,7 @@ impl SymbolWalker {
             //     table.insert(name.clone(), symbol);
             // }
             Expr::Symbol(name) => match table.lookup(name.as_str()) {
-                Some(symbol) => {
-                    eprintln!("{symbol:#?}");
-                }
+                Some(symbol) => {}
                 None => self.errors.push(ErrorKind::Unimplemented(spanned.clone())),
             },
             Expr::List(elements) if starts_with(elements, "var") => {
@@ -309,7 +308,7 @@ impl SymbolWalker {
         self.current_scope = Scope::Function;
 
         let name = format!("lambda_{}", self.lambda_counter);
-        eprintln!("symbol table: {}", name);
+
         self.lambda_counter += 1;
 
         table.enter_new_scope();
@@ -454,7 +453,7 @@ impl SymbolWalker {
 
         // Handle the params
         let mut params_symbol_types = Vec::new();
-        for param in params.iter() {
+        for (i, param) in params.iter().enumerate() {
             let expr = &param.expr;
             let Expr::Symbol(param_name) = expr else {
                 self.errors
@@ -465,7 +464,7 @@ impl SymbolWalker {
             let symbol = Symbol {
                 name: param_name.clone(),
                 symbol_type: SymbolType::Dynamic,
-                kind: SymbolKind::Variable,
+                kind: SymbolKind::Parameter(i),
                 scope: self.current_scope,
                 ..Default::default()
             };
