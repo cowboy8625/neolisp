@@ -67,18 +67,17 @@ impl Compiler {
                     self.compile_operator(ir_code, s_expr, v.as_str())
                 }
                 Expr::Symbol(_) => self.compile_call(ir_code, s_expr),
-                // Expr::List(items) if matches!(items.first(), Some(Spanned { expr: Expr::Symbol(v), .. }) if v.as_str() == "lambda") =>
-                // {
-                //     self.compile_expr(ir_code, &spanned);
-                //     let args = s_expr.iter().skip(1).fold(Vec::new(), |mut acc, s| {
-                //         self.compile_expr(&mut acc, s);
-                //         acc
-                //     });
-                //
-                //     // let name = format!("lambda_{}", self.lambda_counter - 1);
-                //     // eprintln!("{}", name);
-                //     // ir_code.push(Hir::Call(symbol_table::SymbolKind::Lambda, name, args))
-                // }
+                Expr::List(items) if matches!(items.first(), Some(Spanned { expr: Expr::Symbol(v), .. }) if v.as_str() == "lambda") =>
+                {
+                    self.compile_expr(ir_code, &spanned);
+                    let args = s_expr.iter().skip(1).fold(Vec::new(), |mut acc, s| {
+                        self.compile_expr(&mut acc, s);
+                        acc
+                    });
+
+                    let name = format!("lambda_{}", self.lambda_counter - 1);
+                    ir_code.push(Hir::Call(name, args))
+                }
                 _ => self.compile_expr(ir_code, spanned),
             },
             None => {}
@@ -183,13 +182,16 @@ impl Compiler {
             .filter(|v| !params.contains(v))
             .collect();
 
+        for capture in captured.iter() {
+            ir_code.push(Hir::Value(Value::Id(capture.clone())));
+        }
+
         self.lambdas.push(Lambda {
             name: name.to_string(),
             params: params.clone(),
             instruction: body,
             captured,
         });
-        ir_code.push(Hir::LoadLambda(name));
     }
 
     fn compile_test(&mut self, s_expr: &[Spanned<Expr>]) {

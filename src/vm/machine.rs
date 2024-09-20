@@ -83,7 +83,9 @@ impl Machine {
                     self.bring_to_top_of_stack(*arg_count as usize);
                 }
                 Callee::Builtin(name) => self.builtins(name.clone(), *arg_count),
-                _ => todo!(),
+                Callee::UnSetFunctionLocation(name) => {
+                    unreachable!("ERROR IN COMPILER: function location not set: {name}")
+                }
             },
             Instruction::PopIntoLocalStack => {
                 let Some(value) = self.stack.pop() else {

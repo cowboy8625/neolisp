@@ -49,6 +49,51 @@ impl Compiler {
 
         let mut instructions = Vec::new();
 
+        self.set_start(&mut instructions);
+
+        let mut location = self
+            .functions
+            .iter()
+            .fold(0, |acc, f| acc + f.instructions.len() as u32)
+            // Add 1 for the start at instruction
+            + 1;
+
+        for function in self.functions.into_iter() {
+            instructions.extend(function.instructions);
+        }
+
+        for lambda in self.lambdas.into_iter() {
+            self.symbol_table
+                .set_location(Some(&lambda.name), &lambda.name, location);
+            location += lambda.instructions.len() as u32;
+            instructions.extend(lambda.instructions);
+        }
+
+        // Resolve symbol locations
+        for instruction in instructions.iter_mut() {
+            match instruction {
+                Instruction::Call(callee, _)
+                    if matches!(callee, Callee::UnSetFunctionLocation(_)) =>
+                {
+                    let Callee::UnSetFunctionLocation(name) = callee else {
+                        unreachable!();
+                    };
+                    let Some(symbol) = self.symbol_table.lookup(name) else {
+                        panic!("Function `{}` is not defined", name);
+                    };
+                    let Some(location) = symbol.location else {
+                        panic!("Function `{}` location has not been set", name);
+                    };
+                    *callee = Callee::Function(location as usize)
+                }
+                _ => {}
+            }
+        }
+
+        Ok(instructions)
+    }
+
+    fn set_start(&mut self, instructions: &mut Vec<Instruction>) {
         let Some(main_symbol) = self.symbol_table.lookup("main") else {
             panic!("Function `main` is not defined");
         };
@@ -58,15 +103,6 @@ impl Compiler {
         };
 
         instructions.push(Instruction::StartAt(location as usize));
-        for function in self.functions.into_iter() {
-            instructions.extend(function.instructions);
-        }
-
-        for lambda in self.lambdas.into_iter() {
-            instructions.extend(lambda.instructions);
-        }
-
-        Ok(instructions)
     }
 
     fn compile_functions(&mut self, functions: &[HirFunction]) {
@@ -131,13 +167,14 @@ impl Compiler {
             captured,
         } = lambda;
 
-        self.symbol_table.enter_scope(&name);
-        let Some(symbol) = self.symbol_table.get_function_scope(name) else {
-            panic!("Lambda `{}` is not defined", name);
-        };
-
         let mut local_instruction = Vec::new();
+        for _ in params.iter() {
+            local_instruction.push(Instruction::Rot);
+            local_instruction.push(Instruction::PopIntoLocalStack);
+        }
+
         self.symbol_table.enter_scope(&name);
+
         for high_level_instruction in instruction {
             self.compile_hir(&mut local_instruction, high_level_instruction);
         }
@@ -222,11 +259,15 @@ impl Compiler {
                     panic!("Variable `{}` is not defined", name);
                 };
 
-                let SymbolKind::Parameter(index) = symbol.kind else {
-                    panic!("Variable `{}` is not a parameter", name);
-                };
-
-                instructions.push(Instruction::LoadLocal(index));
+                match symbol.kind {
+                    SymbolKind::Parameter(index) => {
+                        instructions.push(Instruction::LoadLocal(index));
+                    }
+                    SymbolKind::Variable => todo!("Variable {}", name),
+                    SymbolKind::Function => todo!("Function {}", name),
+                    SymbolKind::Test => todo!("Test {}", name),
+                    SymbolKind::Lambda => todo!("Lambda {}", name),
+                }
             }
             HirValue::U8(value) => instructions.push(Instruction::Push(Value::U8(*value))),
             HirValue::U32(value) => instructions.push(Instruction::Push(Value::U32(*value))),

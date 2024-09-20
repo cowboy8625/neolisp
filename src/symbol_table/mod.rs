@@ -326,7 +326,7 @@ impl SymbolWalker {
 
         // Handle the params
         let mut params_symbol_types = Vec::new();
-        for param in params.iter() {
+        for (i, param) in params.iter().enumerate() {
             let expr = &param.expr;
             let Expr::Symbol(param_name) = expr else {
                 self.errors
@@ -337,7 +337,7 @@ impl SymbolWalker {
             let symbol = Symbol {
                 name: param_name.clone(),
                 symbol_type: SymbolType::Dynamic,
-                kind: SymbolKind::Variable,
+                kind: SymbolKind::Parameter(i),
                 scope: self.current_scope,
                 ..Default::default()
             };

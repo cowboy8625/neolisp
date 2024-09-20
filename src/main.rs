@@ -79,6 +79,8 @@ fn main() -> anyhow::Result<()> {
     // }
 
     let program = compile(&src)?;
+    eprintln!("compiled to {} instructions", program.len());
+    eprintln!("running...");
     let mut machine = vm::Machine::new(program);
     for i in args.breakpoints {
         machine.add_breakpoint(i);
