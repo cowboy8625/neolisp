@@ -239,8 +239,6 @@ impl Compiler {
             panic!("variable `{name}` not found")
         };
 
-        instruction.push(Hir::LoadGlobal(name.to_string(), symbol.id));
-
         self.vars.push(Var {
             name: name.to_string(),
             instruction,
