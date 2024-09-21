@@ -2,6 +2,19 @@ use super::builtin;
 use super::instruction::{Callee, IState, Instruction};
 use super::value::Value;
 
+const RED: &str = "\x1b[31m";
+const GREEN: &str = "\x1b[32m";
+const RESET: &str = "\x1b[0m";
+
+#[derive(Debug, Default)]
+enum DebugMode {
+    #[default]
+    Off,
+    Pause,
+    Step,
+    Continue,
+}
+
 pub struct Machine {
     pub program: Vec<Instruction>,
     pub ip: usize,
@@ -11,6 +24,7 @@ pub struct Machine {
     pub local_stack: Vec<Vec<Value>>,
     pub global_stack: Vec<Value>,
     pub breakpoints: Vec<usize>,
+    pub debug_mode: DebugMode,
 }
 
 impl Machine {
@@ -24,6 +38,7 @@ impl Machine {
             local_stack: vec![Vec::new()],
             global_stack: Vec::new(),
             breakpoints: Vec::new(),
+            debug_mode: DebugMode::Off,
         }
     }
 
@@ -32,6 +47,19 @@ impl Machine {
     }
 
     pub fn run_once(&mut self) {
+        match self.debug_mode {
+            DebugMode::Off if self.breakpoints.contains(&self.ip) => {
+                self.debug_mode = DebugMode::Pause;
+                return;
+            }
+            DebugMode::Pause => {
+                self.debugger();
+                return;
+            }
+            DebugMode::Step => self.debug_mode = DebugMode::Pause,
+            _ => (),
+        }
+
         let Some(instruction) = &self.program.get(self.ip) else {
             panic!("ip out of bounds")
         };
@@ -176,5 +204,85 @@ impl Machine {
             "car" => builtin::car(self, arg_count).unwrap(),
             _ => panic!("unknown builtin: {}", name),
         }
+    }
+
+    fn debugger(&mut self) {
+        use std::io::Write;
+        let mut input = String::new();
+        let mut result = Vec::new();
+        while input.is_empty() {
+            print!("{RED}debugger> {RESET}");
+            std::io::stdout().flush().unwrap();
+            std::io::stdin().read_line(&mut input).unwrap();
+            result = input.trim().split(' ').collect::<Vec<_>>();
+        }
+        match result[0] {
+            "d" | "display" => self.debug(),
+            "h" | "help" => {
+                println!("h  help");
+                println!("ps print-stack");
+                println!("p  print <index>");
+                println!("b  breakpoint <ip>");
+                println!("c  continue");
+                println!("n  next");
+                // println!("r run");
+                println!("q  quit");
+            }
+            "ps" | "print-stack" => {
+                for (i, item) in self.stack.iter().rev().enumerate() {
+                    println!("{i}: {item}");
+                }
+            }
+            "p" | "print" if result.len() == 2 => {
+                let Ok(stack_index) = result[1].parse::<usize>() else {
+                    println!("print <index> not {RED}{}{RESET}", result[1]);
+                    return;
+                };
+
+                if stack_index >= self.stack.len() {
+                    println!(
+                        "The stack size is {} but your index is out of range {}",
+                        self.stack.len(),
+                        stack_index
+                    );
+                    return;
+                }
+
+                let item = &self.stack[self.stack.len() - 1 - stack_index];
+                println!("{item}");
+            }
+            "b" | "breakpoint" if result.len() == 2 => {
+                let Ok(ip) = result[1].parse::<usize>() else {
+                    println!("breakpoint <ip> not {RED}{}{RESET}", result[1]);
+                    return;
+                };
+                self.add_breakpoint(ip);
+            }
+            "p" | "print" => eprintln!("print <index>"),
+            "c" | "continue" => self.debug_mode = DebugMode::Continue,
+            "n" | "next" => self.debug_mode = DebugMode::Step,
+            "q" | "quit" => self.shutdown(),
+            _ => println!("{RED}unknown command{RESET} {input}"),
+        }
+    }
+
+    fn debug(&self) {
+        for (i, int) in self.program.iter().enumerate() {
+            let selected = if self.ip == i {
+                format!("{GREEN}0x{i:02X} {i} ")
+            } else {
+                format!("0x{i:02X} {i} ")
+            };
+            let breakpoint = if self.breakpoints.contains(&i) {
+                "🔴".to_string()
+            } else {
+                "  ".to_string()
+            };
+            eprintln!("{breakpoint}{selected}{RESET} {int:?}");
+        }
+    }
+
+    fn shutdown(&mut self) {
+        self.is_running = false;
     }
 }

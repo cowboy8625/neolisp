@@ -42,6 +42,7 @@ fn main() -> anyhow::Result<()> {
         for (i, int) in program.iter().enumerate() {
             eprintln!("{i:02X}  {:?}", int);
         }
+        return Ok(());
     }
     eprintln!("compiled to {} instructions", program.len());
     eprintln!("running...");
