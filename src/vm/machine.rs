@@ -1,13 +1,15 @@
 use super::builtin;
-use super::instruction::{Callee, Instruction};
+use super::instruction::{Callee, IState, Instruction};
 use super::value::Value;
 
 pub struct Machine {
     pub program: Vec<Instruction>,
     pub ip: usize,
     pub is_running: bool,
+    pub call_stack: usize,
     pub stack: Vec<Value>,
-    pub local_stack: Vec<Value>,
+    pub local_stack: Vec<Vec<Value>>,
+    pub global_stack: Vec<Value>,
     pub breakpoints: Vec<usize>,
 }
 
@@ -17,8 +19,10 @@ impl Machine {
             program,
             ip: 0,
             is_running: true,
+            call_stack: 0,
             stack: Vec::new(),
-            local_stack: Vec::new(),
+            local_stack: vec![Vec::new()],
+            global_stack: Vec::new(),
             breakpoints: Vec::new(),
         }
     }
@@ -41,7 +45,7 @@ impl Machine {
                     panic!("expected value on stack for return")
                 };
                 self.ip = address as usize;
-                self.local_stack.clear();
+                self.leaving_local_stack();
             }
             Instruction::Push(value) => {
                 self.stack.push(value.clone());
@@ -76,29 +80,59 @@ impl Machine {
                 self.stack.push(right);
                 self.stack.push(left);
             }
-            Instruction::Call(callee, arg_count) => match callee {
-                Callee::Function(address) => {
+            Instruction::Call(callee, arg_count) => match callee.clone() {
+                Callee::Function(IState::Set(address)) => {
+                    let count = *arg_count as usize;
+                    self.new_local_stack();
                     self.stack.push(Value::U32(self.ip as u32));
-                    self.ip = *address;
-                    self.bring_to_top_of_stack(*arg_count as usize);
+                    self.ip = address;
+                    self.bring_to_top_of_stack(count);
+                }
+                Callee::Lambda(IState::Set(local_address)) => {
+                    let Some(Value::Lambda(IState::Set(address))) =
+                        self.get_local(local_address).cloned()
+                    else {
+                        panic!("expected lambda on stack for lambda call")
+                    };
+                    self.new_local_stack();
+                    self.stack.push(Value::U32(self.ip as u32));
+                    self.ip = address;
                 }
                 Callee::Builtin(name) => self.builtins(name.clone(), *arg_count),
-                Callee::UnSetFunctionLocation(name) => {
+                Callee::Function(IState::Unset(name)) => {
                     unreachable!("ERROR IN COMPILER: function location not set: {name}")
                 }
+                Callee::Lambda(IState::Unset(name)) => {
+                    unreachable!("ERROR IN COMPILER: lambda location not set: {name}")
+                }
             },
-            Instruction::PopIntoLocalStack => {
+            Instruction::LoadLocal => {
                 let Some(value) = self.stack.pop() else {
-                    panic!("expected value on stack for PopIntoLocalStack")
-                };
-                self.local_stack.push(value);
-            }
-            Instruction::LoadLocal(index) => {
-                let Some(value) = self.local_stack.get(*index as usize) else {
                     panic!("expected value on stack for LoadLocal")
+                };
+
+                self.push_local(value);
+            }
+            Instruction::GetLocal(IState::Set(index)) => {
+                let Some(value) = self.get_local(*index) else {
+                    panic!("expected value on stack for PopIntoLocalStack")
                 };
                 self.stack.push(value.clone());
             }
+            Instruction::LoadGlobal => {
+                let Some(value) = self.stack.pop() else {
+                    panic!("expected value on stack for LoadGlobal")
+                };
+
+                self.global_stack.push(value);
+            }
+            Instruction::GetGlobal(IState::Set(index)) => {
+                let Some(value) = self.global_stack.get(*index) else {
+                    panic!("expected value on stack for GetGlobal")
+                };
+                self.stack.push(value.clone());
+            }
+            _ => unimplemented!("unimplemented instruction: {instruction:?}"),
         }
     }
 
@@ -110,6 +144,22 @@ impl Machine {
 }
 
 impl Machine {
+    fn new_local_stack(&mut self) {
+        self.local_stack.push(Vec::new());
+        self.call_stack += 1;
+    }
+    fn leaving_local_stack(&mut self) {
+        self.local_stack.pop();
+        self.call_stack -= 1;
+    }
+    fn push_local(&mut self, value: Value) {
+        self.local_stack[self.call_stack].push(value);
+    }
+
+    fn get_local(&self, index: usize) -> Option<&Value> {
+        self.local_stack[self.call_stack].get(index)
+    }
+
     fn bring_to_top_of_stack(&mut self, count: usize) {
         let length = self.stack.len();
         self.stack[length - count..].rotate_left(count);

@@ -1,3 +1,5 @@
+use super::instruction::IState;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     U8(u8),
@@ -8,7 +10,8 @@ pub enum Value {
     String(String),
     Bool(bool),
     List(Vec<Value>),
-    Lambda(u32),
+    Function(usize),
+    Lambda(IState),
 }
 
 impl std::fmt::Display for Value {
@@ -32,7 +35,9 @@ impl std::fmt::Display for Value {
                         .join(" ")
                 )
             }
-            Self::Lambda(index) => write!(f, "<lambda {index:02X}>"),
+            Self::Function(index) => write!(f, "<function {index:02X}>"),
+            Self::Lambda(IState::Set(index)) => write!(f, "<lambda {index:02X}>"),
+            Self::Lambda(IState::Unset(name)) => write!(f, "<lambda {name}>"),
         }
     }
 }

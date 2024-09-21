@@ -34,9 +34,10 @@ pub enum Hir {
     If(If),
     BuiltIn(String, Vec<Hir>),
     Call(String, Vec<Hir>),
-    LoadGlobalVar(String),
+    LoadGlobal(String, usize),
     LoadTest(String, u32),
     LoadLambda(String),
+    // LoadFunction(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]

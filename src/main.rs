@@ -1,13 +1,11 @@
 mod ast;
 mod builtins;
 mod cli;
-// mod compiler;
 mod environment;
 mod error;
 mod eval;
 mod hir_generator;
 mod instruction_generator;
-// mod lir_generator;
 mod parser;
 mod repl;
 mod symbol_table;
@@ -39,46 +37,12 @@ fn main() -> anyhow::Result<()> {
         panic!("failed to read file")
     };
 
-    // let program = match compile(&src) {
-    //     Ok(program) => program,
-    //     Err(e) => {
-    //         for e in e {
-    //             println!("{:?}", e);
-    //         }
-    //         return Ok(());
-    //     }
-    // };
-
-    // let binary_name = filename.split('.').collect::<Vec<&str>>()[0];
-    // std::fs::write(binary_name, program.clone())?;
-
-    // if args.decompile {
-    //     let binary_name = filename.split('.').collect::<Vec<&str>>()[0];
-    //     let (header, decompiled_program) = match compiler::decompile(&program) {
-    //         Ok(result) => result,
-    //         Err((msg, e)) => {
-    //             eprintln!("{msg}");
-    //             for e in e {
-    //                 eprintln!("{:?}", e);
-    //             }
-    //             return Ok(());
-    //         }
-    //     };
-    //     std::fs::write(
-    //         format!("{binary_name}.xxd"),
-    //         format!(
-    //             "{:?}\n{}",
-    //             header,
-    //             decompiled_program
-    //                 .into_iter()
-    //                 .map(|i| format!("{i}\n"))
-    //                 .collect::<String>()
-    //         )
-    //         .as_bytes(),
-    //     )?;
-    // }
-
     let program = compile(&src)?;
+    if args.decompile {
+        for (i, int) in program.iter().enumerate() {
+            eprintln!("{i:02X}  {:?}", int);
+        }
+    }
     eprintln!("compiled to {} instructions", program.len());
     eprintln!("running...");
     let mut machine = vm::Machine::new(program);

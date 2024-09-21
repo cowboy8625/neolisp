@@ -80,6 +80,12 @@ impl SymbolTable {
         self.scope_stack.len()
     }
 
+    pub fn get_id(&self) -> usize {
+        self.scope_stack
+            .iter()
+            .fold(0, |acc, scope| acc + scope.len())
+    }
+
     /// Insert a symbol into the current scope
     pub fn insert(&mut self, name: String, symbol: Symbol) {
         let scope_level = self.scope_stack.len(); // Get the current scope level
@@ -166,11 +172,10 @@ pub enum SymbolType {
     Function(Vec<SymbolType>, Box<SymbolType>), // (params, return type)
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum SymbolKind {
-    #[default]
     Variable,
-    Parameter(usize),
+    Parameter,
     Function,
     Test,
     Lambda,
@@ -186,8 +191,10 @@ pub enum Scope {
     // Block(u32),
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Symbol {
+    /// The id of the symbol in the symbol table related to the current scope
+    pub id: usize,
     pub name: String,
     pub symbol_type: SymbolType,
     pub kind: SymbolKind,
@@ -199,7 +206,9 @@ pub struct Symbol {
 #[derive(Debug, Default)]
 pub struct SymbolWalker {
     current_scope: Scope,
-    lambda_counter: u32,
+    lambda_counter: usize,
+    global_counter: usize,
+    local_counter: usize,
     is_in_lambda: bool,
     errors: Vec<ErrorKind>,
 }
@@ -293,11 +302,13 @@ impl SymbolWalker {
         }
 
         let symbol = Symbol {
+            id: table.get_id(),
             name: name.clone(),
             symbol_type: SymbolType::Dynamic,
             kind: SymbolKind::Test,
             scope,
-            ..Default::default()
+            scope_level: table.get_scope_level() as u32,
+            location: None,
         };
 
         table.insert(name.clone(), symbol);
@@ -311,6 +322,9 @@ impl SymbolWalker {
 
         self.lambda_counter += 1;
 
+        let old_local_counter = self.local_counter;
+        self.local_counter = 0;
+        let id = table.get_id();
         table.enter_new_scope();
 
         // Parameters of the function
@@ -335,11 +349,13 @@ impl SymbolWalker {
             };
             params_symbol_types.push(SymbolType::Dynamic);
             let symbol = Symbol {
+                id: table.get_id(),
                 name: param_name.clone(),
                 symbol_type: SymbolType::Dynamic,
-                kind: SymbolKind::Parameter(i),
+                kind: SymbolKind::Parameter,
                 scope: self.current_scope,
-                ..Default::default()
+                scope_level: table.get_scope_level() as u32,
+                location: None,
             };
             table.insert(param_name.clone(), symbol);
         }
@@ -360,6 +376,7 @@ impl SymbolWalker {
         self.walk_expr(table, body_element);
 
         let symbol = Symbol {
+            id,
             name: name.clone(),
             symbol_type: SymbolType::Function(params_symbol_types, Box::new(SymbolType::Dynamic)),
             kind: SymbolKind::Lambda,
@@ -370,6 +387,8 @@ impl SymbolWalker {
 
         table.insert(name.clone(), symbol);
         table.exit_new_scope(Some(&name));
+
+        self.local_counter = old_local_counter;
     }
 
     fn walk_var(&mut self, table: &mut SymbolTable, elements: &[Spanned<Expr>], span: &Span) {
@@ -393,16 +412,16 @@ impl SymbolWalker {
             return;
         };
 
-        let kind = if let Expr::List(body) = &body_element.expr {
-            if starts_with(body, "lambda") {
-                self.is_in_lambda = true;
-                SymbolKind::Lambda
-            } else {
-                SymbolKind::Variable
-            }
-        } else {
-            SymbolKind::Variable
-        };
+        // let kind = if let Expr::List(body) = &body_element.expr {
+        //     if starts_with(body, "lambda") {
+        //         self.is_in_lambda = true;
+        //         SymbolKind::Lambda
+        //     } else {
+        //         SymbolKind::Variable
+        //     }
+        // } else {
+        //     SymbolKind::Variable
+        // };
 
         self.walk_expr(table, body_element);
 
@@ -410,12 +429,20 @@ impl SymbolWalker {
             self.is_in_lambda = false;
         }
 
+        let var_counter = if self.current_scope == Scope::Global {
+            self.global_counter
+        } else {
+            self.local_counter
+        };
+
         let symbol = Symbol {
+            id: table.get_id(),
             name: name.clone(),
             symbol_type: SymbolType::Dynamic,
-            kind,
+            kind: SymbolKind::Variable,
             scope: self.current_scope,
-            ..Default::default()
+            scope_level: table.get_scope_level() as u32,
+            location: None,
         };
 
         table.insert(name.clone(), symbol);
@@ -423,9 +450,6 @@ impl SymbolWalker {
 
     fn walk_fn(&mut self, table: &mut SymbolTable, elements: &[Spanned<Expr>], span: &Span) {
         // NOTE: We know that the first element is the "fn" keyword
-
-        let scope = self.current_scope;
-        self.current_scope = Scope::Function;
 
         // Name of the function
         let Some(name_element) = elements.get(1) else {
@@ -438,6 +462,12 @@ impl SymbolWalker {
             return;
         };
 
+        let scope = self.current_scope;
+        self.current_scope = Scope::Function;
+
+        let old_local_counter = self.local_counter;
+        self.local_counter = 0;
+        let id = table.get_id();
         table.enter_new_scope();
 
         // Parameters of the function
@@ -453,7 +483,7 @@ impl SymbolWalker {
 
         // Handle the params
         let mut params_symbol_types = Vec::new();
-        for (i, param) in params.iter().enumerate() {
+        for param in params.iter() {
             let expr = &param.expr;
             let Expr::Symbol(param_name) = expr else {
                 self.errors
@@ -462,11 +492,13 @@ impl SymbolWalker {
             };
             params_symbol_types.push(SymbolType::Dynamic);
             let symbol = Symbol {
+                id: table.get_id(),
                 name: param_name.clone(),
                 symbol_type: SymbolType::Dynamic,
-                kind: SymbolKind::Parameter(i),
+                kind: SymbolKind::Parameter,
                 scope: self.current_scope,
-                ..Default::default()
+                scope_level: table.get_scope_level() as u32,
+                location: None,
             };
             table.insert(param_name.clone(), symbol);
         }
@@ -489,6 +521,7 @@ impl SymbolWalker {
         }
 
         let symbol = Symbol {
+            id,
             name: name.clone(),
             symbol_type: SymbolType::Function(params_symbol_types, Box::new(SymbolType::Dynamic)),
             kind: SymbolKind::Function,
@@ -498,7 +531,10 @@ impl SymbolWalker {
         };
 
         table.insert(name.clone(), symbol);
-        table.exit_new_scope(Some(&name))
+        table.exit_new_scope(Some(&name));
+
+        self.current_scope = scope;
+        self.local_counter = old_local_counter;
     }
 }
 

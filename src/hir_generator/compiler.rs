@@ -3,7 +3,7 @@
 use super::hir::{CompiledHir, Function, Hir, If, Lambda, Operator, Test, Value, Var};
 use super::{BUILTINS, OPERATORS};
 use crate::ast::{Expr, Spanned};
-use crate::symbol_table::SymbolTable;
+use crate::symbol_table::{SymbolKind, SymbolTable};
 
 #[derive(Debug)]
 pub struct Compiler {
@@ -80,7 +80,7 @@ impl Compiler {
                 }
                 _ => self.compile_expr(ir_code, spanned),
             },
-            None => {}
+            None => unreachable!(),
         }
     }
 
@@ -186,6 +186,8 @@ impl Compiler {
             ir_code.push(Hir::Value(Value::Id(capture.clone())));
         }
 
+        ir_code.push(Hir::LoadLambda(name.clone()));
+
         self.lambdas.push(Lambda {
             name: name.to_string(),
             params: params.clone(),
@@ -228,10 +230,16 @@ impl Compiler {
         else {
             panic!("expected variable name");
         };
+
         for spanned in s_expr.iter().skip(2) {
             self.compile_expr(&mut instruction, spanned);
         }
-        instruction.push(Hir::LoadGlobalVar(name.to_string()));
+
+        let Some(symbol) = self.symbol_table.lookup(name) else {
+            panic!("variable `{name}` not found")
+        };
+
+        instruction.push(Hir::LoadGlobal(name.to_string(), symbol.id));
 
         self.vars.push(Var {
             name: name.to_string(),
@@ -298,7 +306,7 @@ fn get_variables(ir_code: &[Hir]) -> Vec<String> {
     let mut variables = Vec::new();
     fn visit(ir_code: &Hir, variables: &mut Vec<String>) {
         match ir_code {
-            Hir::LoadGlobalVar(name) => variables.push(name.clone()),
+            Hir::LoadGlobal(name, _) => variables.push(name.clone()),
             Hir::Operator(_, args) => {
                 let v = get_variables(&args);
                 variables.extend(v);

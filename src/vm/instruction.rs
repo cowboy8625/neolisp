@@ -10,13 +10,21 @@ pub enum Instruction {
     Add,
     Rot,
     Call(Callee, u8),
-    PopIntoLocalStack,
-    LoadLocal(usize),
+    LoadLocal,
+    GetLocal(IState),
+    LoadGlobal,
+    GetGlobal(IState),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum IState {
+    Set(usize),
+    Unset(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Callee {
-    Function(usize),
-    UnSetFunctionLocation(String),
+    Function(IState),
+    Lambda(IState),
     Builtin(String),
 }
