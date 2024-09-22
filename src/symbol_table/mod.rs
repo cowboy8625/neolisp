@@ -174,6 +174,7 @@ pub enum SymbolType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum SymbolKind {
+    FreeVariable,
     Variable,
     Parameter,
     Function,
@@ -187,6 +188,7 @@ pub enum Scope {
     #[default]
     Global,
     Function,
+    Free,
     Test,
     // Block(u32),
 }
@@ -209,6 +211,7 @@ pub struct SymbolWalker {
     lambda_counter: usize,
     global_counter: usize,
     local_counter: usize,
+    free_counter: usize,
     is_in_lambda: bool,
     errors: Vec<ErrorKind>,
 }
@@ -230,21 +233,26 @@ impl SymbolWalker {
     }
 
     fn walk_expr(&mut self, table: &mut SymbolTable, spanned: &Spanned<Expr>) {
+        let current_scope_level = table.get_scope_level() as u32;
         match &spanned.expr {
             Expr::Symbol(name) if KEYWORDS.contains(&name.as_str()) => {}
             Expr::Symbol(name) if OPERATORS.contains(&name.as_str()) => {}
             Expr::Symbol(name) if BUILTINS.contains(&name.as_str()) => {}
-            // Expr::Symbol(name) if self.is_in_lambda => {
-            //     let symbol = Symbol {
-            //         name: name.clone(),
-            //         symbol_type: SymbolType::Dynamic,
-            //         kind: SymbolKind::Variable,
-            //         scope: self.current_scope,
-            //         ..Default::default()
-            //     };
-            //     table.insert(name.clone(), symbol);
-            // }
             Expr::Symbol(name) => match table.lookup(name.as_str()) {
+                Some(symbol) if symbol.scope_level < current_scope_level && self.is_in_lambda => {
+                    table.insert(
+                        name.clone(),
+                        Symbol {
+                            id: self.get_free_id(),
+                            name: name.to_string(),
+                            symbol_type: symbol.symbol_type.clone(),
+                            kind: SymbolKind::FreeVariable,
+                            scope: Scope::Free,
+                            scope_level: current_scope_level,
+                            location: None,
+                        },
+                    );
+                }
                 Some(symbol) => {}
                 None => self.errors.push(ErrorKind::Unimplemented(spanned.clone())),
             },
@@ -412,16 +420,11 @@ impl SymbolWalker {
             return;
         };
 
-        // let kind = if let Expr::List(body) = &body_element.expr {
-        //     if starts_with(body, "lambda") {
-        //         self.is_in_lambda = true;
-        //         SymbolKind::Lambda
-        //     } else {
-        //         SymbolKind::Variable
-        //     }
-        // } else {
-        //     SymbolKind::Variable
-        // };
+        let kind = if let Expr::List(body) = &body_element.expr {
+            if starts_with(body, "lambda") {
+                self.is_in_lambda = true;
+            }
+        };
 
         self.walk_expr(table, body_element);
 
@@ -535,6 +538,12 @@ impl SymbolWalker {
 
         self.current_scope = scope;
         self.local_counter = old_local_counter;
+    }
+
+    fn get_free_id(&mut self) -> usize {
+        let id = self.free_counter;
+        self.free_counter += 1;
+        id
     }
 }
 

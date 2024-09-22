@@ -14,6 +14,8 @@ pub enum Instruction {
     GetLocal(IState),
     LoadGlobal,
     GetGlobal(IState),
+    LoadFree,
+    GetFree(IState),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -24,7 +26,6 @@ pub enum IState {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Callee {
-    Function(IState),
-    Lambda(IState),
+    Function,
     Builtin(String),
 }

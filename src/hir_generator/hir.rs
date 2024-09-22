@@ -35,6 +35,8 @@ pub enum Hir {
     BuiltIn(String, Vec<Hir>),
     Call(String, Vec<Hir>),
     LoadGlobal(String, usize),
+    LoadLocal(String, usize),
+    GetLocalAndLoadFree(String),
     LoadTest(String, u32),
     LoadLambda(String),
     // LoadFunction(String),

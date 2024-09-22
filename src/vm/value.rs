@@ -10,8 +10,7 @@ pub enum Value {
     String(String),
     Bool(bool),
     List(Vec<Value>),
-    Function(usize),
-    Lambda(IState),
+    Callable(IState),
 }
 
 impl std::fmt::Display for Value {
@@ -35,9 +34,8 @@ impl std::fmt::Display for Value {
                         .join(" ")
                 )
             }
-            Self::Function(index) => write!(f, "<function {index:02X}>"),
-            Self::Lambda(IState::Set(index)) => write!(f, "<lambda {index:02X}>"),
-            Self::Lambda(IState::Unset(name)) => write!(f, "<lambda {name}>"),
+            Self::Callable(IState::Set(index)) => write!(f, "<function {index:02X}>"),
+            Self::Callable(IState::Unset(name)) => write!(f, "<function unset {name}>"),
         }
     }
 }

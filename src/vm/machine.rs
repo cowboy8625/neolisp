@@ -1,3 +1,5 @@
+use core::panic;
+
 use super::builtin;
 use super::instruction::{Callee, IState, Instruction};
 use super::value::Value;
@@ -23,6 +25,7 @@ pub struct Machine {
     pub stack: Vec<Value>,
     pub local_stack: Vec<Vec<Value>>,
     pub global_stack: Vec<Value>,
+    pub free_stack: Vec<Value>,
     pub breakpoints: Vec<usize>,
     pub debug_mode: DebugMode,
 }
@@ -37,6 +40,7 @@ impl Machine {
             stack: Vec::new(),
             local_stack: vec![Vec::new()],
             global_stack: Vec::new(),
+            free_stack: Vec::new(),
             breakpoints: Vec::new(),
             debug_mode: DebugMode::Off,
         }
@@ -109,30 +113,30 @@ impl Machine {
                 self.stack.push(left);
             }
             Instruction::Call(callee, arg_count) => match callee.clone() {
-                Callee::Function(IState::Set(address)) => {
+                Callee::Function => {
                     let count = *arg_count as usize;
+                    let address = match self.stack.pop() {
+                        Some(Value::Callable(IState::Set(address))) => address,
+                        Some(Value::Callable(IState::Unset(name))) => {
+                            panic!("function {} is not defined", name)
+                        }
+                        None => {
+                            panic!("expected value on stack for function call but stack is empty")
+                        }
+                        value => {
+                            panic!(
+                                "expected value on stack for function call but got {:?}",
+                                value
+                            )
+                        }
+                    };
+
                     self.new_local_stack();
                     self.stack.push(Value::U32(self.ip as u32));
                     self.ip = address;
                     self.bring_to_top_of_stack(count);
                 }
-                Callee::Lambda(IState::Set(local_address)) => {
-                    let Some(Value::Lambda(IState::Set(address))) =
-                        self.get_local(local_address).cloned()
-                    else {
-                        panic!("expected lambda on stack for lambda call")
-                    };
-                    self.new_local_stack();
-                    self.stack.push(Value::U32(self.ip as u32));
-                    self.ip = address;
-                }
                 Callee::Builtin(name) => self.builtins(name.clone(), *arg_count),
-                Callee::Function(IState::Unset(name)) => {
-                    unreachable!("ERROR IN COMPILER: function location not set: {name}")
-                }
-                Callee::Lambda(IState::Unset(name)) => {
-                    unreachable!("ERROR IN COMPILER: lambda location not set: {name}")
-                }
             },
             Instruction::LoadLocal => {
                 let Some(value) = self.stack.pop() else {
@@ -143,7 +147,7 @@ impl Machine {
             }
             Instruction::GetLocal(IState::Set(index)) => {
                 let Some(value) = self.get_local(*index) else {
-                    panic!("expected value on stack for PopIntoLocalStack")
+                    panic!("expected value on stack for GetLocal")
                 };
                 self.stack.push(value.clone());
             }
@@ -157,6 +161,19 @@ impl Machine {
             Instruction::GetGlobal(IState::Set(index)) => {
                 let Some(value) = self.global_stack.get(*index) else {
                     panic!("expected value on stack for GetGlobal")
+                };
+                self.stack.push(value.clone());
+            }
+            Instruction::LoadFree => {
+                let Some(value) = self.stack.pop() else {
+                    panic!("expected value on stack for LoadFree")
+                };
+
+                self.free_stack.push(value);
+            }
+            Instruction::GetFree(IState::Set(index)) => {
+                let Some(value) = self.free_stack.get(*index) else {
+                    panic!("expected value on stack for GetFree")
                 };
                 self.stack.push(value.clone());
             }
@@ -220,6 +237,9 @@ impl Machine {
             "d" | "display" => self.debug(),
             "h" | "help" => {
                 println!("h  help");
+                println!("pfs print-free-stack");
+                println!("pls print-local-stack");
+                println!("pgs print-global-stack");
                 println!("ps print-stack");
                 println!("p  print <index>");
                 println!("b  breakpoint <ip>");
@@ -228,9 +248,29 @@ impl Machine {
                 // println!("r run");
                 println!("q  quit");
             }
+            "pfs" | "print-free-stack" => {
+                println!("FREE STACK:");
+                for (i, item) in self.free_stack.iter().rev().enumerate() {
+                    println!("0x{i:02X}: {item}");
+                }
+            }
+            // HACK: the local stack should be shared with the main stack.
+            "pls" | "print-local-stack" => {
+                println!("LOCAL STACK:");
+                for (i, item) in self.local_stack.iter().rev().enumerate() {
+                    println!("0x{i:02X}: {item:?}");
+                }
+            }
+            "pgs" | "print-global-stack" => {
+                println!("GLOBAL STACK:");
+                for (i, item) in self.global_stack.iter().rev().enumerate() {
+                    println!("0x{i:02X}: {item}");
+                }
+            }
             "ps" | "print-stack" => {
+                println!("STACK:");
                 for (i, item) in self.stack.iter().rev().enumerate() {
-                    println!("{i}: {item}");
+                    println!("0x{i:02X}: {item}");
                 }
             }
             "p" | "print" if result.len() == 2 => {
@@ -269,9 +309,9 @@ impl Machine {
     fn debug(&self) {
         for (i, int) in self.program.iter().enumerate() {
             let selected = if self.ip == i {
-                format!("{GREEN}0x{i:02X} {i} ")
+                format!("{GREEN}0x{i:02X} {i:>2} ")
             } else {
-                format!("0x{i:02X} {i} ")
+                format!("0x{i:02X} {i:>2} ")
             };
             let breakpoint = if self.breakpoints.contains(&i) {
                 "🔴".to_string()

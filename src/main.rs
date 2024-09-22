@@ -38,9 +38,36 @@ fn main() -> anyhow::Result<()> {
     };
 
     let program = compile(&src)?;
+    // use vm::{Callee, IState, Instruction::*, Value};
+    // let program = vec![
+    //     StartAt(10),
+    //     // Add Lambda
+    //     // Prelude
+    //     Rot,
+    //     LoadLocal,
+    //     Rot,
+    //     LoadLocal,
+    //     // ADD
+    //     GetLocal(IState::Set(0)),
+    //     GetLocal(IState::Set(1)),
+    //     Add,
+    //     Rot,
+    //     Return,
+    //     // MAIN PRELUDE
+    //     Push(Value::Callable(IState::Set(1))),
+    //     LoadGlobal,
+    //     // MAIN
+    //     Push(Value::F64(123.0)),
+    //     Push(Value::F64(321.0)),
+    //     GetGlobal(IState::Set(0)),
+    //     Call(Callee::Function, 2),
+    //     Push(Value::String("\n".to_string())),
+    //     Call(Callee::Builtin("print".to_string()), 2),
+    //     Halt,
+    // ];
     if args.decompile {
         for (i, int) in program.iter().enumerate() {
-            eprintln!("{i:02X}  {:?}", int);
+            eprintln!("{i:02X} {i:>2}  {:?}", int);
         }
         return Ok(());
     }

@@ -19,7 +19,7 @@ struct Lambda {
     captured: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Var {
     name: String,
     instructions: Vec<Instruction>,
@@ -60,12 +60,6 @@ impl Compiler {
 
         let mut location = 1;
 
-        for var in self.global_vars.into_iter() {
-            self.symbol_table.set_location(None, &var.name, location);
-            location += var.instructions.len() as u32;
-            instructions.extend(var.instructions);
-        }
-
         for lambda in self.lambdas.into_iter() {
             self.symbol_table
                 .set_location(Some(&lambda.name), &lambda.name, location);
@@ -76,6 +70,14 @@ impl Compiler {
         for function in self.functions.into_iter() {
             self.symbol_table
                 .set_location(Some(&function.name), &function.name, location);
+            if function.name == "main" {
+                for var in self.global_vars.clone().into_iter() {
+                    self.symbol_table.set_location(None, &var.name, location);
+                    location += var.instructions.len() as u32;
+                    instructions.extend(var.instructions);
+                }
+                // instructions.push(Instruction::Call(Callee::Function(IState::Set(0)), 0));
+            }
             location += function.instructions.len() as u32;
             instructions.extend(function.instructions);
         }
@@ -83,7 +85,7 @@ impl Compiler {
         // Resolve symbol locations
         for instruction in instructions.iter_mut() {
             match instruction {
-                Instruction::Call(Callee::Function(istate), _)
+                Instruction::Push(Value::Callable(istate))
                     if matches!(istate, IState::Unset(_)) =>
                 {
                     let IState::Unset(name) = istate else {
@@ -97,54 +99,6 @@ impl Compiler {
                     };
                     *istate = IState::Set(location as usize);
                 }
-                Instruction::Push(Value::Lambda(istate)) if matches!(istate, IState::Unset(_)) => {
-                    let IState::Unset(name) = istate else {
-                        unreachable!();
-                    };
-                    let Some(symbol) = self.symbol_table.lookup(&name.clone()) else {
-                        panic!("Lambda `{}` is not defined", name.clone());
-                    };
-                    let Some(location) = symbol.location else {
-                        panic!("Lambda `{}` location has not been set", name);
-                    };
-                    *istate = IState::Set(location as usize);
-                }
-                // Instruction::LoadGlobal(istate) if matches!(istate, IState::Unset(_)) => {
-                //     let IState::Unset(name) = istate else {
-                //         unreachable!();
-                //     };
-                //     let Some(symbol) = self.symbol_table.lookup(&name.clone()) else {
-                //         panic!("Function `{}` is not defined", name.clone());
-                //     };
-                //     let Some(location) = symbol.location else {
-                //         panic!("Function `{}` location has not been set", name);
-                //     };
-                //     *istate = IState::Set(location as usize);
-                // }
-                // Instruction::LoadGlobal(istate) if matches!(istate, IState::Unset(_)) => {
-                //     let IState::Unset(name) = istate else {
-                //         unreachable!();
-                //     };
-                //     let Some(symbol) = self.symbol_table.lookup(&name.clone()) else {
-                //         panic!("Function `{}` is not defined", name.clone());
-                //     };
-                //     let Some(location) = symbol.location else {
-                //         panic!("Function `{}` location has not been set", name);
-                //     };
-                //     *istate = IState::Set(location as usize);
-                // }
-                // Instruction::LoadLambdaLocal(istate) if matches!(istate, IState::Unset(_)) => {
-                //     let IState::Unset(name) = istate else {
-                //         unreachable!();
-                //     };
-                //     let Some(symbol) = self.symbol_table.lookup(&name.clone()) else {
-                //         panic!("Lambda `{}` is not defined", name.clone());
-                //     };
-                //     let Some(location) = symbol.location else {
-                //         panic!("Lambda `{}` location has not been set", name);
-                //     };
-                //     *istate = IState::Set(location as usize);
-                // }
                 _ => {}
             }
         }
@@ -315,20 +269,16 @@ impl Compiler {
                     panic!("Function `{}` is not defined", name);
                 };
 
-                let callee = if let SymbolKind::Lambda = symbol.kind {
-                    let state = IState::Set(symbol.id);
-                    Callee::Lambda(state)
+                let state = IState::Set(symbol.id);
+                let get_callable = if let Scope::Global = symbol.scope {
+                    Instruction::GetGlobal(state)
                 } else {
-                    let state = IState::Unset(name.clone());
-                    Callee::Function(state)
+                    Instruction::GetLocal(state)
                 };
 
                 let arg_count = args.len() as u8;
-                instructions.push(Instruction::Call(callee, arg_count));
-            }
-            Hir::LoadGlobal(name, ip) => {
-                eprintln!("LoadGlobal {name:#?} -> {ip:#?}");
-                instructions.push(Instruction::LoadGlobal);
+                instructions.push(get_callable);
+                instructions.push(Instruction::Call(Callee::Function, arg_count));
             }
             Hir::LoadTest(_, _) => todo!(),
             Hir::LoadLambda(name) => {
@@ -342,7 +292,7 @@ impl Compiler {
                     IState::Unset(name.clone())
                 };
 
-                instructions.push(Instruction::Push(Value::Lambda(state)));
+                instructions.push(Instruction::Push(Value::Callable(state)));
 
                 let load = if let Scope::Global = symbol.scope {
                     Instruction::LoadGlobal
@@ -350,6 +300,25 @@ impl Compiler {
                     Instruction::LoadLocal
                 };
                 instructions.push(load);
+            }
+            Hir::LoadGlobal(name, ip) => {
+                eprintln!("LoadGlobal {name:#?} -> {ip:#?}");
+                instructions.push(Instruction::LoadGlobal);
+            }
+            Hir::LoadLocal(name, ip) => {
+                eprintln!("LoadLocal {name:#?} -> {ip:#?}");
+                instructions.push(Instruction::LoadLocal);
+            }
+            Hir::GetLocalAndLoadFree(name) => {
+                let Some(symbol) = self.symbol_table.lookup(name) else {
+                    panic!("Variable `{}` is not defined", name);
+                };
+                if let Scope::Global = symbol.scope {
+                    instructions.push(Instruction::GetGlobal(IState::Set(symbol.id)));
+                } else {
+                    instructions.push(Instruction::GetLocal(IState::Set(symbol.id)));
+                }
+                instructions.push(Instruction::LoadFree);
             }
         }
     }
@@ -369,6 +338,9 @@ impl Compiler {
                     SymbolKind::Function => todo!("Function: {}, id: {}", name, symbol.id),
                     SymbolKind::Test => todo!("Test {}", name),
                     SymbolKind::Lambda => todo!("Lambda {}", name),
+                    SymbolKind::FreeVariable => {
+                        instructions.push(Instruction::GetFree(IState::Set(symbol.id)));
+                    }
                 }
             }
             HirValue::U8(value) => instructions.push(Instruction::Push(Value::U8(*value))),

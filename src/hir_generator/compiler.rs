@@ -174,7 +174,9 @@ impl Compiler {
         for spanned in s_expr.iter().skip(2) {
             self.compile_expr(&mut body, spanned);
         }
+
         body.push(Hir::Return);
+
         let name = format!("lambda_{}", id);
 
         let captured: Vec<String> = get_variables(&body)
@@ -182,8 +184,8 @@ impl Compiler {
             .filter(|v| !params.contains(v))
             .collect();
 
-        for capture in captured.iter() {
-            ir_code.push(Hir::Value(Value::Id(capture.clone())));
+        for (i, capture) in captured.iter().enumerate() {
+            body.insert(i, Hir::GetLocalAndLoadFree(capture.clone()));
         }
 
         ir_code.push(Hir::LoadLambda(name.clone()));
@@ -305,6 +307,8 @@ fn get_variables(ir_code: &[Hir]) -> Vec<String> {
     fn visit(ir_code: &Hir, variables: &mut Vec<String>) {
         match ir_code {
             Hir::LoadGlobal(name, _) => variables.push(name.clone()),
+            Hir::LoadLocal(_, _) => {}
+            Hir::GetLocalAndLoadFree(_) => {}
             Hir::Operator(_, args) => {
                 let v = get_variables(&args);
                 variables.extend(v);
