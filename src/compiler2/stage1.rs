@@ -153,7 +153,10 @@ impl Stage1Compiler {
             Expr::Symbol(name) if OPERATORS.contains(&name.as_str()) => {
                 self.compile_operator(instructions, spanned)
             }
-            Expr::Symbol(_) => self.compile_symbol_call(instructions, spanned),
+            Expr::Symbol(name) => {
+                eprintln!("Compiling symbol: {}", name);
+                self.compile_symbol_call(instructions, spanned);
+            }
             Expr::Number(_) => todo!(),
             Expr::List(_) => todo!(),
             Expr::Builtin(_, _) => todo!(),
@@ -182,9 +185,25 @@ impl Stage1Compiler {
             self.compile_expr(instructions, spanned);
         }
 
-        // let Some(symbol) = self.symbol_table.lookup(&name) else {
-        //     panic!("unknown symbol to call: {}", name);
-        // };
+        if let Some(symbol) = self.symbol_table.lookup(&name) {
+            match symbol.kind {
+                SymbolKind::FreeVariable => todo!(),
+                SymbolKind::Variable if symbol.scope == SymbolScope::Global => {
+                    instructions.push(Stage1Instruction::GetGlobal(IState::Set(symbol.id)));
+                }
+                SymbolKind::Variable if symbol.scope == SymbolScope::Function => {
+                    instructions.push(Stage1Instruction::GetLocal(IState::Set(symbol.id)));
+                }
+                SymbolKind::Variable if symbol.scope == SymbolScope::Free => {
+                    instructions.push(Stage1Instruction::GetFree(IState::Set(symbol.id)));
+                }
+                SymbolKind::Parameter => todo!(),
+                SymbolKind::Function => todo!(),
+                SymbolKind::Test => todo!(),
+                SymbolKind::Lambda => todo!(),
+                _ => todo!(),
+            }
+        };
 
         let callee = if BUILTINS.contains(&name.as_str()) {
             Callee::Builtin(name.clone())
@@ -229,8 +248,8 @@ impl Stage1Compiler {
         name: &str,
     ) {
         match name {
-            "fn" => self.compile_fn(instructions, spanned),
-            "lambda" => self.compile_lambda(spanned),
+            "fn" => self.compile_fn(spanned),
+            "lambda" => self.compile_lambda(instructions, spanned),
             "var" => self.compile_var(instructions, spanned),
             // "let", "if"
             _ => unreachable!("unknown keyword: {}", name),
@@ -264,7 +283,7 @@ impl Stage1Compiler {
         instructions.push(instruction);
     }
 
-    fn compile_fn(&mut self, instructions: &mut Vec<Stage1Instruction>, spanned: &Spanned<Expr>) {
+    fn compile_fn(&mut self, spanned: &Spanned<Expr>) {
         const NAME: usize = 1;
         const PARAMS: usize = 2;
         const BODY: usize = 3;
@@ -317,10 +336,6 @@ impl Stage1Compiler {
             body.push(Stage1Instruction::Return);
         }
 
-        instructions.push(Stage1Instruction::Push(Value::Callable(IState::Unset(
-            name.to_string(),
-        ))));
-
         self.functions.push(Function {
             name: name.to_string(),
             prelude: vec![],
@@ -329,7 +344,11 @@ impl Stage1Compiler {
         });
     }
 
-    fn compile_lambda(&mut self, spanned: &Spanned<Expr>) {
+    fn compile_lambda(
+        &mut self,
+        instructions: &mut Vec<Stage1Instruction>,
+        spanned: &Spanned<Expr>,
+    ) {
         const PARAMS: usize = 1;
         const BODY: usize = 2;
         let Expr::List(list) = &spanned.expr else {
@@ -368,7 +387,9 @@ impl Stage1Compiler {
 
         self.symbol_table.exit_scope();
 
-        body.push(Stage1Instruction::Return);
+        instructions.push(Stage1Instruction::Push(Value::Callable(IState::Unset(
+            name.to_string(),
+        ))));
 
         self.lambdas.push(Lambda {
             name: name.to_string(),

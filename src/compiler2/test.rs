@@ -49,12 +49,20 @@ fn test_main_var_lambda() {
     let symbol_table = SymbolWalker::default().walk(&ast).unwrap();
     let mut stage1_compiler = Stage1Compiler::new(symbol_table);
     stage1_compiler.compiler(&ast);
+    // Checking function
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
     assert_eq!(main.name, "main", "main function name");
     assert_eq!(main.params, vec![], "main function params");
-    // TODO: Fix this part of the test
-    assert_eq!(main.prelude, vec![LoadGlobal,], "main function prelude");
+    assert_eq!(
+        main.prelude,
+        // This is the global variable being loaded
+        vec![
+            Push(Value::Callable(IState::Unset("lambda_0".to_string()))),
+            LoadGlobal
+        ],
+        "main function prelude"
+    );
     assert_eq!(
         main.body,
         vec![
@@ -66,5 +74,20 @@ fn test_main_var_lambda() {
             Halt,
         ],
         "main function body"
+    );
+
+    // Check that we have a lambda
+    assert_eq!(stage1_compiler.lambdas.len(), 1, "one lambda");
+    let lambda = &stage1_compiler.lambdas[0];
+    assert_eq!(lambda.name, "lambda_0", "lambda name");
+    assert_eq!(
+        lambda.params,
+        vec![Rot, LoadLocal, Rot, LoadLocal,],
+        "lambda params"
+    );
+    assert_eq!(
+        lambda.body,
+        vec![GetLocal(IState::Set(0)), GetLocal(IState::Set(1)), Add,],
+        "lambda body"
     );
 }
