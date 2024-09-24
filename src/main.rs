@@ -5,8 +5,6 @@ mod compiler2;
 mod environment;
 mod error;
 mod eval;
-mod hir_generator;
-mod instruction_generator;
 mod parser;
 mod repl;
 mod symbol_table;
@@ -39,40 +37,7 @@ fn main() -> anyhow::Result<()> {
     };
 
     let program = compile(&src)?;
-    // use vm::{Callee, IState, Instruction::*, Value};
-    // let program = vec![
-    //     StartAt(17),
-    //     // lambda 0
-    //     Rot,
-    //     LoadLocal,
-    //     GetLocal(IState::Set(0)),
-    //     LoadFree,
-    //     Push(Value::Callable(IState::Set(8))),
-    //     Rot,
-    //     Return,
-    //     // lambda 1
-    //     Rot,
-    //     LoadLocal,
-    //     GetFree(IState::Set(0)),
-    //     LoadLocal,
-    //     GetLocal(IState::Set(0)),
-    //     GetLocal(IState::Set(1)),
-    //     Add,
-    //     Rot,
-    //     Return,
-    //     // var add
-    //     Push(Value::Callable(IState::Set(1))),
-    //     LoadGlobal,
-    //     // main
-    //     Push(Value::F64(321.0)),
-    //     Push(Value::F64(123.0)),
-    //     GetGlobal(IState::Set(0)),
-    //     Call(Callee::Function, 1),
-    //     Call(Callee::Function, 1),
-    //     Push(Value::String("\n".to_string())),
-    //     Call(Callee::Builtin("print".to_string()), 2),
-    //     Halt,
-    // ];
+
     if args.decompile {
         for (i, int) in program.iter().enumerate() {
             eprintln!("{i:02X} {i:>2}  {:?}", int);
@@ -91,19 +56,17 @@ fn main() -> anyhow::Result<()> {
 }
 
 fn compile(src: &str) -> anyhow::Result<Vec<vm::Instruction>> {
-    use crate::hir_generator::HirCompiler;
-    use crate::instruction_generator::InstructionCompiler;
     use crate::parser::parser;
     use crate::symbol_table::SymbolWalker;
     use chumsky::prelude::Parser;
 
     let ast = parser().parse(src).unwrap();
-    let symbol_table = SymbolWalker::default().walk(&ast).unwrap();
-    let hir = HirCompiler::new(symbol_table.clone())
-        .compile(&ast)
-        .unwrap();
-    let instructions = InstructionCompiler::new(symbol_table)
-        .compile(&hir)
-        .unwrap();
-    Ok(instructions)
+    let _symbol_table = SymbolWalker::default().walk(&ast).unwrap();
+    // let hir = HirCompiler::new(symbol_table.clone())
+    //     .compile(&ast)
+    //     .unwrap();
+    // let instructions = InstructionCompiler::new(symbol_table)
+    //     .compile(&hir)
+    //     .unwrap();
+    Ok(vec![])
 }

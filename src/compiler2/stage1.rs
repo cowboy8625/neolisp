@@ -3,7 +3,7 @@ use crate::ast::{Expr, Spanned};
 use crate::symbol_table::{Scope as SymbolScope, Symbol, SymbolKind, SymbolTable};
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Function {
+pub struct Stage1Function {
     pub name: String,
     pub params: Vec<Stage1Instruction>,
     pub prelude: Vec<Stage1Instruction>,
@@ -11,7 +11,7 @@ pub struct Function {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct Lambda {
+pub struct Stage1Lambda {
     pub name: String,
     pub params: Vec<Stage1Instruction>,
     pub body: Vec<Stage1Instruction>,
@@ -23,10 +23,10 @@ pub enum Stage1Instruction {
     Noop,
     Halt,
     Return,
-    Push(Value),
+    Push(Stage1Value),
     Add,
     Rot,
-    Call(Callee, u8),
+    Call(Stage1Callee, u8),
     LoadLocal,
     GetLocal(IState),
     LoadGlobal,
@@ -42,13 +42,13 @@ pub enum IState {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Callee {
+pub enum Stage1Callee {
     Function,
     Builtin(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Value {
+pub enum Stage1Value {
     U8(u8),
     I32(i32),
     U32(u32),
@@ -56,15 +56,15 @@ pub enum Value {
     F64(f64),
     String(String),
     Bool(bool),
-    List(Vec<Value>),
+    List(Vec<Stage1Value>),
     Callable(IState),
 }
 
 #[derive(Debug)]
 pub struct Stage1Compiler {
     pub symbol_table: SymbolTable,
-    pub functions: Vec<Function>,
-    pub lambdas: Vec<Lambda>,
+    pub functions: Vec<Stage1Function>,
+    pub lambdas: Vec<Stage1Lambda>,
     lambda_counter: usize,
 }
 
@@ -99,11 +99,15 @@ impl Stage1Compiler {
 
     fn compile_expr(&mut self, instructions: &mut Vec<Stage1Instruction>, spanned: &Spanned<Expr>) {
         match &spanned.expr {
-            Expr::Bool(value) => instructions.push(Stage1Instruction::Push(Value::Bool(*value))),
-            Expr::String(value) => {
-                instructions.push(Stage1Instruction::Push(Value::String(value.to_string())))
+            Expr::Bool(value) => {
+                instructions.push(Stage1Instruction::Push(Stage1Value::Bool(*value)))
             }
-            Expr::Number(value) => instructions.push(Stage1Instruction::Push(Value::F64(*value))),
+            Expr::String(value) => instructions.push(Stage1Instruction::Push(Stage1Value::String(
+                value.to_string(),
+            ))),
+            Expr::Number(value) => {
+                instructions.push(Stage1Instruction::Push(Stage1Value::F64(*value)))
+            }
             Expr::Symbol(name) => {
                 let Some(symbol) = self.symbol_table.lookup(name) else {
                     panic!("Variable `{}` is not defined", name);
@@ -154,11 +158,15 @@ impl Stage1Compiler {
                 self.compile_operator(instructions, spanned)
             }
             Expr::Symbol(name) => {
-                eprintln!("Compiling symbol: {}", name);
                 self.compile_symbol_call(instructions, spanned);
             }
             Expr::Number(_) => todo!(),
-            Expr::List(_) => todo!(),
+            Expr::List(items) => {
+                for item in list.iter().skip(1) {
+                    self.compile_expr(instructions, item);
+                }
+                self.compile_symbol_call(instructions, first);
+            }
             Expr::Builtin(_, _) => todo!(),
             Expr::Func(_) => todo!(),
             Expr::Lambda(_) => todo!(),
@@ -173,9 +181,11 @@ impl Stage1Compiler {
         let Expr::List(list) = &spanned.expr else {
             unreachable!();
         };
+
         let Some(name_spanned) = list.first() else {
             unreachable!();
         };
+
         let Expr::Symbol(name) = &name_spanned.expr else {
             unreachable!();
         };
@@ -206,9 +216,9 @@ impl Stage1Compiler {
         };
 
         let callee = if BUILTINS.contains(&name.as_str()) {
-            Callee::Builtin(name.clone())
+            Stage1Callee::Builtin(name.clone())
         } else {
-            Callee::Function
+            Stage1Callee::Function
         };
         instructions.push(Stage1Instruction::Call(callee, count as u8));
     }
@@ -328,15 +338,15 @@ impl Stage1Compiler {
             self.compile_expr(&mut body, expr);
         }
 
-        self.symbol_table.exit_scope();
-
         if name == "main" {
             body.push(Stage1Instruction::Halt);
         } else {
             body.push(Stage1Instruction::Return);
         }
 
-        self.functions.push(Function {
+        self.symbol_table.exit_scope();
+
+        self.functions.push(Stage1Function {
             name: name.to_string(),
             prelude: vec![],
             params,
@@ -385,13 +395,15 @@ impl Stage1Compiler {
             self.compile_expr(&mut body, expr);
         }
 
+        body.push(Stage1Instruction::Return);
+
         self.symbol_table.exit_scope();
 
-        instructions.push(Stage1Instruction::Push(Value::Callable(IState::Unset(
-            name.to_string(),
-        ))));
+        instructions.push(Stage1Instruction::Push(Stage1Value::Callable(
+            IState::Unset(name.to_string()),
+        )));
 
-        self.lambdas.push(Lambda {
+        self.lambdas.push(Stage1Lambda {
             name: name.to_string(),
             params,
             body,
