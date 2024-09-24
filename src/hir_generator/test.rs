@@ -24,7 +24,7 @@ fn test_generate_hir_code() {
                         "print".to_string(),
                         vec![
                             Hir::Call(
-                                "add".to_string(),
+                                Some("add".to_string()),
                                 vec![Hir::Value(Value::F64(123.0)), Hir::Value(Value::F64(321.0)),],
                             ),
                             Hir::Value(Value::String("\n".to_string())),

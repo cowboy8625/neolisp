@@ -67,17 +67,27 @@ impl Compiler {
                     self.compile_operator(ir_code, s_expr, v.as_str())
                 }
                 Expr::Symbol(_) => self.compile_call(ir_code, s_expr),
-                Expr::List(items) if matches!(items.first(), Some(Spanned { expr: Expr::Symbol(v), .. }) if v.as_str() == "lambda") =>
-                {
-                    self.compile_expr(ir_code, &spanned);
-                    let args = s_expr.iter().skip(1).fold(Vec::new(), |mut acc, s| {
-                        self.compile_expr(&mut acc, s);
-                        acc
-                    });
-
-                    let name = format!("lambda_{}", self.lambda_counter - 1);
-                    ir_code.push(Hir::Call(name, args))
+                Expr::List(_) => {
+                    println!("LIST");
+                    // self.compile_call(ir_code, s_expr)
+                    self.compile_expr(ir_code, spanned);
+                    let mut args = Vec::new();
+                    for spanned in s_expr.iter().skip(1) {
+                        self.compile_expr(&mut args, spanned);
+                    }
+                    ir_code.push(Hir::Call(None, args))
                 }
+                // Expr::List(items) if matches!(items.first(), Some(Spanned { expr: Expr::Symbol(v), .. }) if v.as_str() == "lambda") =>
+                // {
+                //     self.compile_expr(ir_code, &spanned);
+                //     let args = s_expr.iter().skip(1).fold(Vec::new(), |mut acc, s| {
+                //         self.compile_expr(&mut acc, s);
+                //         acc
+                //     });
+                //
+                //     let name = format!("lambda_{}", self.lambda_counter - 1);
+                //     ir_code.push(Hir::Call(name, args))
+                // }
                 _ => self.compile_expr(ir_code, spanned),
             },
             None => unreachable!(),
@@ -184,8 +194,8 @@ impl Compiler {
             .filter(|v| !params.contains(v))
             .collect();
 
-        for (i, capture) in captured.iter().enumerate() {
-            body.insert(i, Hir::GetLocalAndLoadFree(capture.clone()));
+        for capture in captured.iter() {
+            ir_code.push(Hir::GetLocalAndLoadFree(capture.clone()));
         }
 
         ir_code.push(Hir::LoadLambda(name.clone()));
@@ -268,7 +278,7 @@ impl Compiler {
         let Some(symbol) = self.symbol_table.lookup(name) else {
             panic!("function `{name}` not found")
         };
-        ir_code.push(Hir::Call(name.clone(), args))
+        ir_code.push(Hir::Call(Some(name.clone()), args))
     }
 
     fn compile_if(&mut self, ir_code: &mut Vec<Hir>, s_expr: &[Spanned<Expr>]) {
@@ -330,13 +340,17 @@ fn get_variables(ir_code: &[Hir]) -> Vec<String> {
                 let v = get_variables(&args);
                 variables.extend(v);
             }
-            Hir::Call(name, args) => {
+            Hir::Call(Some(name), args) => {
                 variables.push(name.clone());
                 let v = get_variables(&args);
                 variables.extend(v);
             }
+            Hir::Call(None, args) => {
+                let v = get_variables(&args);
+                variables.extend(v);
+            }
             Hir::LoadTest(_, _) => todo!(),
-            Hir::LoadLambda(name) => variables.push(name.clone()),
+            Hir::LoadLambda(name) => {}
             Hir::Return => {} // nothing to do with Return
             Hir::Halt => {}   // nothing to do with Halt
         }

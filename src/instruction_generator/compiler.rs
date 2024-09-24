@@ -60,7 +60,7 @@ impl Compiler {
 
         let mut location = 1;
 
-        for lambda in self.lambdas.into_iter() {
+        for lambda in self.lambdas.into_iter().rev() {
             self.symbol_table
                 .set_location(Some(&lambda.name), &lambda.name, location);
             location += lambda.instructions.len() as u32;
@@ -260,7 +260,7 @@ impl Compiler {
                     arg_count as u8,
                 ));
             }
-            Hir::Call(name, args) => {
+            Hir::Call(Some(name), args) => {
                 for arg in args {
                     self.compile_hir(instructions, arg);
                 }
@@ -280,6 +280,13 @@ impl Compiler {
                 instructions.push(get_callable);
                 instructions.push(Instruction::Call(Callee::Function, arg_count));
             }
+            Hir::Call(None, args) => {
+                for arg in args {
+                    self.compile_hir(instructions, arg);
+                }
+                let arg_count = args.len() as u8;
+                instructions.push(Instruction::Call(Callee::Function, arg_count));
+            }
             Hir::LoadTest(_, _) => todo!(),
             Hir::LoadLambda(name) => {
                 let Some(symbol) = self.symbol_table.lookup(name) else {
@@ -294,12 +301,12 @@ impl Compiler {
 
                 instructions.push(Instruction::Push(Value::Callable(state)));
 
-                let load = if let Scope::Global = symbol.scope {
-                    Instruction::LoadGlobal
-                } else {
-                    Instruction::LoadLocal
-                };
-                instructions.push(load);
+                // let load = if let Scope::Global = symbol.scope {
+                //     Instruction::LoadGlobal
+                // } else {
+                //     Instruction::LoadLocal
+                // };
+                // instructions.push(load);
             }
             Hir::LoadGlobal(name, ip) => {
                 eprintln!("LoadGlobal {name:#?} -> {ip:#?}");

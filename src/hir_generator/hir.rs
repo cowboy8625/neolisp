@@ -33,7 +33,7 @@ pub enum Hir {
     Value(Value),
     If(If),
     BuiltIn(String, Vec<Hir>),
-    Call(String, Vec<Hir>),
+    Call(Option<String>, Vec<Hir>),
     LoadGlobal(String, usize),
     LoadLocal(String, usize),
     GetLocalAndLoadFree(String),

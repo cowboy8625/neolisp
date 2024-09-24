@@ -7,7 +7,7 @@ use super::{BUILTINS, KEYWORDS, OPERATORS};
 use crate::ast::{Expr, Span, Spanned};
 use std::collections::HashMap;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SymbolTable {
     global_scope: HashMap<String, Symbol>, // Permanent global scope
     function_scopes: HashMap<String, HashMap<String, Symbol>>, // Persistent function scopes
@@ -193,7 +193,7 @@ pub enum Scope {
     // Block(u32),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Symbol {
     /// The id of the symbol in the symbol table related to the current scope
     pub id: usize,

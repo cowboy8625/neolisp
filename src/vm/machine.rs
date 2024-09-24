@@ -6,10 +6,11 @@ use super::value::Value;
 
 const RED: &str = "\x1b[31m";
 const GREEN: &str = "\x1b[32m";
+const UNDERLINE: &str = "\x1b[4m";
 const RESET: &str = "\x1b[0m";
 
 #[derive(Debug, Default)]
-enum DebugMode {
+pub enum DebugMode {
     #[default]
     Off,
     Pause,
@@ -309,7 +310,7 @@ impl Machine {
     fn debug(&self) {
         for (i, int) in self.program.iter().enumerate() {
             let selected = if self.ip == i {
-                format!("{GREEN}0x{i:02X} {i:>2} ")
+                format!("{GREEN}{UNDERLINE}0x{i:02X} {i:>2} ")
             } else {
                 format!("0x{i:02X} {i:>2} ")
             };
@@ -318,7 +319,7 @@ impl Machine {
             } else {
                 "  ".to_string()
             };
-            eprintln!("{breakpoint}{selected}{RESET} {int:?}");
+            eprintln!("{breakpoint}{selected} {int:?}{RESET}");
         }
     }
 

@@ -1,6 +1,7 @@
 mod ast;
 mod builtins;
 mod cli;
+mod compiler2;
 mod environment;
 mod error;
 mod eval;
@@ -40,27 +41,34 @@ fn main() -> anyhow::Result<()> {
     let program = compile(&src)?;
     // use vm::{Callee, IState, Instruction::*, Value};
     // let program = vec![
-    //     StartAt(10),
-    //     // Add Lambda
-    //     // Prelude
+    //     StartAt(17),
+    //     // lambda 0
     //     Rot,
     //     LoadLocal,
+    //     GetLocal(IState::Set(0)),
+    //     LoadFree,
+    //     Push(Value::Callable(IState::Set(8))),
+    //     Rot,
+    //     Return,
+    //     // lambda 1
     //     Rot,
     //     LoadLocal,
-    //     // ADD
+    //     GetFree(IState::Set(0)),
+    //     LoadLocal,
     //     GetLocal(IState::Set(0)),
     //     GetLocal(IState::Set(1)),
     //     Add,
     //     Rot,
     //     Return,
-    //     // MAIN PRELUDE
+    //     // var add
     //     Push(Value::Callable(IState::Set(1))),
     //     LoadGlobal,
-    //     // MAIN
-    //     Push(Value::F64(123.0)),
+    //     // main
     //     Push(Value::F64(321.0)),
+    //     Push(Value::F64(123.0)),
     //     GetGlobal(IState::Set(0)),
-    //     Call(Callee::Function, 2),
+    //     Call(Callee::Function, 1),
+    //     Call(Callee::Function, 1),
     //     Push(Value::String("\n".to_string())),
     //     Call(Callee::Builtin("print".to_string()), 2),
     //     Halt,
