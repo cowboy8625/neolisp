@@ -1,7 +1,6 @@
 use super::{BUILTINS, KEYWORDS, OPERATORS};
 use crate::ast::{Expr, Spanned};
 use crate::symbol_table::{Scope as SymbolScope, Symbol, SymbolKind, SymbolTable};
-use crate::vm::{Callee, Value};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Function {
@@ -14,7 +13,8 @@ pub struct Function {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Lambda {
     pub name: String,
-    pub instructions: Vec<Stage1Instruction>,
+    pub params: Vec<Stage1Instruction>,
+    pub body: Vec<Stage1Instruction>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -41,11 +41,31 @@ pub enum IState {
     Unset(String),
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Callee {
+    Function,
+    Builtin(String),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Value {
+    U8(u8),
+    I32(i32),
+    U32(u32),
+    F32(f32),
+    F64(f64),
+    String(String),
+    Bool(bool),
+    List(Vec<Value>),
+    Callable(IState),
+}
+
 #[derive(Debug)]
 pub struct Stage1Compiler {
     pub symbol_table: SymbolTable,
     pub functions: Vec<Function>,
     pub lambdas: Vec<Lambda>,
+    lambda_counter: usize,
 }
 
 impl Stage1Compiler {
@@ -54,8 +74,16 @@ impl Stage1Compiler {
             symbol_table,
             functions: Vec::new(),
             lambdas: Vec::new(),
+            lambda_counter: 0,
         }
     }
+
+    fn get_lambda_name(&mut self) -> String {
+        let name = format!("lambda_{}", self.lambda_counter);
+        self.lambda_counter += 1;
+        name
+    }
+
     pub fn compiler(&mut self, ast: &[Spanned<Expr>]) {
         let mut instructions = Vec::new();
         for expr in ast {
@@ -201,9 +229,10 @@ impl Stage1Compiler {
         name: &str,
     ) {
         match name {
-            "fn" => self.compile_fn(spanned),
+            "fn" => self.compile_fn(instructions, spanned),
+            "lambda" => self.compile_lambda(spanned),
             "var" => self.compile_var(instructions, spanned),
-            // "let", "if", "lambda",
+            // "let", "if"
             _ => unreachable!("unknown keyword: {}", name),
         }
     }
@@ -235,15 +264,15 @@ impl Stage1Compiler {
         instructions.push(instruction);
     }
 
-    fn compile_fn(&mut self, spanned: &Spanned<Expr>) {
+    fn compile_fn(&mut self, instructions: &mut Vec<Stage1Instruction>, spanned: &Spanned<Expr>) {
         const NAME: usize = 1;
         const PARAMS: usize = 2;
         const BODY: usize = 3;
         let Expr::List(list) = &spanned.expr else {
             unreachable!();
         };
-        // (fn <name> (<params>) ( <body> ))
-        debug_assert!(list.len() == 4);
+
+        debug_assert!(list.len() == 4, "(fn <name> (<params>) ( <body> ))");
 
         let Some(name_spanned) = list.get(NAME) else {
             unreachable!();
@@ -252,6 +281,8 @@ impl Stage1Compiler {
         let Expr::Symbol(name) = &name_spanned.expr else {
             unreachable!();
         };
+
+        self.symbol_table.enter_scope(name);
 
         let Some(params_spanned) = &list.get(PARAMS) else {
             panic!("expected list for params");
@@ -278,15 +309,69 @@ impl Stage1Compiler {
             self.compile_expr(&mut body, expr);
         }
 
+        self.symbol_table.exit_scope();
+
         if name == "main" {
             body.push(Stage1Instruction::Halt);
         } else {
             body.push(Stage1Instruction::Return);
         }
 
+        instructions.push(Stage1Instruction::Push(Value::Callable(IState::Unset(
+            name.to_string(),
+        ))));
+
         self.functions.push(Function {
             name: name.to_string(),
             prelude: vec![],
+            params,
+            body,
+        });
+    }
+
+    fn compile_lambda(&mut self, spanned: &Spanned<Expr>) {
+        const PARAMS: usize = 1;
+        const BODY: usize = 2;
+        let Expr::List(list) = &spanned.expr else {
+            unreachable!();
+        };
+        debug_assert!(list.len() == 3, "(lambda (<params>) ( <body> ))");
+
+        let name = self.get_lambda_name();
+
+        self.symbol_table.enter_scope(&name);
+
+        let Some(params_spanned) = &list.get(PARAMS) else {
+            panic!("expected list for params");
+        };
+
+        let Expr::List(expr_params) = &params_spanned.expr else {
+            panic!(
+                "expected list for params but found {:?}",
+                params_spanned.expr
+            );
+        };
+
+        let mut params = Vec::new();
+        for param in expr_params.iter() {
+            let Expr::Symbol(_) = &param.expr else {
+                panic!("expected symbol for param");
+            };
+            params.push(Stage1Instruction::Rot);
+            params.push(Stage1Instruction::LoadLocal);
+        }
+
+        let mut body = Vec::new();
+        for expr in list.iter().skip(BODY) {
+            self.compile_expr(&mut body, expr);
+        }
+
+        self.symbol_table.exit_scope();
+
+        body.push(Stage1Instruction::Return);
+
+        self.lambdas.push(Lambda {
+            name: name.to_string(),
             params,
             body,
         });

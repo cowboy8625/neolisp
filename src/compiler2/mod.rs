@@ -3,4 +3,4 @@ mod stage1;
 mod test;
 
 use super::{BUILTINS, KEYWORDS, OPERATORS};
-pub use stage1::{Function, IState, Lambda, Stage1Compiler, Stage1Instruction};
+pub use stage1::{Callee, Function, IState, Lambda, Stage1Compiler, Stage1Instruction, Value};
