@@ -126,6 +126,7 @@ fn test_main_var_lambda_curry() {
             Push(Stage1Value::F64(123.0)),
             GetGlobal(IState::Set(0)),
             Call(Stage1Callee::Function, 1),
+            Call(Stage1Callee::Function, 1),
             Call(Stage1Callee::Builtin("print".to_string()), 1),
             Halt,
         ],
@@ -141,6 +142,8 @@ fn test_main_var_lambda_curry() {
     assert_eq!(
         lambda.body,
         vec![
+            GetLocal(IState::Unset("x".to_string())),
+            LoadFree,
             Push(Stage1Value::Callable(IState::Unset("lambda_1".to_string()))),
             Rot,
             Return
@@ -156,7 +159,7 @@ fn test_main_var_lambda_curry() {
         lambda.body,
         vec![
             GetFree(IState::Set(0)),
-            GetLocal(IState::Set(1)),
+            GetLocal(IState::Set(0)),
             Add,
             Rot,
             Return

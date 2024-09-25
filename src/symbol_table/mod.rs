@@ -238,8 +238,15 @@ impl SymbolWalker {
             Expr::Symbol(name) if KEYWORDS.contains(&name.as_str()) => {}
             Expr::Symbol(name) if OPERATORS.contains(&name.as_str()) => {}
             Expr::Symbol(name) if BUILTINS.contains(&name.as_str()) => {}
-            Expr::Symbol(name) => match table.lookup(name.as_str()) {
+            Expr::Symbol(name) => match table.lookup(name.as_str()).cloned() {
                 Some(symbol) if symbol.scope_level < current_scope_level && self.is_in_lambda => {
+                    if let Some(last) = table.scope_stack.last_mut() {
+                        for (name, other_symbol) in last {
+                            if name != &symbol.name && other_symbol.id > 0 {
+                                other_symbol.id -= 1;
+                            }
+                        }
+                    }
                     table.insert(
                         name.clone(),
                         Symbol {

@@ -67,7 +67,13 @@ fn into_instructions(
         }
         Stage1Instruction::LoadLocal => Instruction::LoadLocal,
         Stage1Instruction::GetLocal(IState::Set(v)) => Instruction::GetLocal(*v),
-        Stage1Instruction::GetLocal(IState::Unset(v)) => todo!("GetLocal({})", v),
+        Stage1Instruction::GetLocal(IState::Unset(v)) => {
+            let Some(symbol) = symbol_table.lookup(v) else {
+                panic!("Variable `{}` is not defined", v);
+            };
+
+            Instruction::GetLocal(symbol.id)
+        }
         Stage1Instruction::LoadGlobal => Instruction::LoadGlobal,
         Stage1Instruction::GetGlobal(IState::Set(v)) => Instruction::GetGlobal(*v),
         Stage1Instruction::GetGlobal(IState::Unset(v)) => todo!("GetGlobal({})", v),
@@ -125,19 +131,23 @@ pub fn compile_to_instructions(
 
     instructions.push(Instruction::StartAt(start_location as usize));
     for function in &data.functions {
+        symbol_table.enter_scope(&function.name);
         let params = convert_section_to_instructions(&symbol_table, &function.params);
         instructions.extend(params);
         let prelude = convert_section_to_instructions(&symbol_table, &function.prelude);
         instructions.extend(prelude);
         let body = convert_section_to_instructions(&symbol_table, &function.body);
         instructions.extend(body);
+        symbol_table.exit_scope();
     }
 
     for lambda in &data.lambdas {
+        symbol_table.enter_scope(&lambda.name);
         let params = convert_section_to_instructions(&symbol_table, &lambda.params);
         instructions.extend(params);
         let body = convert_section_to_instructions(&symbol_table, &lambda.body);
         instructions.extend(body);
+        symbol_table.exit_scope();
     }
 
     instructions

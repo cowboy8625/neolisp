@@ -131,7 +131,7 @@ impl Stage1Compiler {
                     SymbolKind::Variable if symbol.scope == SymbolScope::Global => {
                         instructions.push(Stage1Instruction::GetGlobal(IState::Set(symbol.id)));
                     }
-                    SymbolKind::Variable if symbol.scope == SymbolScope::Global => {
+                    SymbolKind::Variable if symbol.scope == SymbolScope::Function => {
                         instructions.push(Stage1Instruction::GetLocal(IState::Set(symbol.id)));
                     }
                     SymbolKind::Variable => todo!("Variable: {}, id: {}", name, symbol.id),
@@ -179,10 +179,11 @@ impl Stage1Compiler {
                     self.compile_expr(instructions, item);
                 }
                 self.compile_list(instructions, first);
-                let Some(Stage1Instruction::Push(Stage1Value::Callable(_))) = instructions.last()
-                else {
-                    panic!("I do not think this is possible to happen, but maybe if something is compiled up stream incorrectly?");
-                };
+                // let Some(Stage1Instruction::Push(Stage1Value::Callable(_))) = instructions.last()
+                // else {
+                //     eprintln!("{list:#?} INSTRUCTIONS {:#?}", instructions);
+                //     return;
+                // };
                 instructions.push(Stage1Instruction::Call(Stage1Callee::Function, count));
             }
             Expr::Builtin(_, _) => todo!(),
@@ -419,6 +420,36 @@ impl Stage1Compiler {
         for expr in list.iter().skip(BODY) {
             self.compile_expr(&mut body, expr);
         }
+
+        let Some(everything) = self.symbol_table.get_function_scope(&name) else {
+            panic!("no scope for {name:?}");
+        };
+        for (name, symbol) in everything.iter() {
+            if symbol.kind == SymbolKind::FreeVariable {
+                let instruction = if symbol.scope == SymbolScope::Global {
+                    Stage1Instruction::GetGlobal(IState::Unset(name.to_string()))
+                } else {
+                    Stage1Instruction::GetLocal(IState::Unset(name.to_string()))
+                };
+                instructions.push(instruction);
+                instructions.push(Stage1Instruction::LoadFree);
+            }
+        }
+        // let captured = get_variables(&body);
+
+        // eprintln!("name: {name:?}");
+        // eprintln!("captured: {captured:?}");
+        // for name in captured.iter() {
+        //     let Some(symbol) = self.symbol_table.lookup(name) else {
+        //         panic!("unknown symbol: {}", name);
+        //     };
+        //     let instruction = if symbol.scope == SymbolScope::Global {
+        //         Stage1Instruction::GetGlobal(IState::Unset(name.to_string()))
+        //     } else {
+        //         Stage1Instruction::GetLocal(IState::Unset(name.to_string()))
+        //     };
+        //     instructions.push(instruction);
+        // }
 
         body.push(Stage1Instruction::Rot);
         body.push(Stage1Instruction::Return);
