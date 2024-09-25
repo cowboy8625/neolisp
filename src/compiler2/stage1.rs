@@ -39,6 +39,8 @@ pub enum Stage1Instruction {
     GetGlobal(IState),
     LoadFree,
     GetFree(IState),
+    JumpIf(usize),
+    Jump(usize),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -290,9 +292,45 @@ impl Stage1Compiler {
             "fn" => self.compile_fn(spanned),
             "lambda" => self.compile_lambda(instructions, spanned),
             "var" => self.compile_var(instructions, spanned),
+            "if" => self.compile_if(instructions, spanned),
             // "let", "if"
             _ => unreachable!("unknown keyword: {}", name),
         }
+    }
+
+    fn compile_if(&mut self, instructions: &mut Vec<Stage1Instruction>, spanned: &Spanned<Expr>) {
+        const CONDITION: usize = 1;
+        const THEN: usize = 2;
+        const ELSE: usize = 3;
+        let Expr::List(list) = &spanned.expr else {
+            unreachable!();
+        };
+
+        let Some(condition_spanned) = list.get(CONDITION) else {
+            panic!("if requires condition");
+        };
+
+        // TODO: Not sure how to get the offset here.  Maybe pass a differ vec in to collect the
+        // instructions to count for the offset to jump if the condition is false?
+        self.compile_expr(instructions, condition_spanned);
+
+        let Some(then_spanned) = list.get(THEN) else {
+            panic!("if without then");
+        };
+
+        let mut then_instructions = Vec::new();
+        self.compile_expr(&mut then_instructions, then_spanned);
+        let then_offset = then_instructions.len() + 1;
+
+        let mut else_instructions = Vec::new();
+        if let Some(else_spanned) = list.get(ELSE) {
+            self.compile_expr(&mut else_instructions, else_spanned);
+        };
+        let else_offset = else_instructions.len();
+        instructions.push(Stage1Instruction::JumpIf(then_offset));
+        instructions.extend(then_instructions);
+        instructions.push(Stage1Instruction::Jump(else_offset));
+        instructions.extend(else_instructions);
     }
 
     fn compile_var(&mut self, instructions: &mut Vec<Stage1Instruction>, spanned: &Spanned<Expr>) {

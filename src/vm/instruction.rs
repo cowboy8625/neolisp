@@ -18,6 +18,8 @@ pub enum Instruction {
     GetGlobal(usize),
     LoadFree,
     GetFree(usize),
+    JumpIf(usize),
+    Jump(usize),
 }
 
 #[derive(Debug, Clone, PartialEq)]

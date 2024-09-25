@@ -212,6 +212,17 @@ impl Machine {
                 };
                 self.stack.push(value.clone());
             }
+            Instruction::JumpIf(address) => {
+                let Some(value) = self.stack.pop() else {
+                    panic!("expected value on stack for JumpIf")
+                };
+                if value == Value::Bool(false) {
+                    self.ip += *address;
+                }
+            }
+            Instruction::Jump(address) => {
+                self.ip += *address;
+            }
         }
     }
 

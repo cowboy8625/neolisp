@@ -78,6 +78,8 @@ fn into_instructions(
         Stage1Instruction::LoadFree => Instruction::LoadFree,
         Stage1Instruction::GetFree(IState::Set(v)) => Instruction::GetFree(*v),
         Stage1Instruction::GetFree(IState::Unset(v)) => todo!("GetFree({})", v),
+        Stage1Instruction::JumpIf(usize) => Instruction::JumpIf(*usize),
+        Stage1Instruction::Jump(usize) => Instruction::Jump(*usize),
     };
     out.push(i);
 }

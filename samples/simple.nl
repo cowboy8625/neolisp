@@ -1,4 +1,7 @@
-(fn main () (print (- 321 123) "\n"))
+(var value false)
+(fn main () (if value (print "then\n") (print "else\n")))
+
+; (fn main () (print (- 321 123) "\n"))
 
 ; (fn apply (f x) (f x))
 ; (fn main () (print (apply (lambda (x) (+ x 321)) 123) "\n"))

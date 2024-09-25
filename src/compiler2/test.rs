@@ -304,3 +304,39 @@ fn test_main_applying_lambda() {
         "lambda_0 body"
     );
 }
+
+#[test]
+fn test_main_if_else() {
+    let src = r#"
+(fn main () (if true (print "then\n") (print "else\n")))
+"#;
+    let ast = parser().parse(src).unwrap();
+    let symbol_table = SymbolWalker::default().walk(&ast).unwrap();
+    let stage1_compiler = Stage1Compiler::new(symbol_table).compiler(&ast);
+
+    // Checking function apply
+    assert_eq!(stage1_compiler.functions.len(), 1, "one functions");
+    // Checking function main
+    let main = &stage1_compiler.functions[0];
+    assert_eq!(main.name, "main", "main function name");
+    assert_eq!(main.params, vec![], "main function params");
+    assert_eq!(
+        main.prelude,
+        // This is the global variable being loaded
+        vec![],
+        "main function prelude"
+    );
+    assert_eq!(
+        main.body,
+        vec![
+            Push(Stage1Value::Bool(true)),
+            JumpIfFalse(2),
+            Push(Stage1Value::String("then\n".to_string())),
+            Call(Stage1Callee::Builtin("print".to_string()), 1),
+            Push(Stage1Value::String("else\n".to_string())),
+            Call(Stage1Callee::Builtin("print".to_string()), 1),
+            Halt,
+        ],
+        "main function body"
+    );
+}
