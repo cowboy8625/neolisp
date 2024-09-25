@@ -1,4 +1,4 @@
-(fn main () (print (= 123 321) "\n"))
+(fn main () (print (- 321 123) "\n"))
 
 ; (fn apply (f x) (f x))
 ; (fn main () (print (apply (lambda (x) (+ x 321)) 123) "\n"))

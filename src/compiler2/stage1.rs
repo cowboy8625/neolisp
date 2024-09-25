@@ -29,6 +29,7 @@ pub enum Stage1Instruction {
     Return,
     Push(Stage1Value),
     Add,
+    Sub,
     Eq,
     Rot,
     Call(Stage1Callee, u8),
@@ -265,6 +266,7 @@ impl Stage1Compiler {
         };
         let op = match operator.as_str() {
             "+" => Stage1Instruction::Add,
+            "-" => Stage1Instruction::Sub,
             "=" => Stage1Instruction::Eq,
             _ => unreachable!("unknown operator: {}", operator),
         };

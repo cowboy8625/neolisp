@@ -54,6 +54,7 @@ fn into_instructions(
             Instruction::Push(stage1_value_into_value(symbol_table, stage1_value))
         }
         Stage1Instruction::Add => Instruction::Add,
+        Stage1Instruction::Sub => Instruction::Sub,
         Stage1Instruction::Eq => Instruction::Eq,
         Stage1Instruction::Rot => Instruction::Rot,
         Stage1Instruction::Call(Stage1Callee::Function, count) => {
