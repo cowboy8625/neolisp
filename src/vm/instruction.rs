@@ -11,17 +11,11 @@ pub enum Instruction {
     Rot,
     Call(Callee, u8),
     LoadLocal,
-    GetLocal(IState),
+    GetLocal(usize),
     LoadGlobal,
-    GetGlobal(IState),
+    GetGlobal(usize),
     LoadFree,
-    GetFree(IState),
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum IState {
-    Set(usize),
-    Unset(String),
+    GetFree(usize),
 }
 
 #[derive(Debug, Clone, PartialEq)]

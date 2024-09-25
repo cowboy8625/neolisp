@@ -2,6 +2,12 @@ use super::{BUILTINS, KEYWORDS, OPERATORS};
 use crate::ast::{Expr, Spanned};
 use crate::symbol_table::{Scope as SymbolScope, Symbol, SymbolKind, SymbolTable};
 
+#[derive(Debug)]
+pub struct Stage1Data {
+    pub functions: Vec<Stage1Function>,
+    pub lambdas: Vec<Stage1Lambda>,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Stage1Function {
     pub name: String,
@@ -84,7 +90,7 @@ impl Stage1Compiler {
         name
     }
 
-    pub fn compiler(&mut self, ast: &[Spanned<Expr>]) {
+    pub fn compiler(mut self, ast: &[Spanned<Expr>]) -> Stage1Data {
         let mut instructions = Vec::new();
         for expr in ast {
             self.compile_expr(&mut instructions, expr);
@@ -94,6 +100,11 @@ impl Stage1Compiler {
                 function.prelude.append(&mut instructions);
                 break;
             }
+        }
+
+        Stage1Data {
+            functions: self.functions,
+            lambdas: self.lambdas,
         }
     }
 
@@ -157,11 +168,11 @@ impl Stage1Compiler {
             Expr::Symbol(name) if OPERATORS.contains(&name.as_str()) => {
                 self.compile_operator(instructions, spanned)
             }
-            Expr::Symbol(name) => {
+            Expr::Symbol(_) => {
                 self.compile_symbol_call(instructions, spanned);
             }
             Expr::Number(_) => todo!(),
-            Expr::List(items) => {
+            Expr::List(_) => {
                 for item in list.iter().skip(1) {
                     self.compile_expr(instructions, item);
                 }
@@ -207,8 +218,14 @@ impl Stage1Compiler {
                 SymbolKind::Variable if symbol.scope == SymbolScope::Free => {
                     instructions.push(Stage1Instruction::GetFree(IState::Set(symbol.id)));
                 }
-                SymbolKind::Parameter => todo!(),
-                SymbolKind::Function => todo!(),
+                SymbolKind::Parameter => {
+                    instructions.push(Stage1Instruction::GetLocal(IState::Set(symbol.id)));
+                }
+                SymbolKind::Function => {
+                    instructions.push(Stage1Instruction::Push(Stage1Value::Callable(
+                        IState::Unset(name.clone()),
+                    )));
+                }
                 SymbolKind::Test => todo!(),
                 SymbolKind::Lambda => todo!(),
                 _ => todo!(),
@@ -341,6 +358,7 @@ impl Stage1Compiler {
         if name == "main" {
             body.push(Stage1Instruction::Halt);
         } else {
+            body.push(Stage1Instruction::Rot);
             body.push(Stage1Instruction::Return);
         }
 
@@ -395,6 +413,7 @@ impl Stage1Compiler {
             self.compile_expr(&mut body, expr);
         }
 
+        body.push(Stage1Instruction::Rot);
         body.push(Stage1Instruction::Return);
 
         self.symbol_table.exit_scope();

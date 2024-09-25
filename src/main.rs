@@ -61,12 +61,8 @@ fn compile(src: &str) -> anyhow::Result<Vec<vm::Instruction>> {
     use chumsky::prelude::Parser;
 
     let ast = parser().parse(src).unwrap();
-    let _symbol_table = SymbolWalker::default().walk(&ast).unwrap();
-    // let hir = HirCompiler::new(symbol_table.clone())
-    //     .compile(&ast)
-    //     .unwrap();
-    // let instructions = InstructionCompiler::new(symbol_table)
-    //     .compile(&hir)
-    //     .unwrap();
-    Ok(vec![])
+    let mut symbol_table = SymbolWalker::default().walk(&ast).unwrap();
+    let stage1_data = compiler2::Stage1Compiler::new(symbol_table.clone()).compiler(&ast);
+    let instructions = compiler2::compile_to_instructions(&mut symbol_table, &stage1_data);
+    Ok(instructions)
 }

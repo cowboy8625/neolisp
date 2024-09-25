@@ -1,7 +1,7 @@
 use core::panic;
 
 use super::builtin;
-use super::instruction::{Callee, IState, Instruction};
+use super::instruction::{Callee, Instruction};
 use super::value::Value;
 
 const RED: &str = "\x1b[31m";
@@ -117,10 +117,7 @@ impl Machine {
                 Callee::Function => {
                     let count = *arg_count as usize;
                     let address = match self.stack.pop() {
-                        Some(Value::Callable(IState::Set(address))) => address,
-                        Some(Value::Callable(IState::Unset(name))) => {
-                            panic!("function {} is not defined", name)
-                        }
+                        Some(Value::Callable(address)) => address,
                         None => {
                             panic!("expected value on stack for function call but stack is empty")
                         }
@@ -146,7 +143,7 @@ impl Machine {
 
                 self.push_local(value);
             }
-            Instruction::GetLocal(IState::Set(index)) => {
+            Instruction::GetLocal(index) => {
                 let Some(value) = self.get_local(*index) else {
                     panic!("expected value on stack for GetLocal")
                 };
@@ -159,7 +156,7 @@ impl Machine {
 
                 self.global_stack.push(value);
             }
-            Instruction::GetGlobal(IState::Set(index)) => {
+            Instruction::GetGlobal(index) => {
                 let Some(value) = self.global_stack.get(*index) else {
                     panic!("expected value on stack for GetGlobal")
                 };
@@ -172,13 +169,12 @@ impl Machine {
 
                 self.free_stack.push(value);
             }
-            Instruction::GetFree(IState::Set(index)) => {
+            Instruction::GetFree(index) => {
                 let Some(value) = self.free_stack.get(*index) else {
                     panic!("expected value on stack for GetFree")
                 };
                 self.stack.push(value.clone());
             }
-            _ => unimplemented!("unimplemented instruction: {instruction:?}"),
         }
     }
 

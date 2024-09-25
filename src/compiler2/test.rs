@@ -1,6 +1,4 @@
-use super::{
-    IState, Stage1Callee, Stage1Compiler, Stage1Function, Stage1Instruction::*, Stage1Value,
-};
+use super::{IState, Stage1Callee, Stage1Compiler, Stage1Instruction::*, Stage1Value};
 use crate::parser::parser;
 use crate::symbol_table::SymbolWalker;
 use chumsky::prelude::Parser;
@@ -14,8 +12,7 @@ fn test_main_var() {
 ";
     let ast = parser().parse(src).unwrap();
     let symbol_table = SymbolWalker::default().walk(&ast).unwrap();
-    let mut stage1_compiler = Stage1Compiler::new(symbol_table);
-    stage1_compiler.compiler(&ast);
+    let stage1_compiler = Stage1Compiler::new(symbol_table).compiler(&ast);
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
     assert_eq!(main.name, "main", "main function name");
@@ -49,8 +46,7 @@ fn test_main_var_lambda() {
 ";
     let ast = parser().parse(src).unwrap();
     let symbol_table = SymbolWalker::default().walk(&ast).unwrap();
-    let mut stage1_compiler = Stage1Compiler::new(symbol_table);
-    stage1_compiler.compiler(&ast);
+    let stage1_compiler = Stage1Compiler::new(symbol_table).compiler(&ast);
     // Checking function
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
@@ -93,6 +89,7 @@ fn test_main_var_lambda() {
             GetLocal(IState::Set(0)),
             GetLocal(IState::Set(1)),
             Add,
+            Rot,
             Return
         ],
         "lambda body"
@@ -107,8 +104,7 @@ fn test_main_var_lambda_curry() {
 ";
     let ast = parser().parse(src).unwrap();
     let symbol_table = SymbolWalker::default().walk(&ast).unwrap();
-    let mut stage1_compiler = Stage1Compiler::new(symbol_table);
-    stage1_compiler.compiler(&ast);
+    let stage1_compiler = Stage1Compiler::new(symbol_table).compiler(&ast);
     // Checking function
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
@@ -146,6 +142,7 @@ fn test_main_var_lambda_curry() {
         lambda.body,
         vec![
             Push(Stage1Value::Callable(IState::Unset("lambda_1".to_string()))),
+            Rot,
             Return
         ],
         "lambda_0 body"
@@ -161,6 +158,7 @@ fn test_main_var_lambda_curry() {
             GetFree(IState::Set(0)),
             GetLocal(IState::Set(1)),
             Add,
+            Rot,
             Return
         ],
         "lambda_1 body"

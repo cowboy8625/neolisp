@@ -1,5 +1,3 @@
-use super::instruction::IState;
-
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     U8(u8),
@@ -10,7 +8,7 @@ pub enum Value {
     String(String),
     Bool(bool),
     List(Vec<Value>),
-    Callable(IState),
+    Callable(usize),
 }
 
 impl std::fmt::Display for Value {
@@ -34,8 +32,7 @@ impl std::fmt::Display for Value {
                         .join(" ")
                 )
             }
-            Self::Callable(IState::Set(index)) => write!(f, "<function {index:02X}>"),
-            Self::Callable(IState::Unset(name)) => write!(f, "<function unset {name}>"),
+            Self::Callable(index) => write!(f, "<function {index:02X}>"),
         }
     }
 }
