@@ -1,6 +1,6 @@
 use super::{BUILTINS, KEYWORDS, OPERATORS};
 use crate::ast::{Expr, Spanned};
-use crate::symbol_table::{Scope as SymbolScope, Symbol, SymbolKind, SymbolTable};
+use crate::symbol_table::{Scope as SymbolScope, SymbolKind, SymbolTable};
 
 #[derive(Debug)]
 pub struct Stage1Data {
@@ -25,8 +25,6 @@ pub struct Stage1Lambda {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stage1Instruction {
-    StartAt(usize),
-    Noop,
     Halt,
     Return,
     Push(Stage1Value),

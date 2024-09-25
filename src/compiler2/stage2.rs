@@ -1,5 +1,3 @@
-use chumsky::prelude;
-
 use super::{
     IState, Stage1Callee, Stage1Data, Stage1Function, Stage1Instruction, Stage1Lambda, Stage1Value,
 };
@@ -50,8 +48,6 @@ fn into_instructions(
     out: &mut Vec<Instruction>,
 ) {
     let i = match instruction {
-        Stage1Instruction::StartAt(_) => unreachable!(),
-        Stage1Instruction::Noop => Instruction::Noop,
         Stage1Instruction::Halt => Instruction::Halt,
         Stage1Instruction::Return => Instruction::Return,
         Stage1Instruction::Push(stage1_value) => {

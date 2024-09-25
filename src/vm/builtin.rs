@@ -121,7 +121,7 @@ pub fn car(machine: &mut Machine, count: u8) -> Result<()> {
     if count != 1 {
         anyhow::bail!("car only support 2 args");
     }
-    let Some(Value::List(mut list)) = machine.stack.pop() else {
+    let Some(Value::List(list)) = machine.stack.pop() else {
         panic!("expected a List on stack for car")
     };
     let item = list.first().cloned().unwrap_or(Value::Bool(false));
