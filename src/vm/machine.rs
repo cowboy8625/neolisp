@@ -234,16 +234,16 @@ impl Machine {
             "d" | "display" => self.debug(),
             "h" | "help" => {
                 println!("h  help");
-                println!("pfs print-free-stack");
-                println!("pls print-local-stack");
-                println!("pgs print-global-stack");
-                println!("ps print-stack");
-                println!("p  print <index>");
-                println!("b  breakpoint <ip>");
-                println!("c  continue");
-                println!("n  next");
-                // println!("r run");
-                println!("q  quit");
+                println!("pfs  print-free-stack");
+                println!("pls  print-local-stack");
+                println!("pgs  print-global-stack");
+                println!("ps   print-stack");
+                println!("p    print <index>");
+                println!("b    breakpoint <ip>");
+                println!("c    continue");
+                println!("n    next");
+                println!("rot  rotate <count>");
+                println!("q    quit");
             }
             "pfs" | "print-free-stack" => {
                 println!("FREE STACK:");
@@ -298,6 +298,22 @@ impl Machine {
             "p" | "print" => eprintln!("print <index>"),
             "c" | "continue" => self.debug_mode = DebugMode::Continue,
             "n" | "next" => self.debug_mode = DebugMode::Step,
+            "rot" if result.len() == 2 => {
+                let Ok(count) = result[1].parse::<usize>() else {
+                    println!("rotate <count> not {RED}{}{RESET}", result[1]);
+                    return;
+                };
+                println!("ROT BY: {count}");
+                println!("{:?}", self.stack);
+                let mut temp = Vec::new();
+                for _ in 0..count {
+                    temp.push(self.stack.pop().unwrap());
+                }
+                for item in temp.into_iter() {
+                    self.stack.push(item);
+                }
+                println!("{:?}", self.stack);
+            }
             "q" | "quit" => self.shutdown(),
             _ => println!("{RED}unknown command{RESET} {input}"),
         }

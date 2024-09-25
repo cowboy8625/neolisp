@@ -17,7 +17,6 @@ const BUILTINS: &[&str] = &["print", "nth", "length", "assert-eq", "list", "cons
 const KEYWORDS: &[&str] = &["var", "let", "fn", "if", "lambda"];
 
 use clap::Parser as ClapParser;
-// use compiler::compile;
 
 fn main() -> anyhow::Result<()> {
     let args = cli::Cli::parse();
