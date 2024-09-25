@@ -173,10 +173,17 @@ impl Stage1Compiler {
             }
             Expr::Number(_) => todo!(),
             Expr::List(_) => {
+                let mut count = 0;
                 for item in list.iter().skip(1) {
+                    count += 1;
                     self.compile_expr(instructions, item);
                 }
-                self.compile_symbol_call(instructions, first);
+                self.compile_list(instructions, first);
+                let Some(Stage1Instruction::Push(Stage1Value::Callable(_))) = instructions.last()
+                else {
+                    panic!("I do not think this is possible to happen, but maybe if something is compiled up stream incorrectly?");
+                };
+                instructions.push(Stage1Instruction::Call(Stage1Callee::Function, count));
             }
             Expr::Builtin(_, _) => todo!(),
             Expr::Func(_) => todo!(),
