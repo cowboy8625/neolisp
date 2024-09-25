@@ -223,3 +223,84 @@ fn test_main_call_lambda() {
         "lambda_0 body"
     );
 }
+
+#[test]
+fn test_main_applying_lambda() {
+    let src = r#"
+(fn apply (f x) (f x))
+(fn main () (print (apply (lambda (x) (+ x 321)) 123) "\n"))
+"#;
+    let ast = parser().parse(src).unwrap();
+    let symbol_table = SymbolWalker::default().walk(&ast).unwrap();
+    let stage1_compiler = Stage1Compiler::new(symbol_table).compiler(&ast);
+
+    // Checking function apply
+    assert_eq!(stage1_compiler.functions.len(), 2, "two functions");
+    let apply = &stage1_compiler.functions[0];
+    assert_eq!(apply.name, "apply", "apply function name");
+    assert_eq!(
+        apply.params,
+        vec![Rot, LoadLocal, Rot, LoadLocal],
+        "apply function params"
+    );
+    assert_eq!(
+        apply.prelude,
+        // This is the global variable being loaded
+        vec![],
+        "apply function prelude"
+    );
+    assert_eq!(
+        apply.body,
+        vec![
+            // FIXME: Swap ordering
+            GetLocal(IState::Set(0)),
+            GetLocal(IState::Set(1)),
+            Call(Stage1Callee::Function, 1),
+            Rot,
+            Return
+        ],
+        "apply function body"
+    );
+
+    // Checking function main
+    let main = &stage1_compiler.functions[1];
+    assert_eq!(main.name, "main", "main function name");
+    assert_eq!(main.params, vec![], "main function params");
+    assert_eq!(
+        main.prelude,
+        // This is the global variable being loaded
+        vec![],
+        "main function prelude"
+    );
+    assert_eq!(
+        main.body,
+        vec![
+            Push(Stage1Value::Callable(IState::Unset("lambda_0".to_string()))),
+            Push(Stage1Value::F64(123.0)),
+            Push(Stage1Value::Callable(IState::Unset("apply".to_string()))),
+            Call(Stage1Callee::Function, 2),
+            Push(Stage1Value::String("\n".to_string())),
+            Call(Stage1Callee::Builtin("print".to_string()), 2),
+            Halt,
+        ],
+        "main function body"
+    );
+
+    assert_eq!(stage1_compiler.lambdas.len(), 1, "two lambda");
+
+    // Check that we have a lambda 1
+    let lambda = &stage1_compiler.lambdas[0];
+    assert_eq!(lambda.name, "lambda_0", "lambda_0 name");
+    assert_eq!(lambda.params, vec![Rot, LoadLocal], "lambda_0 params");
+    assert_eq!(
+        lambda.body,
+        vec![
+            GetLocal(IState::Set(0)),
+            Push(Stage1Value::F64(321.0)),
+            Add,
+            Rot,
+            Return
+        ],
+        "lambda_0 body"
+    );
+}

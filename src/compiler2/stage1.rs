@@ -177,11 +177,6 @@ impl Stage1Compiler {
                     self.compile_expr(instructions, item);
                 }
                 self.compile_list(instructions, first);
-                // let Some(Stage1Instruction::Push(Stage1Value::Callable(_))) = instructions.last()
-                // else {
-                //     eprintln!("{list:#?} INSTRUCTIONS {:#?}", instructions);
-                //     return;
-                // };
                 instructions.push(Stage1Instruction::Call(Stage1Callee::Function, count));
             }
             Expr::Builtin(_, _) => todo!(),
@@ -207,6 +202,15 @@ impl Stage1Compiler {
             unreachable!();
         };
 
+        if let Some(symbol) = self.symbol_table.lookup(&name) {
+            match symbol.kind {
+                SymbolKind::Parameter => {
+                    instructions.push(Stage1Instruction::GetLocal(IState::Set(symbol.id)));
+                }
+                _ => {}
+            }
+        };
+
         let count = list.len() - 1;
         for spanned in list.iter().skip(1) {
             self.compile_expr(instructions, spanned);
@@ -224,9 +228,10 @@ impl Stage1Compiler {
                 SymbolKind::Variable if symbol.scope == SymbolScope::Free => {
                     instructions.push(Stage1Instruction::GetFree(IState::Set(symbol.id)));
                 }
-                SymbolKind::Parameter => {
-                    instructions.push(Stage1Instruction::GetLocal(IState::Set(symbol.id)));
-                }
+                SymbolKind::Parameter => {}
+                // SymbolKind::Parameter => {
+                //     instructions.push(Stage1Instruction::GetLocal(IState::Set(symbol.id)));
+                // }
                 SymbolKind::Function => {
                     instructions.push(Stage1Instruction::Push(Stage1Value::Callable(
                         IState::Unset(name.clone()),
@@ -433,21 +438,6 @@ impl Stage1Compiler {
                 instructions.push(Stage1Instruction::LoadFree);
             }
         }
-        // let captured = get_variables(&body);
-
-        // eprintln!("name: {name:?}");
-        // eprintln!("captured: {captured:?}");
-        // for name in captured.iter() {
-        //     let Some(symbol) = self.symbol_table.lookup(name) else {
-        //         panic!("unknown symbol: {}", name);
-        //     };
-        //     let instruction = if symbol.scope == SymbolScope::Global {
-        //         Stage1Instruction::GetGlobal(IState::Unset(name.to_string()))
-        //     } else {
-        //         Stage1Instruction::GetLocal(IState::Unset(name.to_string()))
-        //     };
-        //     instructions.push(instruction);
-        // }
 
         body.push(Stage1Instruction::Rot);
         body.push(Stage1Instruction::Return);
