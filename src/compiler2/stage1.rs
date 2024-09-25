@@ -29,6 +29,7 @@ pub enum Stage1Instruction {
     Return,
     Push(Stage1Value),
     Add,
+    Eq,
     Rot,
     Call(Stage1Callee, u8),
     LoadLocal,
@@ -229,9 +230,6 @@ impl Stage1Compiler {
                     instructions.push(Stage1Instruction::GetFree(IState::Set(symbol.id)));
                 }
                 SymbolKind::Parameter => {}
-                // SymbolKind::Parameter => {
-                //     instructions.push(Stage1Instruction::GetLocal(IState::Set(symbol.id)));
-                // }
                 SymbolKind::Function => {
                     instructions.push(Stage1Instruction::Push(Stage1Value::Callable(
                         IState::Unset(name.clone()),
@@ -267,6 +265,7 @@ impl Stage1Compiler {
         };
         let op = match operator.as_str() {
             "+" => Stage1Instruction::Add,
+            "=" => Stage1Instruction::Eq,
             _ => unreachable!("unknown operator: {}", operator),
         };
 

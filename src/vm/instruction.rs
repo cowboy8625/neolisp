@@ -8,6 +8,7 @@ pub enum Instruction {
     Return,
     Push(Value),
     Add,
+    Eq,
     Rot,
     Call(Callee, u8),
     LoadLocal,
