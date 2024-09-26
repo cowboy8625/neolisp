@@ -93,6 +93,9 @@ impl Compiler {
                 header.set_start(location);
             }
         }
+        eprintln!("Program size: {}", program.len());
+        eprintln!("Functions: {:#?}", self.functions);
+        eprintln!("Test: {:#?}", self.tests);
 
         let header_bytes = match self.header {
             Some(h) => h.to_bytecode(),
@@ -214,7 +217,9 @@ impl Compiler {
                         acc
                     });
 
-                    ir_code.push(Ir::CallLambda(args))
+                    // let name = format!("lambda_{}", self.lambda_counter - 1);
+                    // eprintln!("{}", name);
+                    // ir_code.push(Ir::Call(symbol_table::SymbolKind::Lambda, name, args))
                 }
                 _ => self.compile_expr(symbol_table, ir_code, spanned),
             },

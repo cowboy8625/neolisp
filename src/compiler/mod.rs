@@ -4,6 +4,7 @@
 mod compiler;
 mod decompiler;
 mod header;
+mod instruction;
 mod ir;
 use super::{BUILTINS, OPERATORS};
 use crate::ast::{Expr, Spanned};
@@ -14,6 +15,7 @@ use chumsky::prelude::Parser;
 use compiler::Compiler;
 pub use decompiler::{decompile, decompile_chunk, display_chunk};
 pub use header::Header;
+pub use instruction::Instruction;
 pub use ir::{Function, Ir, Value};
 
 pub fn compile(src: &str) -> Result<Vec<u8>, Vec<String>> {

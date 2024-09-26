@@ -1,12 +1,16 @@
-use super::{builtin, Header, OpCode, Value};
-use crate::compiler::{decompile, display_chunk};
-use anyhow::Result;
+use core::panic;
+
+use super::builtin;
+use super::instruction::{Callee, Instruction};
+use super::value::Value;
+
 const RED: &str = "\x1b[31m";
 const GREEN: &str = "\x1b[32m";
+const UNDERLINE: &str = "\x1b[4m";
 const RESET: &str = "\x1b[0m";
 
 #[derive(Debug, Default)]
-enum DebugMode {
+pub enum DebugMode {
     #[default]
     Off,
     Pause,
@@ -14,43 +18,268 @@ enum DebugMode {
     Continue,
 }
 
-/// Virtual Machine
-///
-/// Stack based virtual machine for evaluating LISP code
-///
-/// # Examples
-///
-/// ```rust
-/// let mut vm = vm::Machine::new(program);
-/// vm.run();
-/// ```
-#[derive(Debug, Default)]
 pub struct Machine {
-    program: Vec<u8>,
-    ip: usize,
-    is_running: bool,
-    stack: Vec<Value>,
-    local_var: Vec<Value>,
-    global_var: Vec<Value>,
-    decompile: bool,
-    breakpoints: Vec<usize>,
-    debug_mode: DebugMode,
+    pub program: Vec<Instruction>,
+    pub ip: usize,
+    pub is_running: bool,
+    pub call_stack: usize,
+    pub stack: Vec<Value>,
+    pub local_stack: Vec<Vec<Value>>,
+    pub global_stack: Vec<Value>,
+    pub free_stack: Vec<Value>,
+    pub breakpoints: Vec<usize>,
+    pub debug_mode: DebugMode,
 }
 
 impl Machine {
-    pub fn new(program: Vec<u8>, decompile: bool) -> Self {
-        debug_assert!(program.len() > Header::SIZE as usize);
-        let program_header = Header::from(&program[0..Header::SIZE as usize]);
+    pub fn new(program: Vec<Instruction>) -> Self {
         Self {
             program,
-            ip: program_header.start as usize,
+            ip: 0,
             is_running: true,
-            decompile,
-            ..Default::default()
+            call_stack: 0,
+            stack: Vec::new(),
+            local_stack: vec![Vec::new()],
+            global_stack: Vec::new(),
+            free_stack: Vec::new(),
+            breakpoints: Vec::new(),
+            debug_mode: DebugMode::Off,
         }
     }
+
     pub fn add_breakpoint(&mut self, ip: usize) {
         self.breakpoints.push(ip);
+    }
+
+    pub fn run_once(&mut self) {
+        match self.debug_mode {
+            DebugMode::Off if self.breakpoints.contains(&self.ip) => {
+                self.debug_mode = DebugMode::Pause;
+                return;
+            }
+            DebugMode::Pause => {
+                self.debugger();
+                return;
+            }
+            DebugMode::Step => self.debug_mode = DebugMode::Pause,
+            _ => (),
+        }
+
+        let Some(instruction) = &self.program.get(self.ip) else {
+            panic!("ip out of bounds")
+        };
+        self.ip += 1;
+        match instruction {
+            Instruction::StartAt(address) => self.ip = *address as usize,
+            Instruction::Noop => {}
+            Instruction::Halt => self.is_running = false,
+            Instruction::Return => {
+                let Some(Value::U32(address)) = self.stack.pop() else {
+                    panic!("expected value on stack for return")
+                };
+                self.ip = address as usize;
+                self.leaving_local_stack();
+            }
+            Instruction::Push(value) => {
+                self.stack.push(value.clone());
+            }
+            Instruction::Add => {
+                let Some(right) = self.stack.pop() else {
+                    panic!("expected value on stack for Add")
+                };
+                let Some(left) = self.stack.pop() else {
+                    panic!("expected value on stack for Add")
+                };
+                match (left, right) {
+                    (Value::I32(left), Value::I32(right)) => {
+                        self.stack.push(Value::I32(left + right));
+                    }
+                    (Value::F64(left), Value::F64(right)) => {
+                        self.stack.push(Value::F64(left + right));
+                    }
+                    (Value::String(left), Value::String(right)) => {
+                        self.stack.push(Value::String(format!("{}{}", left, right)));
+                    }
+                    _ => panic!("invalid types for Add"),
+                }
+            }
+            Instruction::Sub => {
+                let Some(right) = self.stack.pop() else {
+                    panic!("expected value on stack for Sub")
+                };
+                let Some(left) = self.stack.pop() else {
+                    panic!("expected value on stack for Sub")
+                };
+                match (left, right) {
+                    (Value::I32(left), Value::I32(right)) => {
+                        self.stack.push(Value::I32(left - right));
+                    }
+                    (Value::F64(left), Value::F64(right)) => {
+                        self.stack.push(Value::F64(left - right));
+                    }
+                    _ => panic!("invalid types for Add"),
+                }
+            }
+            Instruction::Eq => {
+                let Some(right) = self.stack.pop() else {
+                    panic!("expected value on stack for Eq")
+                };
+                let Some(left) = self.stack.pop() else {
+                    panic!("expected value on stack for Eq")
+                };
+                match (left, right) {
+                    (Value::I32(left), Value::I32(right)) => {
+                        self.stack.push(Value::Bool(left == right));
+                    }
+                    (Value::F64(left), Value::F64(right)) => {
+                        self.stack.push(Value::Bool(left == right));
+                    }
+                    (Value::String(left), Value::String(right)) => {
+                        self.stack.push(Value::Bool(left == right));
+                    }
+                    _ => panic!("invalid types for Add"),
+                }
+            }
+            Instruction::Or => {
+                let Some(right) = self.stack.pop() else {
+                    panic!("expected value on stack for Or")
+                };
+                let Some(left) = self.stack.pop() else {
+                    panic!("expected value on stack for Or")
+                };
+                match (left, right) {
+                    (Value::Bool(left), Value::Bool(right)) => {
+                        self.stack.push(Value::Bool(left || right));
+                    }
+                    _ => panic!("invalid types for Or"),
+                }
+            }
+            Instruction::Rot => {
+                let Some(right) = self.stack.pop() else {
+                    panic!("expected value on stack for rot")
+                };
+                let Some(left) = self.stack.pop() else {
+                    panic!("expected value on stack for rot")
+                };
+                self.stack.push(right);
+                self.stack.push(left);
+            }
+            Instruction::Call(callee, arg_count) => match callee.clone() {
+                Callee::Function => {
+                    let count = *arg_count as usize;
+                    let address = match self.stack.pop() {
+                        Some(Value::Callable(address)) => address,
+                        None => {
+                            panic!("expected value on stack for function call but stack is empty")
+                        }
+                        value => {
+                            panic!(
+                                "expected value on stack for function call but got {:?}",
+                                value
+                            )
+                        }
+                    };
+
+                    self.new_local_stack();
+                    self.stack.push(Value::U32(self.ip as u32));
+                    self.ip = address;
+                    self.bring_to_top_of_stack(count);
+                }
+                Callee::Builtin(name) => self.builtins(name.clone(), *arg_count),
+            },
+            Instruction::LoadLocal => {
+                let Some(value) = self.stack.pop() else {
+                    panic!("expected value on stack for LoadLocal")
+                };
+
+                self.push_local(value);
+            }
+            Instruction::GetLocal(index) => {
+                let Some(value) = self.get_local(*index) else {
+                    panic!("expected value on stack for GetLocal")
+                };
+                self.stack.push(value.clone());
+            }
+            Instruction::LoadGlobal => {
+                let Some(value) = self.stack.pop() else {
+                    panic!("expected value on stack for LoadGlobal")
+                };
+
+                self.global_stack.push(value);
+            }
+            Instruction::GetGlobal(index) => {
+                let Some(value) = self.global_stack.get(*index) else {
+                    panic!("expected value on stack for GetGlobal")
+                };
+                self.stack.push(value.clone());
+            }
+            Instruction::LoadFree => {
+                let Some(value) = self.stack.pop() else {
+                    panic!("expected value on stack for LoadFree")
+                };
+
+                self.free_stack.push(value);
+            }
+            Instruction::GetFree(index) => {
+                let Some(value) = self.free_stack.get(*index) else {
+                    panic!("expected value on stack for GetFree")
+                };
+                self.stack.push(value.clone());
+            }
+            Instruction::JumpIf(address) => {
+                let Some(value) = self.stack.pop() else {
+                    panic!("expected value on stack for JumpIf")
+                };
+                if value == Value::Bool(false) {
+                    self.ip += *address;
+                }
+            }
+            Instruction::Jump(address) => {
+                self.ip += *address;
+            }
+        }
+    }
+
+    pub fn run(&mut self) {
+        while self.is_running {
+            self.run_once();
+        }
+    }
+}
+
+impl Machine {
+    fn new_local_stack(&mut self) {
+        self.local_stack.push(Vec::new());
+        self.call_stack += 1;
+    }
+    fn leaving_local_stack(&mut self) {
+        self.local_stack.pop();
+        self.call_stack -= 1;
+    }
+    fn push_local(&mut self, value: Value) {
+        self.local_stack[self.call_stack].push(value);
+    }
+
+    fn get_local(&self, index: usize) -> Option<&Value> {
+        self.local_stack[self.call_stack].get(index)
+    }
+
+    fn bring_to_top_of_stack(&mut self, count: usize) {
+        let length = self.stack.len();
+        self.stack[length - count..].rotate_left(count);
+    }
+
+    fn builtins(&mut self, name: String, arg_count: u8) {
+        match name.as_str() {
+            "print" => builtin::nlvm_print(self, arg_count).unwrap(),
+            "nth" => builtin::nth(self, arg_count).unwrap(),
+            "length" => builtin::length(self, arg_count).unwrap(),
+            "assert-eq" => builtin::nlvm_assert_eq(self, arg_count).unwrap(),
+            "list" => builtin::list(self, arg_count).unwrap(),
+            "cons" => builtin::cons(self, arg_count).unwrap(),
+            "car" => builtin::car(self, arg_count).unwrap(),
+            _ => panic!("unknown builtin: {}", name),
+        }
     }
 
     fn debugger(&mut self) {
@@ -67,17 +296,40 @@ impl Machine {
             "d" | "display" => self.debug(),
             "h" | "help" => {
                 println!("h  help");
-                println!("ps print-stack");
-                println!("p  print <index>");
-                println!("b  breakpoint <ip>");
-                println!("c  continue");
-                println!("n  next");
-                // println!("r run");
-                println!("q  quit");
+                println!("pfs  print-free-stack");
+                println!("pls  print-local-stack");
+                println!("pgs  print-global-stack");
+                println!("ps   print-stack");
+                println!("p    print <index>");
+                println!("b    breakpoint <ip>");
+                println!("c    continue");
+                println!("n    next");
+                println!("rot  rotate <count>");
+                println!("q    quit");
+            }
+            "pfs" | "print-free-stack" => {
+                println!("FREE STACK:");
+                for (i, item) in self.free_stack.iter().rev().enumerate() {
+                    println!("0x{i:02X}: {item}");
+                }
+            }
+            // HACK: the local stack should be shared with the main stack.
+            "pls" | "print-local-stack" => {
+                println!("LOCAL STACK:");
+                for (i, item) in self.local_stack.iter().rev().enumerate() {
+                    println!("0x{i:02X}: {item:?}");
+                }
+            }
+            "pgs" | "print-global-stack" => {
+                println!("GLOBAL STACK:");
+                for (i, item) in self.global_stack.iter().rev().enumerate() {
+                    println!("0x{i:02X}: {item}");
+                }
             }
             "ps" | "print-stack" => {
+                println!("STACK:");
                 for (i, item) in self.stack.iter().rev().enumerate() {
-                    println!("{i}: {item}");
+                    println!("0x{i:02X}: {item}");
                 }
             }
             "p" | "print" if result.len() == 2 => {
@@ -108,362 +360,44 @@ impl Machine {
             "p" | "print" => eprintln!("print <index>"),
             "c" | "continue" => self.debug_mode = DebugMode::Continue,
             "n" | "next" => self.debug_mode = DebugMode::Step,
+            "rot" if result.len() == 2 => {
+                let Ok(count) = result[1].parse::<usize>() else {
+                    println!("rotate <count> not {RED}{}{RESET}", result[1]);
+                    return;
+                };
+                println!("ROT BY: {count}");
+                println!("{:?}", self.stack);
+                let mut temp = Vec::new();
+                for _ in 0..count {
+                    temp.push(self.stack.pop().unwrap());
+                }
+                for item in temp.into_iter() {
+                    self.stack.push(item);
+                }
+                println!("{:?}", self.stack);
+            }
             "q" | "quit" => self.shutdown(),
             _ => println!("{RED}unknown command{RESET} {input}"),
         }
     }
 
-    pub fn run_once(&mut self) -> Result<()> {
-        match self.debug_mode {
-            DebugMode::Off if self.breakpoints.contains(&self.ip) => {
-                self.debug_mode = DebugMode::Pause;
-                return Ok(());
-            }
-            DebugMode::Pause => {
-                self.debugger();
-                return Ok(());
-            }
-            DebugMode::Step => self.debug_mode = DebugMode::Pause,
-            _ => (),
-        }
-
-        let op = self.get_op_code()?;
-
-        match op {
-            OpCode::Noop => Ok(()),
-            OpCode::Halt => Ok(self.shutdown()),
-            OpCode::AddF64 => {
-                let count = self.get_u32()?;
-                let mut result = 0.;
-                for _ in 0..count {
-                    let Some(Value::F64(value)) = self.stack.pop() else {
-                        panic!("expected value on stack for AddF64")
-                    };
-                    result += value;
-                }
-                self.stack.push(Value::F64(result));
-                Ok(())
-            }
-            OpCode::Eq => {
-                let count = self.get_u32()?;
-                let all = self.stack.split_off(self.stack.len() - count as usize);
-                let start = all.first().expect("expected value on stack for Eq").clone();
-                let mut result = false;
-                for value in all.iter() {
-                    result = value == &start;
-                }
-                self.stack.push(Value::Bool(result));
-                Ok(())
-            }
-            OpCode::PushBool => {
-                let value = self.get_u8()?;
-                self.stack.push(Value::Bool(value != 0));
-                Ok(())
-            }
-            OpCode::PushU8 => {
-                let value = self.get_u8()?;
-                self.stack.push(Value::U8(value));
-                Ok(())
-            }
-            OpCode::PushF64 => {
-                let value = self.get_f64()?;
-                self.stack.push(Value::F64(value));
-                Ok(())
-            }
-            OpCode::PushString => {
-                let value = self.get_string()?;
-                self.stack.push(Value::String(value));
-                Ok(())
-            }
-            OpCode::Call => {
-                let address = self.get_u32()? as usize;
-                self.stack.push(Value::U32(self.ip as u32));
-                self.ip = address;
-                Ok(())
-            }
-
-            OpCode::LoadLocalVar => {
-                // NOTE: I dont think this LocalVar(index) is used
-                let _ = self.get_u32()? as usize;
-                let Some(value) = self.stack.pop() else {
-                    panic!("expected value on stack for LoadLocalVar")
-                };
-                self.local_var.push(value);
-                Ok(())
-            }
-            OpCode::LoadGlobalVar => {
-                let Some(value) = self.stack.pop() else {
-                    panic!("expected value on stack for LoadGlobalVar")
-                };
-                self.global_var.push(value);
-                Ok(())
-            }
-            OpCode::GetLocalVar => {
-                let index = self.get_u32()? as usize;
-                let Some(value) = self.local_var.get(index) else {
-                    panic!("expected value on stack for GetLocalVar")
-                };
-                self.stack.push(value.clone());
-                Ok(())
-            }
-            OpCode::GetGlobalVar => {
-                let index = self.get_u32()? as usize;
-                let Some(value) = self.global_var.get(index) else {
-                    panic!("expected value on stack for GetGlobalVar")
-                };
-                self.stack.push(value.clone());
-                Ok(())
-            }
-            OpCode::Rot => {
-                let Some(right) = self.stack.pop() else {
-                    panic!("expected value on stack for rot")
-                };
-                let Some(left) = self.stack.pop() else {
-                    panic!("expected value on stack for rot")
-                };
-                self.stack.push(right);
-                self.stack.push(left);
-                Ok(())
-            }
-            OpCode::Return => {
-                let Some(Value::U32(address)) = self.stack.pop() else {
-                    panic!("expected value on stack for return")
-                };
-                self.ip = address as usize;
-                self.local_var.clear();
-                Ok(())
-            }
-            OpCode::BuiltIn => self.builtins(),
-            OpCode::LoadTest => {
-                let name = self.get_string()?;
-                let address = self.get_u32()? as usize;
-                self.stack.push(Value::U32(self.ip as u32));
-                self.stack.push(Value::String(name));
-                self.ip = address;
-                Ok(())
-            }
-            OpCode::JumpIfFalse => {
-                let jump_offset = self.get_u32()? as usize;
-                if self.stack.pop() == Some(Value::Bool(false)) {
-                    self.ip += jump_offset;
-                }
-                Ok(())
-            }
-            OpCode::JumpForward => {
-                let jump_offset = self.get_u32()? as usize;
-                self.ip += jump_offset;
-                Ok(())
-            }
-            OpCode::LoadLambda => {
-                let count = self.get_u32()? as usize;
-                self.stack.push(Value::Lambda(self.ip as u32));
-                self.ip += count;
-                Ok(())
-            }
-            OpCode::CallLambda => {
-                let count = self.get_u32()? as usize;
-                self.bring_to_top_of_stack(count + 1);
-                let Some(Value::Lambda(address)) = self.stack.pop() else {
-                    panic!("expected value on stack for CallLambda")
-                };
-                self.stack.push(Value::U32(self.ip as u32));
-                self.ip = address as usize;
-                Ok(())
-            }
-            op => unimplemented!("opcode: {:?}\n{:02X}\n{:#?}", op, self.ip, self.stack),
-        }
-    }
-
-    fn bring_to_top_of_stack(&mut self, count: usize) {
-        let length = self.stack.len();
-        self.stack[length - count..].rotate_left(count);
-    }
-
     fn debug(&self) {
-        eprintln!(
-            "ip: {0}{1:02X} {1}, {2:02X} {2}{3}",
-            GREEN,
-            self.ip,
-            self.ip.saturating_sub(Header::SIZE as usize),
-            RESET
-        );
-        let instructions = match decompile(&self.program) {
-            Ok((_, instructions)) => instructions,
-            Err((e, instructions)) => {
-                eprintln!("{}", e);
-                instructions
-            }
-        };
-        let mut program_counter = Header::SIZE as usize;
-        for i in instructions {
-            let selected = if self.ip == program_counter {
-                format!("{GREEN}{:02X} ", program_counter - Header::SIZE as usize)
-            } else if (program_counter..program_counter + i.size() as usize).contains(&self.ip) {
-                format!("{RED}{:02X} ", program_counter - Header::SIZE as usize)
+        for (i, int) in self.program.iter().enumerate() {
+            let selected = if self.ip == i {
+                format!("{GREEN}{UNDERLINE}0x{i:02X} {i:>2} ")
             } else {
-                format!("{:02X} ", program_counter - Header::SIZE as usize)
+                format!("0x{i:02X} {i:>2} ")
             };
-            let breakpoint = if self.breakpoints.contains(&program_counter) {
+            let breakpoint = if self.breakpoints.contains(&i) {
                 "🔴".to_string()
             } else {
                 "  ".to_string()
             };
-            eprintln!("{breakpoint}{selected}{i}{RESET}");
-            program_counter += i.size() as usize;
+            eprintln!("{breakpoint}{selected} {int:?}{RESET}");
         }
-    }
-
-    pub fn run(&mut self) -> Result<()> {
-        if self.decompile {
-            self.debug();
-        }
-        while self.is_running && self.ip < self.program.len() {
-            self.run_once()?;
-        }
-        Ok(())
     }
 
     fn shutdown(&mut self) {
         self.is_running = false;
     }
-
-    fn get_op_code(&mut self) -> Result<OpCode> {
-        let byte = self.program[self.ip];
-        let op = OpCode::try_from(byte).map_err(|e| anyhow::anyhow!(e))?;
-        self.ip += 1;
-        Ok(op)
-    }
-
-    fn get_u8(&mut self) -> Result<u8> {
-        let byte = self.program[self.ip];
-        self.ip += 1;
-        Ok(byte)
-    }
-
-    fn get_u16(&mut self) -> Result<u16> {
-        let byte2 = self.get_u8()? as u16;
-        let byte1 = self.get_u8()? as u16;
-        Ok(byte1 << 8 | byte2)
-    }
-
-    fn get_u32(&mut self) -> Result<u32> {
-        let byte4 = self.get_u8()? as u32;
-        let byte3 = self.get_u8()? as u32;
-        let byte2 = self.get_u8()? as u32;
-        let byte1 = self.get_u8()? as u32;
-        Ok(byte1 << 24 | byte2 << 16 | byte3 << 8 | byte4)
-    }
-
-    fn get_u64(&mut self) -> Result<u64> {
-        let byte8 = self.get_u8()? as u64;
-        let byte7 = self.get_u8()? as u64;
-        let byte6 = self.get_u8()? as u64;
-        let byte5 = self.get_u8()? as u64;
-        let byte4 = self.get_u8()? as u64;
-        let byte3 = self.get_u8()? as u64;
-        let byte2 = self.get_u8()? as u64;
-        let byte1 = self.get_u8()? as u64;
-        Ok(byte1 << 56
-            | byte2 << 48
-            | byte3 << 40
-            | byte4 << 32
-            | byte5 << 24
-            | byte6 << 16
-            | byte7 << 8
-            | byte8)
-    }
-
-    fn get_f64(&mut self) -> Result<f64> {
-        let byte1 = self.get_u8()? as u64;
-        let byte2 = self.get_u8()? as u64;
-        let byte3 = self.get_u8()? as u64;
-        let byte4 = self.get_u8()? as u64;
-        let byte5 = self.get_u8()? as u64;
-        let byte6 = self.get_u8()? as u64;
-        let byte7 = self.get_u8()? as u64;
-        let byte8 = self.get_u8()? as u64;
-        Ok(f64::from_le_bytes([
-            byte1 as u8,
-            byte2 as u8,
-            byte3 as u8,
-            byte4 as u8,
-            byte5 as u8,
-            byte6 as u8,
-            byte7 as u8,
-            byte8 as u8,
-        ]))
-    }
-
-    fn get_string(&mut self) -> Result<String> {
-        let len = self.get_u32()? as usize;
-        let bytes = self.program[self.ip..self.ip + len].to_vec();
-        self.ip += len;
-        Ok(String::from_utf8(bytes)?)
-    }
-
-    fn builtins(&mut self) -> Result<()> {
-        let count = self.get_u32()?;
-        let name = self.get_string()?;
-        match name.as_str() {
-            "print" => builtin::nlvm_print(self, count)?,
-            "nth" => builtin::nth(self, count)?,
-            "length" => builtin::length(self, count)?,
-            "assert-eq" => builtin::nlvm_assert_eq(self, count)?,
-            "list" => builtin::list(self, count)?,
-            "cons" => builtin::cons(self, count)?,
-            "car" => builtin::car(self, count)?,
-            _ => unimplemented!("{}", name),
-        }
-        Ok(())
-    }
-}
-
-impl Machine {
-    pub fn push(&mut self, value: Value) {
-        self.stack.push(value);
-    }
-
-    pub fn pop(&mut self) -> Option<Value> {
-        self.stack.pop()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    fn create_test_program(bytes: &[u8]) -> Vec<u8> {
-        let header = Header::default();
-        let mut program = header.to_bytecode();
-        program.extend(bytes.to_vec());
-        program
-    }
-
-    #[test]
-    fn test_opcode() {
-        assert_eq!(OpCode::try_from(0), Ok(OpCode::Noop));
-        assert_eq!(OpCode::try_from(1), Ok(OpCode::Halt));
-    }
-
-    #[test]
-    fn test_machine_get_op_code() -> Result<()> {
-        let mut machine = Machine::new(create_test_program(&[0, 1]), false);
-        assert_eq!(machine.get_op_code()?, OpCode::Noop);
-        assert_eq!(machine.get_op_code()?, OpCode::Halt);
-        Ok(())
-    }
-
-    // #[test]
-    // fn test_get_u16() -> Result<()> {
-    //     eprintln!("F64: {:?}", 10.0f64.to_le_bytes());
-    //     let number: u16 = 0x0102;
-    //     let bytes = number.to_le_bytes();
-    //     let mut h = Header::new();
-    //     let mut program = h.to_bytecode();
-    //     program.extend(bytes.to_vec());
-    //     let mut machine = Machine::new(program);
-    //     let bytes_u16 = machine.get_u16()?;
-    //     eprintln!("{:02X}", bytes_u16);
-    //     assert_eq!(bytes_u16, 0x0102);
-    //     Ok(())
-    // }
 }
