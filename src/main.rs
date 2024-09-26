@@ -12,7 +12,7 @@ mod symbol_table;
 mod tests;
 mod vm;
 
-const OPERATORS: &[&str] = &["+", "-", "="];
+const OPERATORS: &[&str] = &["+", "-", "=", "or"];
 const BUILTINS: &[&str] = &["print", "nth", "length", "assert-eq", "list", "cons", "car"];
 const KEYWORDS: &[&str] = &["var", "let", "fn", "if", "lambda"];
 
@@ -49,7 +49,10 @@ fn main() -> anyhow::Result<()> {
     for i in args.breakpoints {
         machine.add_breakpoint(i);
     }
+    let new = std::time::Instant::now();
     machine.run();
+
+    eprintln!("ran in {}ms", new.elapsed().as_millis() / 100);
 
     Ok(())
 }

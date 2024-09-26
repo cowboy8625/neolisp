@@ -10,6 +10,7 @@ pub enum Instruction {
     Add,
     Sub,
     Eq,
+    Or,
     Rot,
     Call(Callee, u8),
     LoadLocal,

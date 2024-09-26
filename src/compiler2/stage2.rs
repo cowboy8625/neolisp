@@ -56,6 +56,7 @@ fn into_instructions(
         Stage1Instruction::Add => Instruction::Add,
         Stage1Instruction::Sub => Instruction::Sub,
         Stage1Instruction::Eq => Instruction::Eq,
+        Stage1Instruction::Or => Instruction::Or,
         Stage1Instruction::Rot => Instruction::Rot,
         Stage1Instruction::Call(Stage1Callee::Function, count) => {
             Instruction::Call(Callee::Function, *count)

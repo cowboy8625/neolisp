@@ -261,7 +261,11 @@ impl SymbolWalker {
                     );
                 }
                 Some(symbol) => {}
-                None => self.errors.push(ErrorKind::Unimplemented(spanned.clone())),
+                None => {
+                    // eprintln!("Symbol not found: {}", name);
+                    // eprintln!("{:#?}", table);
+                    // self.errors.push(ErrorKind::Unimplemented(spanned.clone()));
+                }
             },
             Expr::List(elements) if starts_with(elements, "var") => {
                 self.walk_var(table, elements, &spanned.span);

@@ -31,6 +31,7 @@ pub enum Stage1Instruction {
     Add,
     Sub,
     Eq,
+    Or,
     Rot,
     Call(Stage1Callee, u8),
     LoadLocal,
@@ -270,6 +271,7 @@ impl Stage1Compiler {
             "+" => Stage1Instruction::Add,
             "-" => Stage1Instruction::Sub,
             "=" => Stage1Instruction::Eq,
+            "or" => Stage1Instruction::Or,
             _ => unreachable!("unknown operator: {}", operator),
         };
 

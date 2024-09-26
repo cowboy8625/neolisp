@@ -21,14 +21,6 @@
    (+ x y)) ; -> 444
 ```
 
-### -
-- returns the difference of the arguments
-- arguments type: `Number`
-- example:
-```lisp
-(- 20 10) ; -> 10
-```
-
 ### *
 - returns the product of the arguments
 - arguments type: `Number`
@@ -92,14 +84,6 @@
 ```lisp
 (print 10)
 ```
-### or
-- returns true if any of the arguments are true
-- arguments type: `Bool`
-- example:
-```lisp
-(print 10)
-```
-
 ### not
 - returns the opposite of the first argument
 - arguments type: `Bool`

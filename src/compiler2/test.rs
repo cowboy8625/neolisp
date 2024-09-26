@@ -330,9 +330,10 @@ fn test_main_if_else() {
         main.body,
         vec![
             Push(Stage1Value::Bool(true)),
-            JumpIfFalse(2),
+            JumpIf(3),
             Push(Stage1Value::String("then\n".to_string())),
             Call(Stage1Callee::Builtin("print".to_string()), 1),
+            Jump(2),
             Push(Stage1Value::String("else\n".to_string())),
             Call(Stage1Callee::Builtin("print".to_string()), 1),
             Halt,
