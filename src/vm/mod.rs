@@ -1,6 +1,9 @@
 mod builtin;
+mod decompile;
 mod instruction;
 mod machine;
+#[cfg(test)]
+mod test;
 mod value;
 pub use instruction::{Callee, Instruction};
 pub use machine::Machine;

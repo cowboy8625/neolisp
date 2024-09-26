@@ -11,6 +11,63 @@ pub enum Value {
     Callable(usize),
 }
 
+impl Value {
+    pub const CODE_U8: u8 = 0x00;
+    pub const CODE_I32: u8 = 0x01;
+    pub const CODE_U32: u8 = 0x02;
+    pub const CODE_F32: u8 = 0x03;
+    pub const CODE_F64: u8 = 0x04;
+    pub const CODE_STRING: u8 = 0x05;
+    pub const CODE_BOOL: u8 = 0x06;
+    pub const CODE_LIST: u8 = 0x07;
+    pub const CODE_CALLABLE: u8 = 0x08;
+
+    pub fn to_bytecode(&self) -> Vec<u8> {
+        match self {
+            Value::U8(v) => vec![Self::CODE_U8, *v],
+            Value::I32(v) => {
+                let mut bytes = vec![Self::CODE_I32];
+                bytes.extend_from_slice(&v.to_le_bytes());
+                bytes
+            }
+            Value::U32(v) => {
+                let mut bytes = vec![Self::CODE_U32];
+                bytes.extend_from_slice(&v.to_le_bytes());
+                bytes
+            }
+            Value::F32(v) => {
+                let mut bytes = vec![Self::CODE_F32];
+                bytes.extend_from_slice(&v.to_le_bytes());
+                bytes
+            }
+            Value::F64(v) => {
+                let mut bytes = vec![Self::CODE_F64];
+                bytes.extend_from_slice(&v.to_le_bytes());
+                bytes
+            }
+            Value::String(v) => {
+                let mut bytes = vec![Self::CODE_STRING, v.len() as u8];
+                bytes.extend_from_slice(&v.as_bytes());
+                bytes
+            }
+            Value::Bool(v) => vec![Self::CODE_BOOL, if *v { 1 } else { 0 }],
+            Value::List(vec) => {
+                let mut bytes = vec![Self::CODE_LIST];
+                bytes.extend_from_slice(&(vec.len() as u32).to_le_bytes());
+                for v in vec {
+                    bytes.extend(v.to_bytecode());
+                }
+                bytes
+            }
+            Value::Callable(v) => {
+                let mut bytes = vec![Self::CODE_CALLABLE];
+                bytes.extend_from_slice(&(*v as u32).to_le_bytes());
+                bytes
+            }
+        }
+    }
+}
+
 impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
