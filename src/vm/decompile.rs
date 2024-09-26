@@ -16,20 +16,24 @@ pub fn decompile(bytes: &[u8]) -> Vec<Instruction> {
 fn get_instructions(bytes: &[u8], ip: &mut usize) -> Result<Instruction, String> {
     match bytes[*ip] {
         Instruction::START_AT => {
+            debug_assert!(bytes[*ip..].len() >= 5);
             *ip += 1;
             let address = u32::from_le_bytes(bytes[*ip..*ip + 4].try_into().unwrap());
             *ip += 4;
             Ok(Instruction::StartAt(address as usize))
         }
         Instruction::NOOP => {
+            debug_assert!(bytes[*ip..].len() >= 1);
             *ip += 1;
             Ok(Instruction::Noop)
         }
         Instruction::HALT => {
+            debug_assert!(bytes[*ip..].len() >= 1);
             *ip += 1;
             Ok(Instruction::Halt)
         }
         Instruction::RETURN => {
+            debug_assert!(bytes[*ip..].len() >= 1);
             *ip += 1;
             Ok(Instruction::Return)
         }
@@ -122,7 +126,7 @@ fn get_instructions(bytes: &[u8], ip: &mut usize) -> Result<Instruction, String>
 
 #[test]
 fn test_decompile_start_at() {
-    let bytes = vec![0x00, 0x01, 0x00, 0x00, 0x00];
+    let bytes = vec![Instruction::START_AT, 0x01, 0x00, 0x00, 0x00];
 
     let instructions = decompile(&bytes);
     assert_eq!(instructions, vec![Instruction::StartAt(1)]);
@@ -130,7 +134,7 @@ fn test_decompile_start_at() {
 
 #[test]
 fn test_decompile_noop() {
-    let bytes = vec![0x01];
+    let bytes = vec![Instruction::NOOP];
 
     let instructions = decompile(&bytes);
     assert_eq!(instructions, vec![Instruction::Noop]);
@@ -138,7 +142,7 @@ fn test_decompile_noop() {
 
 #[test]
 fn test_decompile_halt() {
-    let bytes = vec![0x02];
+    let bytes = vec![Instruction::HALT];
 
     let instructions = decompile(&bytes);
     assert_eq!(instructions, vec![Instruction::Halt]);
@@ -146,7 +150,7 @@ fn test_decompile_halt() {
 
 #[test]
 fn test_decompile_return() {
-    let bytes = vec![0x03];
+    let bytes = vec![Instruction::RETURN];
 
     let instructions = decompile(&bytes);
     assert_eq!(instructions, vec![Instruction::Return]);
@@ -154,7 +158,7 @@ fn test_decompile_return() {
 
 #[test]
 fn test_decompile_push() {
-    let bytes = vec![0x04, 0x00, 0x04];
+    let bytes = vec![Instruction::PUSH, 0x00, 0x04];
 
     let instructions = decompile(&bytes);
     assert_eq!(instructions, vec![Instruction::Push(Value::U8(4))]);
