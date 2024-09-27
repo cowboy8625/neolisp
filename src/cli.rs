@@ -1,4 +1,4 @@
-use clap::{Parser, ValueEnum, ValueHint};
+use clap::{Parser, Subcommand, ValueEnum, ValueHint};
 #[cfg(windows)]
 const HISTORY_PATH: &str = "%TEMP%.history";
 #[cfg(unix)]
@@ -7,19 +7,32 @@ const HISTORY_PATH: &str = "/tmp/.history";
 #[derive(Debug, Parser)]
 #[command(about = "A fictional versioning CLI", long_about = None, color = clap::ColorChoice::Always)]
 pub struct Cli {
-    #[arg(short, long, default_value_t = EditMode::Vi)]
-    pub editor_mode: EditMode,
-    #[arg(short, long, default_value_t = false)]
-    pub repl: bool,
     #[arg(short='H', long, default_value_t = String::from(HISTORY_PATH))]
     pub history_path: String,
-    #[arg(short = 't', long, default_value_t = false)]
-    pub test: bool,
-    #[arg(short = 'd', long, default_value_t = false)]
-    pub decompile: bool,
-    #[arg(long, help = "IP address to break on", value_delimiter = ',', value_hint = ValueHint::Other)]
-    pub breakpoints: Vec<usize>,
-    pub files: Vec<String>,
+    #[arg(short, long, default_value_t = EditMode::Vi)]
+    pub editor_mode: EditMode,
+    #[command(subcommand)]
+    pub command: Commands,
+}
+#[derive(Debug, Subcommand)]
+pub enum Commands {
+    Build {
+        #[arg(short = 'd', long, default_value_t = false)]
+        decompile: bool,
+        file: Option<String>,
+    },
+    Run {
+        #[arg(short, long, default_value_t = false)]
+        repl: bool,
+        #[arg(long, help = "IP address to break on", value_delimiter = ',', value_hint = ValueHint::Other)]
+        breakpoints: Vec<usize>,
+        #[arg(short = 'd', long, default_value_t = false)]
+        decompile: bool,
+        file: Option<String>,
+    },
+    Test {
+        file: Option<String>,
+    },
 }
 
 #[derive(Debug, ValueEnum, Clone, Copy)]
