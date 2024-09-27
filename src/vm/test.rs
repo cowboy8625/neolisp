@@ -1,5 +1,5 @@
 use super::*;
-use crate::compiler2;
+use crate::compiler;
 use crate::parser::parser;
 use crate::symbol_table::SymbolWalker;
 use chumsky::prelude::Parser;
@@ -8,8 +8,8 @@ use pretty_assertions::assert_eq;
 fn compile(src: &str) -> anyhow::Result<Vec<Instruction>> {
     let ast = parser().parse(src).unwrap();
     let mut symbol_table = SymbolWalker::default().walk(&ast).unwrap();
-    let stage1_data = compiler2::Stage1Compiler::new(symbol_table.clone()).compiler(&ast);
-    let instructions = compiler2::compile_to_instructions(&mut symbol_table, &stage1_data);
+    let stage1_data = compiler::Stage1Compiler::new(symbol_table.clone()).compiler(&ast);
+    let instructions = compiler::compile_to_instructions(&mut symbol_table, &stage1_data);
     Ok(instructions)
 }
 

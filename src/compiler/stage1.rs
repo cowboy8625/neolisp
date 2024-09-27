@@ -219,9 +219,6 @@ impl Stage1Compiler {
                 }
             }
             Expr::List(_) => self.compile_list(chunk, spanned),
-            Expr::Builtin(_, _) => todo!(),
-            Expr::Func(_) => todo!(),
-            Expr::Lambda(_) => todo!(),
         }
     }
 
@@ -256,9 +253,6 @@ impl Stage1Compiler {
                 self.compile_list(chunk, first);
                 chunk.push(Stage1Instruction::Call(Stage1Callee::Function, count));
             }
-            Expr::Builtin(_, _) => todo!(),
-            Expr::Func(_) => todo!(),
-            Expr::Lambda(_) => todo!(),
         }
     }
 

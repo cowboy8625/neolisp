@@ -1,10 +1,8 @@
 mod ast;
-mod builtins;
 mod cli;
-mod compiler2;
-mod environment;
+mod compiler;
+mod docs;
 mod error;
-mod eval;
 mod parser;
 mod repl;
 mod symbol_table;
@@ -32,7 +30,7 @@ fn main() -> anyhow::Result<()> {
             file,
             ..
         } => run(file, breakpoints, decompile),
-        cli::Commands::Test { file } => todo!(),
+        cli::Commands::Test { file: _ } => todo!(),
     }
 }
 
@@ -43,7 +41,7 @@ fn build(file: Option<String>, decompile: bool) -> anyhow::Result<()> {
         panic!("failed to read file")
     };
     let now = std::time::Instant::now();
-    let program = compile(&src)?;
+    let program = compiler::compile(&src)?;
     eprintln!("Compiled in {}ms", now.elapsed().as_millis());
     eprintln!("Compiled to {} bytes", program.len());
 
@@ -86,20 +84,4 @@ fn display_instructions(program: &[u8]) {
         eprintln!("{offset:02X} {offset:>2}  {:?}", int);
         offset += int.size();
     }
-}
-
-fn compile(src: &str) -> anyhow::Result<Vec<u8>> {
-    use crate::parser::parser;
-    use crate::symbol_table::SymbolWalker;
-    use chumsky::prelude::Parser;
-
-    let ast = parser().parse(src).unwrap();
-    let mut symbol_table = SymbolWalker::default().walk(&ast).unwrap();
-    let stage1_data = compiler2::Stage1Compiler::new(symbol_table.clone()).compiler(&ast);
-    let instructions = compiler2::compile_to_instructions(&mut symbol_table, &stage1_data);
-    let mut program = Vec::new();
-    for i in instructions {
-        program.extend(i.to_bytecode());
-    }
-    Ok(program)
 }
