@@ -1,4 +1,5 @@
 use crate::cli::Cli;
+use crate::docs;
 use crate::vm::Machine;
 use rustyline::config::Configurer;
 use rustyline::highlight::MatchingBracketHighlighter;
@@ -63,6 +64,8 @@ pub fn run(args: Cli) -> Result<()> {
         println!("No previous history.");
     }
 
+    let help_docs = docs::load_doc();
+
     loop {
         let input = rl.readline("> ")?;
 
@@ -72,16 +75,29 @@ pub fn run(args: Cli) -> Result<()> {
         rl.add_history_entry(input.as_str())?;
 
         // Run command
-        match input.as_str() {
+        let command = input.split(' ').collect::<Vec<&str>>();
+        if command.is_empty() {
+            continue;
+        }
+        match command[0] {
             ":q" | ":e" | ":exit" | ":quit" => break,
             ":help" => println!("{HELP}"),
             ":clear" => rl.clear_screen()?,
+            ":help-doc" if command.len() == 2 => {
+                let name = command[1];
+                let Some(docs) = help_docs.get(name) else {
+                    println!("No docs for {name}");
+                    continue;
+                };
+
+                println!("{docs}");
+            }
             _ => (),
         }
 
         // Ignore commands
-        match input.as_str() {
-            ":help" | ":clear" | ":env" => continue,
+        match command[0] {
+            ":help-doc" | ":help" | ":clear" | ":env" => continue,
             _ => (),
         }
 
