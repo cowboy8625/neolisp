@@ -67,37 +67,62 @@ impl Instruction {
             Instruction::Call(callee, count) => {
                 let mut bytes = vec![Self::CALL];
                 bytes.extend_from_slice(&callee.to_bytecode());
-                bytes.extend_from_slice(&count.to_le_bytes());
+                bytes.push(*count as u8);
                 bytes
             }
             Instruction::LoadLocal => vec![Self::LOAD_LOCAL],
             Instruction::GetLocal(index) => {
                 let mut bytes = vec![Self::GET_LOCAL];
-                bytes.extend_from_slice(&index.to_le_bytes());
+                bytes.push(*index as u8);
+                // bytes.extend_from_slice(&index.to_le_bytes());
                 bytes
             }
             Instruction::LoadGlobal => vec![Self::LOAD_GLOBAL],
             Instruction::GetGlobal(index) => {
                 let mut bytes = vec![Self::GET_GLOBAL];
-                bytes.extend_from_slice(&index.to_le_bytes());
+                bytes.push(*index as u8);
+                // bytes.extend_from_slice(&index.to_le_bytes());
                 bytes
             }
             Instruction::LoadFree => vec![Self::LOAD_FREE],
             Instruction::GetFree(index) => {
                 let mut bytes = vec![Self::GET_FREE];
-                bytes.extend_from_slice(&index.to_le_bytes());
+                bytes.push(*index as u8);
+                // bytes.extend_from_slice(&index.to_le_bytes());
                 bytes
             }
             Instruction::JumpIf(address) => {
                 let mut bytes = vec![Self::JUMP_IF];
-                bytes.extend_from_slice(&address.to_le_bytes());
+                bytes.extend_from_slice(&(*address as u32).to_le_bytes());
                 bytes
             }
             Instruction::Jump(address) => {
                 let mut bytes = vec![Self::JUMP];
-                bytes.extend_from_slice(&address.to_le_bytes());
+                bytes.extend_from_slice(&(*address as u32).to_le_bytes());
                 bytes
             }
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        // NOTE: if anything changes here update to Stage1Instruction.size as well
+        match self {
+            Self::StartAt(_) => 5,
+            Self::Add
+            | Self::Sub
+            | Self::Eq
+            | Self::Or
+            | Self::Rot
+            | Self::Noop
+            | Self::Halt
+            | Self::LoadGlobal
+            | Self::LoadLocal
+            | Self::LoadFree
+            | Self::Return => 1,
+            Self::Push(value) => 1 + value.size(),
+            Self::Call(callee, _) => 1 + callee.size() + 1,
+            Self::GetLocal(_) | Self::GetGlobal(_) | Self::GetFree(_) => 2,
+            Self::JumpIf(_) | Self::Jump(_) => 5,
         }
     }
 }
@@ -119,5 +144,51 @@ impl Callee {
                 bytes
             }
         }
+    }
+
+    pub fn size(&self) -> usize {
+        match self {
+            Callee::Function => 1,
+            Callee::Builtin(name) => 1 + 1 + name.len(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn test_size_vs_bytes_len(i: Instruction) {
+        assert_eq!(i.size(), i.to_bytecode().len(), "{i:?}");
+    }
+
+    #[test]
+    fn test_junk() {
+        let i = vec![
+            Instruction::Push(Value::String("then\n".to_string())),
+            Instruction::Call(Callee::Builtin("print".to_string()), 1),
+            Instruction::Jump(19),
+        ];
+        let size = i.iter().map(|i| i.size()).sum::<usize>();
+        eprintln!("{}", size);
+        let bytes_len = i.iter().map(|i| i.to_bytecode().len()).sum::<usize>();
+        eprintln!("len: {}", bytes_len);
+
+        assert_eq!(
+            Instruction::Push(Value::String("then\n".to_string())).size(),
+            Instruction::Push(Value::String("then\n".to_string()))
+                .to_bytecode()
+                .len(),
+        );
+        test_size_vs_bytes_len(Instruction::StartAt(5));
+        test_size_vs_bytes_len(Instruction::Push(Value::Bool(false)));
+        test_size_vs_bytes_len(Instruction::LoadGlobal);
+        test_size_vs_bytes_len(Instruction::GetGlobal(0));
+        test_size_vs_bytes_len(Instruction::JumpIf(24));
+        test_size_vs_bytes_len(Instruction::Push(Value::String("then\n".to_string())));
+        test_size_vs_bytes_len(Instruction::Call(Callee::Builtin("print".to_string()), 1));
+        test_size_vs_bytes_len(Instruction::Jump(19));
+        test_size_vs_bytes_len(Instruction::Push(Value::String("else\n".to_string())));
+        test_size_vs_bytes_len(Instruction::Call(Callee::Builtin("print".to_string()), 1));
+        test_size_vs_bytes_len(Instruction::Halt);
     }
 }

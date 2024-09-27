@@ -1,4 +1,4 @@
-use super::{IState, Stage1Callee, Stage1Compiler, Stage1Instruction::*, Stage1Value};
+use super::{Chunk, IState, Stage1Callee, Stage1Compiler, Stage1Instruction::*, Stage1Value};
 use crate::parser::parser;
 use crate::symbol_table::SymbolWalker;
 use chumsky::prelude::Parser;
@@ -16,24 +16,24 @@ fn test_main_var() {
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
     assert_eq!(main.name, "main", "main function name");
-    assert_eq!(main.params, vec![], "main function params");
+    assert_eq!(main.params, Chunk::new(), "main function params");
     assert_eq!(
         main.prelude,
-        vec![
+        Chunk::from(vec![
             Push(Stage1Value::F64(1.0)),
             Push(Stage1Value::F64(2.0)),
             Add,
             LoadGlobal,
-        ],
+        ]),
         "main function prelude"
     );
     assert_eq!(
         main.body,
-        vec![
+        Chunk::from(vec![
             GetGlobal(IState::Set(0)),
             Call(Stage1Callee::Builtin("print".to_string()), 1),
             Halt,
-        ],
+        ]),
         "main function body"
     );
 }
@@ -51,26 +51,26 @@ fn test_main_var_lambda() {
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
     assert_eq!(main.name, "main", "main function name");
-    assert_eq!(main.params, vec![], "main function params");
+    assert_eq!(main.params, Chunk::new(), "main function params");
     assert_eq!(
         main.prelude,
         // This is the global variable being loaded
-        vec![
+        Chunk::from(vec![
             Push(Stage1Value::Callable(IState::Unset("lambda_0".to_string()))),
             LoadGlobal
-        ],
+        ]),
         "main function prelude"
     );
     assert_eq!(
         main.body,
-        vec![
+        Chunk::from(vec![
             Push(Stage1Value::F64(123.0)),
             Push(Stage1Value::F64(321.0)),
             GetGlobal(IState::Set(0)),
             Call(Stage1Callee::Function, 2),
             Call(Stage1Callee::Builtin("print".to_string()), 1),
             Halt,
-        ],
+        ]),
         "main function body"
     );
 
@@ -80,18 +80,18 @@ fn test_main_var_lambda() {
     assert_eq!(lambda.name, "lambda_0", "lambda name");
     assert_eq!(
         lambda.params,
-        vec![Rot, LoadLocal, Rot, LoadLocal,],
+        Chunk::from(vec![Rot, LoadLocal, Rot, LoadLocal]),
         "lambda params"
     );
     assert_eq!(
         lambda.body,
-        vec![
+        Chunk::from(vec![
             GetLocal(IState::Set(0)),
             GetLocal(IState::Set(1)),
             Add,
             Rot,
             Return
-        ],
+        ]),
         "lambda body"
     );
 }
@@ -109,19 +109,19 @@ fn test_main_var_lambda_curry() {
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
     assert_eq!(main.name, "main", "main function name");
-    assert_eq!(main.params, vec![], "main function params");
+    assert_eq!(main.params, Chunk::new(), "main function params");
     assert_eq!(
         main.prelude,
         // This is the global variable being loaded
-        vec![
+        Chunk::from(vec![
             Push(Stage1Value::Callable(IState::Unset("lambda_0".to_string()))),
             LoadGlobal
-        ],
+        ]),
         "main function prelude"
     );
     assert_eq!(
         main.body,
-        vec![
+        Chunk::from(vec![
             Push(Stage1Value::F64(321.0)),
             Push(Stage1Value::F64(123.0)),
             GetGlobal(IState::Set(0)),
@@ -129,7 +129,7 @@ fn test_main_var_lambda_curry() {
             Call(Stage1Callee::Function, 1),
             Call(Stage1Callee::Builtin("print".to_string()), 1),
             Halt,
-        ],
+        ]),
         "main function body"
     );
 
@@ -138,32 +138,40 @@ fn test_main_var_lambda_curry() {
     // Check that we have a lambda 1
     let lambda = &stage1_compiler.lambdas[1];
     assert_eq!(lambda.name, "lambda_0", "lambda_0 name");
-    assert_eq!(lambda.params, vec![Rot, LoadLocal], "lambda_0 params");
+    assert_eq!(
+        lambda.params,
+        Chunk::from(vec![Rot, LoadLocal]),
+        "lambda_0 params"
+    );
     assert_eq!(
         lambda.body,
-        vec![
+        Chunk::from(vec![
             GetLocal(IState::Unset("x".to_string())),
             LoadFree,
             Push(Stage1Value::Callable(IState::Unset("lambda_1".to_string()))),
             Rot,
             Return
-        ],
+        ]),
         "lambda_0 body"
     );
 
     // Check that we have a lambda 2
     let lambda = &stage1_compiler.lambdas[0];
     assert_eq!(lambda.name, "lambda_1", "lambda name");
-    assert_eq!(lambda.params, vec![Rot, LoadLocal], "lambda params");
+    assert_eq!(
+        lambda.params,
+        Chunk::from(vec![Rot, LoadLocal]),
+        "lambda params"
+    );
     assert_eq!(
         lambda.body,
-        vec![
+        Chunk::from(vec![
             GetFree(IState::Set(0)),
             GetLocal(IState::Set(0)),
             Add,
             Rot,
             Return
-        ],
+        ]),
         "lambda_1 body"
     );
 }
@@ -180,16 +188,16 @@ fn test_main_call_lambda() {
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
     assert_eq!(main.name, "main", "main function name");
-    assert_eq!(main.params, vec![], "main function params");
+    assert_eq!(main.params, Chunk::new(), "main function params");
     assert_eq!(
         main.prelude,
         // This is the global variable being loaded
-        vec![],
+        Chunk::new(),
         "main function prelude"
     );
     assert_eq!(
         main.body,
-        vec![
+        Chunk::from(vec![
             Push(Stage1Value::F64(123.0)),
             Push(Stage1Value::F64(321.0)),
             Push(Stage1Value::Callable(IState::Unset("lambda_0".to_string()))),
@@ -197,7 +205,7 @@ fn test_main_call_lambda() {
             Push(Stage1Value::String("\n".to_string())),
             Call(Stage1Callee::Builtin("print".to_string()), 2),
             Halt,
-        ],
+        ]),
         "main function body"
     );
 
@@ -208,18 +216,18 @@ fn test_main_call_lambda() {
     assert_eq!(lambda.name, "lambda_0", "lambda_0 name");
     assert_eq!(
         lambda.params,
-        vec![Rot, LoadLocal, Rot, LoadLocal],
+        Chunk::from(vec![Rot, LoadLocal, Rot, LoadLocal]),
         "lambda_0 params"
     );
     assert_eq!(
         lambda.body,
-        vec![
+        Chunk::from(vec![
             GetLocal(IState::Set(0)),
             GetLocal(IState::Set(1)),
             Add,
             Rot,
             Return
-        ],
+        ]),
         "lambda_0 body"
     );
 }
@@ -240,41 +248,41 @@ fn test_main_applying_lambda() {
     assert_eq!(apply.name, "apply", "apply function name");
     assert_eq!(
         apply.params,
-        vec![Rot, LoadLocal, Rot, LoadLocal],
+        Chunk::from(vec![Rot, LoadLocal, Rot, LoadLocal]),
         "apply function params"
     );
     assert_eq!(
         apply.prelude,
         // This is the global variable being loaded
-        vec![],
+        Chunk::new(),
         "apply function prelude"
     );
     assert_eq!(
         apply.body,
-        vec![
+        Chunk::from(vec![
             // FIXME: Swap ordering
             GetLocal(IState::Set(0)),
             GetLocal(IState::Set(1)),
             Call(Stage1Callee::Function, 1),
             Rot,
             Return
-        ],
+        ]),
         "apply function body"
     );
 
     // Checking function main
     let main = &stage1_compiler.functions[1];
     assert_eq!(main.name, "main", "main function name");
-    assert_eq!(main.params, vec![], "main function params");
+    assert_eq!(main.params, Chunk::new(), "main function params");
     assert_eq!(
         main.prelude,
         // This is the global variable being loaded
-        vec![],
+        Chunk::new(),
         "main function prelude"
     );
     assert_eq!(
         main.body,
-        vec![
+        Chunk::from(vec![
             Push(Stage1Value::Callable(IState::Unset("lambda_0".to_string()))),
             Push(Stage1Value::F64(123.0)),
             Push(Stage1Value::Callable(IState::Unset("apply".to_string()))),
@@ -282,7 +290,7 @@ fn test_main_applying_lambda() {
             Push(Stage1Value::String("\n".to_string())),
             Call(Stage1Callee::Builtin("print".to_string()), 2),
             Halt,
-        ],
+        ]),
         "main function body"
     );
 
@@ -291,16 +299,20 @@ fn test_main_applying_lambda() {
     // Check that we have a lambda 1
     let lambda = &stage1_compiler.lambdas[0];
     assert_eq!(lambda.name, "lambda_0", "lambda_0 name");
-    assert_eq!(lambda.params, vec![Rot, LoadLocal], "lambda_0 params");
+    assert_eq!(
+        lambda.params,
+        Chunk::from(vec![Rot, LoadLocal]),
+        "lambda_0 params"
+    );
     assert_eq!(
         lambda.body,
-        vec![
+        Chunk::from(vec![
             GetLocal(IState::Set(0)),
             Push(Stage1Value::F64(321.0)),
             Add,
             Rot,
             Return
-        ],
+        ]),
         "lambda_0 body"
     );
 }
@@ -319,16 +331,16 @@ fn test_main_if_else() {
     // Checking function main
     let main = &stage1_compiler.functions[0];
     assert_eq!(main.name, "main", "main function name");
-    assert_eq!(main.params, vec![], "main function params");
+    assert_eq!(main.params, Chunk::new(), "main function params");
     assert_eq!(
         main.prelude,
         // This is the global variable being loaded
-        vec![],
+        Chunk::new(),
         "main function prelude"
     );
     assert_eq!(
         main.body,
-        vec![
+        Chunk::from(vec![
             Push(Stage1Value::Bool(true)),
             JumpIf(3),
             Push(Stage1Value::String("then\n".to_string())),
@@ -337,7 +349,7 @@ fn test_main_if_else() {
             Push(Stage1Value::String("else\n".to_string())),
             Call(Stage1Callee::Builtin("print".to_string()), 1),
             Halt,
-        ],
+        ]),
         "main function body"
     );
 }

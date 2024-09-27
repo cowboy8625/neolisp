@@ -1,6 +1,7 @@
 use core::panic;
 
 use super::builtin;
+use super::decompile::{decompile, get_instruction};
 use super::instruction::{Callee, Instruction};
 use super::value::Value;
 
@@ -19,7 +20,7 @@ pub enum DebugMode {
 }
 
 pub struct Machine {
-    pub program: Vec<Instruction>,
+    pub program: Vec<u8>,
     pub ip: usize,
     pub is_running: bool,
     pub call_stack: usize,
@@ -32,7 +33,7 @@ pub struct Machine {
 }
 
 impl Machine {
-    pub fn new(program: Vec<Instruction>) -> Self {
+    pub fn new(program: Vec<u8>) -> Self {
         Self {
             program,
             ip: 0,
@@ -65,12 +66,12 @@ impl Machine {
             _ => (),
         }
 
-        let Some(instruction) = &self.program.get(self.ip) else {
+        let Some(instruction) = get_instruction(&self.program, &mut self.ip).ok() else {
             panic!("ip out of bounds")
         };
-        self.ip += 1;
+
         match instruction {
-            Instruction::StartAt(address) => self.ip = *address as usize,
+            Instruction::StartAt(address) => self.ip = address as usize,
             Instruction::Noop => {}
             Instruction::Halt => self.is_running = false,
             Instruction::Return => {
@@ -166,7 +167,7 @@ impl Machine {
             }
             Instruction::Call(callee, arg_count) => match callee.clone() {
                 Callee::Function => {
-                    let count = *arg_count as usize;
+                    let count = arg_count as usize;
                     let address = match self.stack.pop() {
                         Some(Value::Callable(address)) => address,
                         None => {
@@ -185,7 +186,7 @@ impl Machine {
                     self.ip = address;
                     self.bring_to_top_of_stack(count);
                 }
-                Callee::Builtin(name) => self.builtins(name.clone(), *arg_count),
+                Callee::Builtin(name) => self.builtins(name.clone(), arg_count),
             },
             Instruction::LoadLocal => {
                 let Some(value) = self.stack.pop() else {
@@ -195,7 +196,7 @@ impl Machine {
                 self.push_local(value);
             }
             Instruction::GetLocal(index) => {
-                let Some(value) = self.get_local(*index) else {
+                let Some(value) = self.get_local(index) else {
                     panic!("expected value on stack for GetLocal")
                 };
                 self.stack.push(value.clone());
@@ -208,7 +209,7 @@ impl Machine {
                 self.global_stack.push(value);
             }
             Instruction::GetGlobal(index) => {
-                let Some(value) = self.global_stack.get(*index) else {
+                let Some(value) = self.global_stack.get(index) else {
                     panic!("expected value on stack for GetGlobal")
                 };
                 self.stack.push(value.clone());
@@ -221,7 +222,7 @@ impl Machine {
                 self.free_stack.push(value);
             }
             Instruction::GetFree(index) => {
-                let Some(value) = self.free_stack.get(*index) else {
+                let Some(value) = self.free_stack.get(index) else {
                     panic!("expected value on stack for GetFree")
                 };
                 self.stack.push(value.clone());
@@ -231,11 +232,11 @@ impl Machine {
                     panic!("expected value on stack for JumpIf")
                 };
                 if value == Value::Bool(false) {
-                    self.ip += *address;
+                    self.ip += address;
                 }
             }
             Instruction::Jump(address) => {
-                self.ip += *address;
+                self.ip += address;
             }
         }
     }
@@ -305,6 +306,7 @@ impl Machine {
                 println!("c    continue");
                 println!("n    next");
                 println!("rot  rotate <count>");
+                println!("ip   shows ip address");
                 println!("q    quit");
             }
             "pfs" | "print-free-stack" => {
@@ -376,24 +378,28 @@ impl Machine {
                 }
                 println!("{:?}", self.stack);
             }
+            "ip" => println!("ip: 0x{:02X}, {0}", self.ip),
             "q" | "quit" => self.shutdown(),
             _ => println!("{RED}unknown command{RESET} {input}"),
         }
     }
 
     fn debug(&self) {
-        for (i, int) in self.program.iter().enumerate() {
-            let selected = if self.ip == i {
-                format!("{GREEN}{UNDERLINE}0x{i:02X} {i:>2} ")
+        let instructions = decompile(&self.program);
+        let mut offset = 0;
+        for int in instructions.iter() {
+            let selected = if self.ip == offset {
+                format!("{GREEN}{UNDERLINE}0x{offset:02X} {offset:>2} ")
             } else {
-                format!("0x{i:02X} {i:>2} ")
+                format!("0x{offset:02X} {offset:>2} ")
             };
-            let breakpoint = if self.breakpoints.contains(&i) {
+            let breakpoint = if self.breakpoints.contains(&offset) {
                 "🔴".to_string()
             } else {
                 "  ".to_string()
             };
             eprintln!("{breakpoint}{selected} {int:?}{RESET}");
+            offset += int.size();
         }
     }
 

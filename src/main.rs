@@ -38,26 +38,29 @@ fn main() -> anyhow::Result<()> {
     let program = compile(&src)?;
 
     if args.decompile {
-        for (i, int) in program.iter().enumerate() {
-            eprintln!("{i:02X} {i:>2}  {:?}", int);
+        let instructions = vm::decompile(&program);
+        let mut offset = 0;
+        for int in instructions.iter() {
+            eprintln!("{offset:02X} {offset:>2}  {:?}", int);
+            offset += int.size();
         }
         return Ok(());
     }
-    eprintln!("compiled to {} instructions", program.len());
+    eprintln!("compiled to {} bytes", program.len());
     eprintln!("running...");
     let mut machine = vm::Machine::new(program);
     for i in args.breakpoints {
         machine.add_breakpoint(i);
     }
-    let new = std::time::Instant::now();
+    // let new = std::time::Instant::now();
     machine.run();
 
-    eprintln!("ran in {}ms", new.elapsed().as_millis() / 100);
+    // eprintln!("ran in {}ms", new.elapsed().as_millis() / 100);
 
     Ok(())
 }
 
-fn compile(src: &str) -> anyhow::Result<Vec<vm::Instruction>> {
+fn compile(src: &str) -> anyhow::Result<Vec<u8>> {
     use crate::parser::parser;
     use crate::symbol_table::SymbolWalker;
     use chumsky::prelude::Parser;
@@ -66,5 +69,9 @@ fn compile(src: &str) -> anyhow::Result<Vec<vm::Instruction>> {
     let mut symbol_table = SymbolWalker::default().walk(&ast).unwrap();
     let stage1_data = compiler2::Stage1Compiler::new(symbol_table.clone()).compiler(&ast);
     let instructions = compiler2::compile_to_instructions(&mut symbol_table, &stage1_data);
-    Ok(instructions)
+    let mut program = Vec::new();
+    for i in instructions {
+        program.extend(i.to_bytecode());
+    }
+    Ok(program)
 }
