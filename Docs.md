@@ -165,7 +165,7 @@
 - argument type: `Any`
 - example:
 ```lisp
-(typeof 10) ; -> Number
+(typeof 10) ; -> f32
 ```
 
 ### help
