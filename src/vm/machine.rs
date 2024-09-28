@@ -432,6 +432,7 @@ impl Machine {
 
     fn builtins(&mut self, name: String, arg_count: u8) {
         match name.as_str() {
+            "filter" => builtin::nlvm_filter(self, arg_count).unwrap(),
             "fold-right" => builtin::nlvm_fold_right(self, arg_count).unwrap(),
             "fold" => builtin::nlvm_fold(self, arg_count).unwrap(),
             "map" => builtin::nlvm_map(self, arg_count).unwrap(),

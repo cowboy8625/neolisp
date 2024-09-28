@@ -11,27 +11,6 @@
    (+ x y)) ; -> 444
 ```
 
-### fold-right
-- **NOT IMPLEMENTED**
-- returns the result of applying a function to each element of a list in reverse order
-- arguments
-   1. `Function`
-   2. `List`
-- example:
-```lisp
-(fold-right + (list 1 2 3)) ; -> 6
-```
-
-### filter
-- returns a list with elements that satisfy a function
-- arguments
-   1. `Function`
-   2. `List`
-- example:
-```lisp
-(filter (lambda (x) (> x 1)) (list 1 2 3)) ; -> (2 3)
-```
-
 ### loop
 - returns the result of last iteration
 - arguments

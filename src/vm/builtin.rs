@@ -3,6 +3,29 @@ use super::Value;
 use anyhow::Result;
 use std::io::Write;
 
+pub fn nlvm_filter(machine: &mut Machine, count: u8) -> Result<()> {
+    // (filter (lambda (x) (> x 1)) (list 1 2 3)) ; -> (2 3)
+    if count != 2 {
+        anyhow::bail!("filter only support 2 args");
+    }
+    let Some(Value::List(mut list)) = machine.stack.pop() else {
+        anyhow::bail!("expected list on stack for filter")
+    };
+    let Some(Value::Callable(address)) = machine.stack.pop() else {
+        anyhow::bail!("expected lambda on stack for filter")
+    };
+    let mut result = Vec::new();
+    for value in list.drain(..) {
+        machine.stack.push(value.clone());
+        machine.call(address, 1);
+        let Some(Value::Bool(true)) = machine.stack.pop() else {
+            continue;
+        };
+        result.push(value);
+    }
+    machine.stack.push(Value::List(result));
+    Ok(())
+}
 pub fn nlvm_fold_right(machine: &mut Machine, count: u8) -> Result<()> {
     // (fold-right 0 (lambda (x y) (+ x y)) (list 1 2 3)) => 6
     if count != 3 {
