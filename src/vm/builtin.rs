@@ -3,6 +3,30 @@ use super::Value;
 use anyhow::Result;
 use std::io::Write;
 
+pub fn nlvm_map(machine: &mut Machine, count: u8) -> Result<()> {
+    // (map (lambda (x) (+ x 1)) (list 1 2 3)) => (2 3 4)
+    if count != 2 {
+        anyhow::bail!("map only support 2 args");
+    }
+
+    let Some(Value::List(mut list)) = machine.stack.pop() else {
+        anyhow::bail!("expected list on stack for map")
+    };
+
+    let Some(Value::Callable(address)) = machine.stack.pop() else {
+        anyhow::bail!("expected lambda on stack for map")
+    };
+    let mut result = Vec::new();
+    for value in list.drain(..) {
+        machine.stack.push(value);
+        machine.call(address, 1);
+        result.push(machine.stack.pop().unwrap());
+    }
+
+    machine.stack.push(Value::List(result));
+    Ok(())
+}
+
 pub fn nlvm_nth(machine: &mut Machine, count: u8) -> Result<()> {
     // (nth (list 1 2 3) 1) => 2
     if count != 2 {

@@ -390,6 +390,22 @@ impl Machine {
             self.run_once();
         }
     }
+
+    pub fn call(&mut self, address: usize, arg_count: usize) {
+        self.new_local_stack();
+        self.stack.push(Value::U32(self.ip as u32));
+        self.ip = address;
+        self.bring_to_top_of_stack(arg_count);
+        loop {
+            let mut ip = self.ip;
+            let Some(Instruction::Return) = get_instruction(&self.program, &mut ip).ok() else {
+                self.run_once();
+                continue;
+            };
+            self.run_once();
+            break;
+        }
+    }
 }
 
 impl Machine {
@@ -416,6 +432,7 @@ impl Machine {
 
     fn builtins(&mut self, name: String, arg_count: u8) {
         match name.as_str() {
+            "map" => builtin::nlvm_map(self, arg_count).unwrap(),
             "nth" => builtin::nlvm_nth(self, arg_count).unwrap(),
             "reverse" => builtin::nlvm_reverse(self, arg_count).unwrap(),
             "append" => builtin::nlvm_append(self, arg_count).unwrap(),
