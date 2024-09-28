@@ -58,22 +58,6 @@
 (typeof 10) ; -> Number
 ```
 
-### help
-- **Currently Help does not work on all built-in functions**
-- returns this message as a `String`
-- argument type: `Function`
-- example:
-```lisp
-(help +)
-; - returns a sum of the arguments
-; - arguments type: `Number`
-; - example:
-; ```lisp
-; (+ 10 20) ; -> 30
-; -------
-; prints the help message of the function
-```
-
 ### cdr
 - returns a list or string without the first element
 - argument
