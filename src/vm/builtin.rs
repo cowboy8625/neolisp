@@ -3,9 +3,37 @@ use super::Value;
 use anyhow::Result;
 use std::io::Write;
 
-pub fn nlvm_typeof(machine: &mut Machine, count: u8) -> Result<()> {
+pub fn nlvm_cdr(machine: &mut Machine, count: u8) -> Result<()> {
+    // (cdr (list 1 2)) => (2)
     if count != 1 {
-        anyhow::bail!("nth only support 1 args");
+        anyhow::bail!("cdr only support 1 args");
+    }
+
+    let Some(value) = machine.stack.pop() else {
+        panic!("expected value on stack for cdr")
+    };
+    match &value {
+        Value::List(list) if list.is_empty() => {
+            machine.stack.push(Value::List(vec![]));
+        }
+        Value::List(list) => {
+            machine.stack.push(Value::List(list[1..].to_vec()));
+        }
+        _ => anyhow::bail!("expected list on stack for cdr"),
+    }
+
+    if let Value::List(list) = value {
+        if let Some(Value::List(list)) = list.last() {
+            machine.stack.push(list[0].clone());
+        }
+    }
+    Ok(())
+}
+
+pub fn nlvm_typeof(machine: &mut Machine, count: u8) -> Result<()> {
+    // (typeof 1) => "Number"
+    if count != 1 {
+        anyhow::bail!("typeof only support 1 args");
     }
     let Some(value) = machine.stack.pop() else {
         panic!("expected value on stack for typeof")

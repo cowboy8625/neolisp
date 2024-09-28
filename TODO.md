@@ -11,24 +11,6 @@
    (+ x y)) ; -> 444
 ```
 
-### typeof
-- returns the type of the first argument
-- argument type: `Any`
-- example:
-```lisp
-(typeof 10) ; -> Number
-```
-
-### cdr
-- returns a list or string without the first element
-- argument
-   1. List
-- example:
-```lisp
-(cdr (list 1 2 3)) ; -> (2 3)
-(cdr "hello") ; -> "ello"
-```
-
 ### last
 - returns a last element in list
 - argument
