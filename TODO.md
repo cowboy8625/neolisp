@@ -11,36 +11,6 @@
    (+ x y)) ; -> 444
 ```
 
-### map
-- returns a list with the result of applying a function to each element of a list
-- arguments
-   1. `Function`
-   2. `List`
-- example:
-```lisp
-; map takes a lambda
-(map (lambda (x) (+ x 1)) (list 1 2 3)) ; -> (2 3 4)
-
-; or
-
-(fn addone (x) (+ x 1))
-(map addone (list 1 2 3)) ; -> (2 3 4)
-```
-
-### fold
-- returns the result of applying a function to each element of a list
-- arguments
-   1. `T` starting value
-   2. `Function` `(lambda (x y) ...)`
-   3. `List`
-- example:
-```lisp
-(fold 0 + (list 1 2 3)) ; -> 6
-
-(fn add (x y) (+ x y))
-(fold 0 add (list 1 2 3)) ; -> 6
-```
-
 ### fold-right
 - **NOT IMPLEMENTED**
 - returns the result of applying a function to each element of a list in reverse order

@@ -432,6 +432,7 @@ impl Machine {
 
     fn builtins(&mut self, name: String, arg_count: u8) {
         match name.as_str() {
+            "fold" => builtin::nlvm_fold(self, arg_count).unwrap(),
             "map" => builtin::nlvm_map(self, arg_count).unwrap(),
             "nth" => builtin::nlvm_nth(self, arg_count).unwrap(),
             "reverse" => builtin::nlvm_reverse(self, arg_count).unwrap(),

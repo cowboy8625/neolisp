@@ -3,6 +3,31 @@ use super::Value;
 use anyhow::Result;
 use std::io::Write;
 
+pub fn nlvm_fold(machine: &mut Machine, count: u8) -> Result<()> {
+    // (fold 0 (lambda (x y) (+ x y)) (list 1 2 3)) => 6
+    if count != 3 {
+        anyhow::bail!("fold only support 3 args");
+    }
+    let Some(Value::List(mut list)) = machine.stack.pop() else {
+        anyhow::bail!("expected list on stack for fold")
+    };
+    let Some(Value::Callable(address)) = machine.stack.pop() else {
+        anyhow::bail!("expected lambda on stack for fold")
+    };
+    let Some(initial) = machine.stack.pop() else {
+        anyhow::bail!("expected number on stack for fold")
+    };
+    let mut result = initial;
+    for value in list.drain(..) {
+        machine.stack.push(result);
+        machine.stack.push(value);
+        machine.call(address, 2);
+        result = machine.stack.pop().unwrap();
+    }
+    machine.stack.push(result);
+    Ok(())
+}
+
 pub fn nlvm_map(machine: &mut Machine, count: u8) -> Result<()> {
     // (map (lambda (x) (+ x 1)) (list 1 2 3)) => (2 3 4)
     if count != 2 {
