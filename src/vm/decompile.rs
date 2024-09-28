@@ -47,6 +47,7 @@ pub fn get_instruction(bytes: &[u8], ip: &mut usize) -> Result<Instruction, Stri
         OpCode::Div => Ok(Instruction::Div),
         OpCode::Eq => Ok(Instruction::Eq),
         OpCode::GreaterThan => Ok(Instruction::GreaterThan),
+        OpCode::LessThan => Ok(Instruction::LessThan),
         OpCode::Or => Ok(Instruction::Or),
         OpCode::Mod => Ok(Instruction::Mod),
         OpCode::Rot => Ok(Instruction::Rot),
