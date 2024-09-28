@@ -5,7 +5,7 @@ NeoLisp is a simple Lisp-inspired programming language designed for ease of use 
 ## Features
 
 - **Simple Syntax**: NeoLisp follows a simple syntax inspired by Lisp, making it easy to learn and use.
-- **Functional Programming**: Embrace functional programming paradigms with first-class functions, closures, and immutability.
+- **Functional Programming**: Embrace functional programming paradigms with first-class functions and closures.
 - **Extensibility**: NeoLisp is designed to be easily extensible, allowing users to define their own functions.
 
 ## Getting Started
@@ -23,7 +23,7 @@ To get started with NeoLisp, follow these steps:
 1. **Run Examples**: Explore the examples provided in the `samples/` directory to understand NeoLisp's syntax and features.
 
    ```bash
-   cargo run --release -- samples/hello_world.nl
+   cargo run --release -- run samples/hello_world.nl
    ```
 1. ***Docs***: View the [documentation](Docs.md) for NeoLisp more in-depth info.
 
@@ -63,13 +63,13 @@ To install NeoLisp, simply run `cargo install --path .` from your terminal while
 To use NeoLisp, simply run the compiled binary with a NeoLisp script file as an argument.
 
 ```bash
-neolisp my_script.nl
+neolisp run my_script.nl
 ```
 
 You can also enter the NeoLisp REPL (Read-Eval-Print Loop) by running the binary with the `-r` flag.
 
 ```bash
-neolisp -r
+neolisp run -r
 ```
 
 ## Contributing
