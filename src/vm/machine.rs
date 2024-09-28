@@ -432,6 +432,7 @@ impl Machine {
 
     fn builtins(&mut self, name: String, arg_count: u8) {
         match name.as_str() {
+            "fold-right" => builtin::nlvm_fold_right(self, arg_count).unwrap(),
             "fold" => builtin::nlvm_fold(self, arg_count).unwrap(),
             "map" => builtin::nlvm_map(self, arg_count).unwrap(),
             "nth" => builtin::nlvm_nth(self, arg_count).unwrap(),
@@ -441,7 +442,6 @@ impl Machine {
             "cdr" => builtin::nlvm_cdr(self, arg_count).unwrap(),
             "typeof" => builtin::nlvm_typeof(self, arg_count).unwrap(),
             "print" => builtin::nlvm_print(self, arg_count).unwrap(),
-            "nth" => builtin::nth(self, arg_count).unwrap(),
             "length" => builtin::length(self, arg_count).unwrap(),
             "assert-eq" => builtin::nlvm_assert_eq(self, arg_count).unwrap(),
             "list" => builtin::list(self, arg_count).unwrap(),

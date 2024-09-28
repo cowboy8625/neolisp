@@ -3,6 +3,31 @@ use super::Value;
 use anyhow::Result;
 use std::io::Write;
 
+pub fn nlvm_fold_right(machine: &mut Machine, count: u8) -> Result<()> {
+    // (fold-right 0 (lambda (x y) (+ x y)) (list 1 2 3)) => 6
+    if count != 3 {
+        anyhow::bail!("fold only support 3 args");
+    }
+    let Some(Value::List(mut list)) = machine.stack.pop() else {
+        anyhow::bail!("expected list on stack for fold")
+    };
+    let Some(Value::Callable(address)) = machine.stack.pop() else {
+        anyhow::bail!("expected lambda on stack for fold")
+    };
+    let Some(initial) = machine.stack.pop() else {
+        anyhow::bail!("expected number on stack for fold")
+    };
+    let mut result = initial;
+    for value in list.drain(..).rev() {
+        machine.stack.push(result);
+        machine.stack.push(value);
+        machine.call(address, 2);
+        result = machine.stack.pop().unwrap();
+    }
+    machine.stack.push(result);
+    Ok(())
+}
+
 pub fn nlvm_fold(machine: &mut Machine, count: u8) -> Result<()> {
     // (fold 0 (lambda (x y) (+ x y)) (list 1 2 3)) => 6
     if count != 3 {
@@ -188,28 +213,6 @@ pub fn nlvm_print(machine: &mut Machine, count: u8) -> Result<()> {
         machine.stack.push(items);
     }
 
-    Ok(())
-}
-
-pub fn nth(machine: &mut Machine, count: u8) -> Result<()> {
-    // (nth list index)
-    if count != 2 {
-        anyhow::bail!("nth only support 2 args");
-    }
-
-    let Some(Value::F64(index)) = machine.stack.pop() else {
-        anyhow::bail!("expected an index on stack for nth");
-    };
-
-    let Some(Value::List(list)) = machine.stack.pop() else {
-        anyhow::bail!("expected a List on stack for nth");
-    };
-
-    let index = index as usize;
-    let Some(value) = list.get(index) else {
-        anyhow::bail!("nth index out of bounds");
-    };
-    machine.stack.push(value.clone());
     Ok(())
 }
 
