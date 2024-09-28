@@ -13,7 +13,16 @@ mod vm;
 const OPERATORS: &[&str] = &[
     "+", "-", "*", "/", "=", ">", "<", ">=", "<=", "and", "or", "not", "mod",
 ];
-const BUILTINS: &[&str] = &["print", "nth", "length", "assert-eq", "list", "cons", "car"];
+const BUILTINS: &[&str] = &[
+    "typeof",
+    "print",
+    "nth",
+    "length",
+    "assert-eq",
+    "list",
+    "cons",
+    "car",
+];
 const KEYWORDS: &[&str] = &["var", "let", "fn", "if", "lambda"];
 
 use clap::Parser as ClapParser;

@@ -3,6 +3,18 @@ use super::Value;
 use anyhow::Result;
 use std::io::Write;
 
+pub fn nlvm_typeof(machine: &mut Machine, count: u8) -> Result<()> {
+    if count != 1 {
+        anyhow::bail!("nth only support 1 args");
+    }
+    let Some(value) = machine.stack.pop() else {
+        panic!("expected value on stack for typeof")
+    };
+    let output = format!("{:?}", value.type_of());
+    machine.stack.push(Value::String(output));
+    Ok(())
+}
+
 pub fn nlvm_print(machine: &mut Machine, count: u8) -> Result<()> {
     let lock = std::io::stdout().lock();
     let mut writer = std::io::BufWriter::new(lock);
