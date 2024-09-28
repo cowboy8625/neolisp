@@ -11,14 +11,6 @@
    (+ x y)) ; -> 444
 ```
 
-### >=
-- returns true if the first argument is greater than or equal to the rest
-- arguments type: `Number`
-- example:
-```lisp
-(>= 10 10) ; -> true
-```
-
 ### <=
 - returns true if the first argument is less than or equal to the rest
 - arguments type: `Number`

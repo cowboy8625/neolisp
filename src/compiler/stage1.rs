@@ -35,6 +35,7 @@ pub enum Stage1Instruction {
     Eq,
     GreaterThan,
     LessThan,
+    GreaterThanOrEqual,
     Or,
     Mod,
     Rot,
@@ -59,6 +60,7 @@ impl Stage1Instruction {
             | Self::Eq
             | Self::GreaterThan
             | Self::LessThan
+            | Self::GreaterThanOrEqual
             | Self::Or
             | Self::Mod
             | Self::Rot
@@ -336,6 +338,10 @@ impl Stage1Compiler {
         let Expr::Symbol(operator) = &operator_spanned.expr else {
             unreachable!();
         };
+
+        // NOTE: When implementing a new operator if this step is skipped the compiler will crash
+        // here reminding you to add the new operator to this list. ONLY if you added the operator
+        // to the OPERATORS list in main.rs
         let op = match operator.as_str() {
             "+" => Stage1Instruction::Add,
             "-" => Stage1Instruction::Sub,
@@ -344,6 +350,7 @@ impl Stage1Compiler {
             "=" => Stage1Instruction::Eq,
             ">" => Stage1Instruction::GreaterThan,
             "<" => Stage1Instruction::LessThan,
+            ">=" => Stage1Instruction::GreaterThanOrEqual,
             "or" => Stage1Instruction::Or,
             "mod" => Stage1Instruction::Mod,
             _ => unreachable!("unknown operator: {}", operator),

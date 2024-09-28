@@ -58,6 +58,7 @@ fn into_instructions(
         Stage1Instruction::Eq => Instruction::Eq,
         Stage1Instruction::GreaterThan => Instruction::GreaterThan,
         Stage1Instruction::LessThan => Instruction::LessThan,
+        Stage1Instruction::GreaterThanOrEqual => Instruction::GreaterThanOrEqual,
         Stage1Instruction::Or => Instruction::Or,
         Stage1Instruction::Mod => Instruction::Mod,
         Stage1Instruction::Rot => Instruction::Rot,

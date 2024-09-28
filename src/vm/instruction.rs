@@ -17,6 +17,7 @@ pub enum OpCode {
     Eq,
     GreaterThan,
     LessThan,
+    GreaterThanOrEqual,
     Or,
     Mod,
     Rot,
@@ -45,6 +46,7 @@ pub enum Instruction {
     Eq,
     GreaterThan,
     LessThan,
+    GreaterThanOrEqual,
     Or,
     Mod,
     Rot,
@@ -82,6 +84,7 @@ impl Instruction {
             Instruction::Eq => vec![OpCode::Eq as u8],
             Instruction::GreaterThan => vec![OpCode::GreaterThan as u8],
             Instruction::LessThan => vec![OpCode::LessThan as u8],
+            Instruction::GreaterThanOrEqual => vec![OpCode::GreaterThanOrEqual as u8],
             Instruction::Or => vec![OpCode::Or as u8],
             Instruction::Mod => vec![OpCode::Mod as u8],
             Instruction::Rot => vec![OpCode::Rot as u8],
@@ -136,6 +139,7 @@ impl Instruction {
             | Self::Eq
             | Self::GreaterThan
             | Self::LessThan
+            | Self::GreaterThanOrEqual
             | Self::Or
             | Self::Mod
             | Self::Rot
