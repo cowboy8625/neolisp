@@ -11,13 +11,6 @@
    (+ x y)) ; -> 444
 ```
 
-### and
-- returns true if all the arguments are true
-- arguments type: `Bool`
-- example:
-```lisp
-(print 10)
-```
 ### not
 - returns the opposite of the first argument
 - arguments type: `Bool`

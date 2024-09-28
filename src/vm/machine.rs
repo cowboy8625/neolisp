@@ -243,6 +243,20 @@ impl Machine {
                     _ => panic!("invalid types for Greater Less or Equal"),
                 }
             }
+            Instruction::And => {
+                let Some(right) = self.stack.pop() else {
+                    panic!("expected value on stack for Or")
+                };
+                let Some(left) = self.stack.pop() else {
+                    panic!("expected value on stack for Or")
+                };
+                match (left, right) {
+                    (Value::Bool(left), Value::Bool(right)) => {
+                        self.stack.push(Value::Bool(left && right));
+                    }
+                    _ => panic!("invalid types for Or"),
+                }
+            }
             Instruction::Or => {
                 let Some(right) = self.stack.pop() else {
                     panic!("expected value on stack for Or")
