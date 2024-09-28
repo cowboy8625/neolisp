@@ -47,6 +47,7 @@ pub fn get_instruction(bytes: &[u8], ip: &mut usize) -> Result<Instruction, Stri
         OpCode::Div => Ok(Instruction::Div),
         OpCode::Eq => Ok(Instruction::Eq),
         OpCode::Or => Ok(Instruction::Or),
+        OpCode::Mod => Ok(Instruction::Mod),
         OpCode::Rot => Ok(Instruction::Rot),
         OpCode::Call => {
             let callee = get_callee(bytes, ip)?;

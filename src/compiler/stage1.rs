@@ -34,6 +34,7 @@ pub enum Stage1Instruction {
     Div,
     Eq,
     Or,
+    Mod,
     Rot,
     Call(Stage1Callee, u8),
     LoadLocal,
@@ -55,6 +56,7 @@ impl Stage1Instruction {
             | Self::Div
             | Self::Eq
             | Self::Or
+            | Self::Mod
             | Self::Rot
             | Self::Halt
             | Self::LoadGlobal
@@ -337,6 +339,7 @@ impl Stage1Compiler {
             "/" => Stage1Instruction::Div,
             "=" => Stage1Instruction::Eq,
             "or" => Stage1Instruction::Or,
+            "mod" => Stage1Instruction::Mod,
             _ => unreachable!("unknown operator: {}", operator),
         };
 

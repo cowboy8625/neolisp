@@ -16,6 +16,7 @@ pub enum OpCode {
     Div,
     Eq,
     Or,
+    Mod,
     Rot,
     Call,
     LoadLocal,
@@ -41,6 +42,7 @@ pub enum Instruction {
     Div,
     Eq,
     Or,
+    Mod,
     Rot,
     Call(Callee, u8),
     LoadLocal,
@@ -75,6 +77,7 @@ impl Instruction {
             Instruction::Div => vec![OpCode::Div as u8],
             Instruction::Eq => vec![OpCode::Eq as u8],
             Instruction::Or => vec![OpCode::Or as u8],
+            Instruction::Mod => vec![OpCode::Mod as u8],
             Instruction::Rot => vec![OpCode::Rot as u8],
             Instruction::Call(callee, count) => {
                 let mut bytes = vec![OpCode::Call as u8];
@@ -126,6 +129,7 @@ impl Instruction {
             | Self::Div
             | Self::Eq
             | Self::Or
+            | Self::Mod
             | Self::Rot
             | Self::Noop
             | Self::Halt

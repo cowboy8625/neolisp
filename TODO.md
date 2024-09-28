@@ -11,14 +11,6 @@
    (+ x y)) ; -> 444
 ```
 
-### mod
-- returns the remainder of the arguments
-- arguments type: `Number`
-- example:
-```lisp
-(mod 10 2) ; -> 0
-```
-
 ### >
 - returns true if the first argument is greater than the rest
 - arguments type: `Number`
