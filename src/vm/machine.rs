@@ -175,6 +175,23 @@ impl Machine {
                     _ => panic!("invalid types for Add"),
                 }
             }
+            Instruction::GreaterThan => {
+                let Some(right) = self.stack.pop() else {
+                    panic!("expected value on stack for Greater Than")
+                };
+                let Some(left) = self.stack.pop() else {
+                    panic!("expected value on stack for Greater Than")
+                };
+                match (left, right) {
+                    (Value::I32(left), Value::I32(right)) => {
+                        self.stack.push(Value::Bool(left > right));
+                    }
+                    (Value::F64(left), Value::F64(right)) => {
+                        self.stack.push(Value::Bool(left > right));
+                    }
+                    _ => panic!("invalid types for Greater Than"),
+                }
+            }
             Instruction::Or => {
                 let Some(right) = self.stack.pop() else {
                     panic!("expected value on stack for Or")

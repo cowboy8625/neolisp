@@ -15,6 +15,7 @@ pub enum OpCode {
     Mul,
     Div,
     Eq,
+    GreaterThan,
     Or,
     Mod,
     Rot,
@@ -41,6 +42,7 @@ pub enum Instruction {
     Mul,
     Div,
     Eq,
+    GreaterThan,
     Or,
     Mod,
     Rot,
@@ -76,6 +78,7 @@ impl Instruction {
             Instruction::Mul => vec![OpCode::Mul as u8],
             Instruction::Div => vec![OpCode::Div as u8],
             Instruction::Eq => vec![OpCode::Eq as u8],
+            Instruction::GreaterThan => vec![OpCode::GreaterThan as u8],
             Instruction::Or => vec![OpCode::Or as u8],
             Instruction::Mod => vec![OpCode::Mod as u8],
             Instruction::Rot => vec![OpCode::Rot as u8],
@@ -128,6 +131,7 @@ impl Instruction {
             | Self::Mul
             | Self::Div
             | Self::Eq
+            | Self::GreaterThan
             | Self::Or
             | Self::Mod
             | Self::Rot

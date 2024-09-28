@@ -33,6 +33,7 @@ pub enum Stage1Instruction {
     Mul,
     Div,
     Eq,
+    GreaterThan,
     Or,
     Mod,
     Rot,
@@ -55,6 +56,7 @@ impl Stage1Instruction {
             | Self::Mul
             | Self::Div
             | Self::Eq
+            | Self::GreaterThan
             | Self::Or
             | Self::Mod
             | Self::Rot
@@ -338,6 +340,7 @@ impl Stage1Compiler {
             "*" => Stage1Instruction::Mul,
             "/" => Stage1Instruction::Div,
             "=" => Stage1Instruction::Eq,
+            ">" => Stage1Instruction::GreaterThan,
             "or" => Stage1Instruction::Or,
             "mod" => Stage1Instruction::Mod,
             _ => unreachable!("unknown operator: {}", operator),

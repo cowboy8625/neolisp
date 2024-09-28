@@ -7,7 +7,7 @@
 ; (fn main () (print (apply (lambda (x) (+ x 321)) 123) "\n"))
 
 ; (var mul (lambda (x y) (* x y)))
-(fn main () (print (/ 123 321) "\n"))
+(fn main () (print (> 123 321) "\n"))
 
 ; (var mul (lambda (x) (lambda (y) (* x y))))
 ; (fn main () (print ((mul 123) 321) "\n"))
