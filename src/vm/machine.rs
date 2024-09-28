@@ -226,6 +226,23 @@ impl Machine {
                     _ => panic!("invalid types for Greater Than or Equal"),
                 }
             }
+            Instruction::LessThanOrEqual => {
+                let Some(right) = self.stack.pop() else {
+                    panic!("expected value on stack for Less Than or Equal")
+                };
+                let Some(left) = self.stack.pop() else {
+                    panic!("expected value on stack for Less Than or Equal")
+                };
+                match (left, right) {
+                    (Value::I32(left), Value::I32(right)) => {
+                        self.stack.push(Value::Bool(left <= right));
+                    }
+                    (Value::F64(left), Value::F64(right)) => {
+                        self.stack.push(Value::Bool(left <= right));
+                    }
+                    _ => panic!("invalid types for Greater Less or Equal"),
+                }
+            }
             Instruction::Or => {
                 let Some(right) = self.stack.pop() else {
                     panic!("expected value on stack for Or")

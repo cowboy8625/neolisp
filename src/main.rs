@@ -10,7 +10,7 @@ mod symbol_table;
 mod tests;
 mod vm;
 
-const OPERATORS: &[&str] = &["+", "-", "*", "/", "=", ">", "<", ">=", "or", "mod"];
+const OPERATORS: &[&str] = &["+", "-", "*", "/", "=", ">", "<", ">=", "<=", "or", "mod"];
 const BUILTINS: &[&str] = &["print", "nth", "length", "assert-eq", "list", "cons", "car"];
 const KEYWORDS: &[&str] = &["var", "let", "fn", "if", "lambda"];
 
