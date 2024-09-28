@@ -11,22 +11,6 @@
    (+ x y)) ; -> 444
 ```
 
-### *
-- returns the product of the arguments
-- arguments type: `Number`
-- example:
-```lisp
-(* 10 20) ; -> 200
-```
-
-### /
-- returns the quotient of the arguments
-- arguments type: `Number`
-- example:
-```lisp
-(/ 20 10) ; -> 2
-```
-
 ### mod
 - returns the remainder of the arguments
 - arguments type: `Number`

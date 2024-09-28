@@ -31,6 +31,7 @@ pub enum Stage1Instruction {
     Add,
     Sub,
     Mul,
+    Div,
     Eq,
     Or,
     Rot,
@@ -44,12 +45,14 @@ pub enum Stage1Instruction {
     JumpIf(usize),
     Jump(usize),
 }
+
 impl Stage1Instruction {
     pub fn size(&self) -> usize {
         match self {
             Self::Add
             | Self::Sub
             | Self::Mul
+            | Self::Div
             | Self::Eq
             | Self::Or
             | Self::Rot
@@ -329,8 +332,9 @@ impl Stage1Compiler {
         };
         let op = match operator.as_str() {
             "+" => Stage1Instruction::Add,
-            "*" => Stage1Instruction::Mul,
             "-" => Stage1Instruction::Sub,
+            "*" => Stage1Instruction::Mul,
+            "/" => Stage1Instruction::Div,
             "=" => Stage1Instruction::Eq,
             "or" => Stage1Instruction::Or,
             _ => unreachable!("unknown operator: {}", operator),

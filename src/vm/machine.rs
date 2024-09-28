@@ -138,6 +138,23 @@ impl Machine {
                     _ => panic!("invalid types for Mul"),
                 }
             }
+            Instruction::Div => {
+                let Some(right) = self.stack.pop() else {
+                    panic!("expected value on stack for Div")
+                };
+                let Some(left) = self.stack.pop() else {
+                    panic!("expected value on stack for Div")
+                };
+                match (left, right) {
+                    (Value::I32(left), Value::I32(right)) => {
+                        self.stack.push(Value::I32(left / right));
+                    }
+                    (Value::F64(left), Value::F64(right)) => {
+                        self.stack.push(Value::F64(left / right));
+                    }
+                    _ => panic!("invalid types for Div"),
+                }
+            }
             Instruction::Eq => {
                 let Some(right) = self.stack.pop() else {
                     panic!("expected value on stack for Eq")

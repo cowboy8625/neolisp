@@ -13,6 +13,7 @@ pub enum OpCode {
     Add,
     Sub,
     Mul,
+    Div,
     Eq,
     Or,
     Rot,
@@ -37,6 +38,7 @@ pub enum Instruction {
     Add,
     Sub,
     Mul,
+    Div,
     Eq,
     Or,
     Rot,
@@ -70,6 +72,7 @@ impl Instruction {
             Instruction::Add => vec![OpCode::Add as u8],
             Instruction::Sub => vec![OpCode::Sub as u8],
             Instruction::Mul => vec![OpCode::Mul as u8],
+            Instruction::Div => vec![OpCode::Div as u8],
             Instruction::Eq => vec![OpCode::Eq as u8],
             Instruction::Or => vec![OpCode::Or as u8],
             Instruction::Rot => vec![OpCode::Rot as u8],
@@ -120,6 +123,7 @@ impl Instruction {
             Self::Add
             | Self::Sub
             | Self::Mul
+            | Self::Div
             | Self::Eq
             | Self::Or
             | Self::Rot
