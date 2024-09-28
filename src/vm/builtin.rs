@@ -3,6 +3,19 @@ use super::Value;
 use anyhow::Result;
 use std::io::Write;
 
+pub fn nlvm_reverse(machine: &mut Machine, count: u8) -> Result<()> {
+    // (reverse (list 1 2 3)) => (3 2 1)
+    if count != 1 {
+        anyhow::bail!("reverse only support 1 args");
+    }
+    let Some(Value::List(mut list)) = machine.stack.pop() else {
+        anyhow::bail!("expected list on stack for reverse")
+    };
+    list.reverse();
+    machine.stack.push(Value::List(list));
+    Ok(())
+}
+
 pub fn nlvm_append(machine: &mut Machine, count: u8) -> Result<()> {
     // (append (list 1 2) (list 3 4)) => (1 2 3 4)
     if count != 2 {

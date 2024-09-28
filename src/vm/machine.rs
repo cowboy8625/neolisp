@@ -416,6 +416,7 @@ impl Machine {
 
     fn builtins(&mut self, name: String, arg_count: u8) {
         match name.as_str() {
+            "reverse" => builtin::nlvm_reverse(self, arg_count).unwrap(),
             "append" => builtin::nlvm_append(self, arg_count).unwrap(),
             "last" => builtin::nlvm_last(self, arg_count).unwrap(),
             "cdr" => builtin::nlvm_cdr(self, arg_count).unwrap(),
