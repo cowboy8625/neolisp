@@ -3,6 +3,26 @@ use super::Value;
 use anyhow::Result;
 use std::io::Write;
 
+pub fn nlvm_nth(machine: &mut Machine, count: u8) -> Result<()> {
+    // (nth (list 1 2 3) 1) => 2
+    if count != 2 {
+        anyhow::bail!("nth only support 2 args");
+    }
+    let Some(Value::F64(index)) = machine.stack.pop() else {
+        anyhow::bail!("expected number on stack for nth")
+    };
+    let Some(Value::List(mut list)) = machine.stack.pop() else {
+        anyhow::bail!("expected list on stack for nth")
+    };
+    let index = index as usize;
+    if index >= list.len() {
+        anyhow::bail!("nth index out of range");
+    }
+    let value = list.remove(index);
+    machine.stack.push(value);
+    Ok(())
+}
+
 pub fn nlvm_reverse(machine: &mut Machine, count: u8) -> Result<()> {
     // (reverse (list 1 2 3)) => (3 2 1)
     if count != 1 {

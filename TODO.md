@@ -11,22 +11,6 @@
    (+ x y)) ; -> 444
 ```
 
-### reverse
-- returns a list with elements in reverse order
-- argument type: `List`
-- example:
-```lisp
-(reverse (list 1 2 3)) ; -> (3 2 1)
-```
-
-### nth
-- returns the nth element of a list
-- arguments type: `List`
-- example:
-```lisp
-(nth (list 1 2 3) 2) ; -> 3
-```
-
 ### map
 - returns a list with the result of applying a function to each element of a list
 - arguments
