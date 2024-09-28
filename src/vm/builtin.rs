@@ -3,6 +3,30 @@ use super::Value;
 use anyhow::Result;
 use std::io::Write;
 
+pub fn nlvm_last(machine: &mut Machine, count: u8) -> Result<()> {
+    // (last (list 1 2 3 4)) => 4
+    if count != 1 {
+        anyhow::bail!("last only support 1 args");
+    }
+    let Some(value) = machine.stack.pop() else {
+        panic!("expected value on stack for last")
+    };
+    match &value {
+        Value::List(list) if list.is_empty() => {
+            machine.stack.push(Value::List(vec![]));
+        }
+        Value::List(list) => {
+            if let Some(value) = list.last() {
+                machine.stack.push(value.clone());
+                return Ok(());
+            }
+            anyhow::bail!("expected list to have at least 1 for `last`");
+        }
+        _ => anyhow::bail!("expected list on stack for last"),
+    }
+    Ok(())
+}
+
 pub fn nlvm_cdr(machine: &mut Machine, count: u8) -> Result<()> {
     // (cdr (list 1 2)) => (2)
     if count != 1 {
