@@ -1,13 +1,3 @@
-### lambda
-- returns a `Function`
-- arguments
-   1. `List`: arguments
-   2. `List`: body
-- example:
-```lisp
-(lambda (x y) (+ x y))
-(10 20) ; -> 30
-```
 ### let
 - binds a list of values to symbols in the current scope and returns the last evaluated value
 - arguments

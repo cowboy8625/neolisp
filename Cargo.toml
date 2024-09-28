@@ -9,6 +9,8 @@ chumsky = "0.9.3"
 clap = { version = "4.5.17", features = ["derive"] }
 rustyline = { version = "14.0.0", features = ["derive", "regex", "with-file-history"] }
 anyhow = "1.0.87"
+num-traits = "0.2.19"
+num-derive = "0.4.2"
 
 [dev-dependencies]
-pretty_assertions = "1.4.0"
+pretty_assertions = "1.4.1"

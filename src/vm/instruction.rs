@@ -1,5 +1,32 @@
 use super::value::Value;
 
+use num_derive::{FromPrimitive, ToPrimitive};
+
+#[repr(u8)]
+#[derive(Debug, Clone, PartialEq, FromPrimitive, ToPrimitive)]
+pub enum OpCode {
+    StartAt,
+    Noop,
+    Halt,
+    Return,
+    Push,
+    Add,
+    Sub,
+    Mul,
+    Eq,
+    Or,
+    Rot,
+    Call,
+    LoadLocal,
+    GetLocal,
+    LoadGlobal,
+    GetGlobal,
+    LoadFree,
+    GetFree,
+    JumpIf,
+    Jump,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Instruction {
     StartAt(usize),
@@ -9,6 +36,7 @@ pub enum Instruction {
     Push(Value),
     Add,
     Sub,
+    Mul,
     Eq,
     Or,
     Rot,
@@ -24,80 +52,61 @@ pub enum Instruction {
 }
 
 impl Instruction {
-    pub const START_AT: u8 = 0x00;
-    pub const NOOP: u8 = 0x01;
-    pub const HALT: u8 = 0x02;
-    pub const RETURN: u8 = 0x03;
-    pub const PUSH: u8 = 0x04;
-    pub const ADD: u8 = 0x05;
-    pub const SUB: u8 = 0x06;
-    pub const EQ: u8 = 0x07;
-    pub const OR: u8 = 0x08;
-    pub const ROT: u8 = 0x09;
-    pub const CALL: u8 = 0x0A;
-    pub const LOAD_LOCAL: u8 = 0x0B;
-    pub const GET_LOCAL: u8 = 0x0C;
-    pub const LOAD_GLOBAL: u8 = 0x0D;
-    pub const GET_GLOBAL: u8 = 0x0E;
-    pub const LOAD_FREE: u8 = 0x0F;
-    pub const GET_FREE: u8 = 0x10;
-    pub const JUMP_IF: u8 = 0x11;
-    pub const JUMP: u8 = 0x12;
-
     pub fn to_bytecode(&self) -> Vec<u8> {
         match self {
             Instruction::StartAt(v) => {
-                let mut bytes = vec![Self::START_AT];
+                let mut bytes = vec![OpCode::StartAt as u8];
                 bytes.extend_from_slice(&(*v as u32).to_le_bytes());
                 bytes
             }
-            Instruction::Noop => vec![Self::NOOP],
-            Instruction::Halt => vec![Self::HALT],
-            Instruction::Return => vec![Self::RETURN],
+            Instruction::Noop => vec![OpCode::Noop as u8],
+            Instruction::Halt => vec![OpCode::Halt as u8],
+            Instruction::Return => vec![OpCode::Return as u8],
             Instruction::Push(value) => {
-                let mut bytes = vec![Self::PUSH];
+                let mut bytes = vec![OpCode::Push as u8];
                 bytes.extend_from_slice(&value.to_bytecode());
                 bytes
             }
-            Instruction::Add => vec![Self::ADD],
-            Instruction::Sub => vec![Self::SUB],
-            Instruction::Eq => vec![Self::EQ],
-            Instruction::Or => vec![Self::OR],
-            Instruction::Rot => vec![Self::ROT],
+            Instruction::Add => vec![OpCode::Add as u8],
+            Instruction::Sub => vec![OpCode::Sub as u8],
+            Instruction::Mul => vec![OpCode::Mul as u8],
+            Instruction::Eq => vec![OpCode::Eq as u8],
+            Instruction::Or => vec![OpCode::Or as u8],
+            Instruction::Rot => vec![OpCode::Rot as u8],
             Instruction::Call(callee, count) => {
-                let mut bytes = vec![Self::CALL];
+                let mut bytes = vec![OpCode::Call as u8];
                 bytes.extend_from_slice(&callee.to_bytecode());
                 bytes.push(*count as u8);
                 bytes
             }
-            Instruction::LoadLocal => vec![Self::LOAD_LOCAL],
+            Instruction::LoadLocal => vec![OpCode::LoadLocal as u8],
             Instruction::GetLocal(index) => {
-                let mut bytes = vec![Self::GET_LOCAL];
+                let mut bytes = vec![OpCode::GetLocal as u8];
                 bytes.push(*index as u8);
                 // bytes.extend_from_slice(&index.to_le_bytes());
                 bytes
             }
-            Instruction::LoadGlobal => vec![Self::LOAD_GLOBAL],
+            Instruction::LoadGlobal => vec![OpCode::LoadGlobal as u8],
             Instruction::GetGlobal(index) => {
-                let mut bytes = vec![Self::GET_GLOBAL];
+                let mut bytes = vec![OpCode::GetGlobal as u8];
                 bytes.push(*index as u8);
                 // bytes.extend_from_slice(&index.to_le_bytes());
                 bytes
             }
-            Instruction::LoadFree => vec![Self::LOAD_FREE],
+            Instruction::LoadFree => vec![OpCode::LoadFree as u8],
             Instruction::GetFree(index) => {
-                let mut bytes = vec![Self::GET_FREE];
+                let mut bytes = vec![OpCode::GetFree as u8];
                 bytes.push(*index as u8);
                 // bytes.extend_from_slice(&index.to_le_bytes());
                 bytes
             }
             Instruction::JumpIf(address) => {
-                let mut bytes = vec![Self::JUMP_IF];
+                let mut bytes = vec![OpCode::JumpIf as u8];
                 bytes.extend_from_slice(&(*address as u32).to_le_bytes());
                 bytes
             }
             Instruction::Jump(address) => {
-                let mut bytes = vec![Self::JUMP];
+                let mut bytes = vec![OpCode::Jump as u8];
                 bytes.extend_from_slice(&(*address as u32).to_le_bytes());
                 bytes
             }
@@ -110,6 +119,7 @@ impl Instruction {
             Self::StartAt(_) => 5,
             Self::Add
             | Self::Sub
+            | Self::Mul
             | Self::Eq
             | Self::Or
             | Self::Rot

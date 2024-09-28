@@ -30,6 +30,7 @@ pub enum Stage1Instruction {
     Push(Stage1Value),
     Add,
     Sub,
+    Mul,
     Eq,
     Or,
     Rot,
@@ -48,6 +49,7 @@ impl Stage1Instruction {
         match self {
             Self::Add
             | Self::Sub
+            | Self::Mul
             | Self::Eq
             | Self::Or
             | Self::Rot
@@ -327,6 +329,7 @@ impl Stage1Compiler {
         };
         let op = match operator.as_str() {
             "+" => Stage1Instruction::Add,
+            "*" => Stage1Instruction::Mul,
             "-" => Stage1Instruction::Sub,
             "=" => Stage1Instruction::Eq,
             "or" => Stage1Instruction::Or,

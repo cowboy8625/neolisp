@@ -10,7 +10,7 @@ mod symbol_table;
 mod tests;
 mod vm;
 
-const OPERATORS: &[&str] = &["+", "-", "=", "or"];
+const OPERATORS: &[&str] = &["+", "-", "*", "=", "or"];
 const BUILTINS: &[&str] = &["print", "nth", "length", "assert-eq", "list", "cons", "car"];
 const KEYWORDS: &[&str] = &["var", "let", "fn", "if", "lambda"];
 
@@ -64,6 +64,9 @@ fn get_compiled_filename(file: Option<String>) -> anyhow::Result<String> {
 
 fn run(file: Option<String>, breakpoints: Vec<usize>, decompile: bool) -> anyhow::Result<()> {
     build(file.clone(), decompile)?;
+    if decompile {
+        return Ok(());
+    }
 
     let compiled_filename = get_compiled_filename(file)?;
 
