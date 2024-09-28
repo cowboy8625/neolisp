@@ -39,6 +39,7 @@ pub enum Stage1Instruction {
     LessThanOrEqual,
     And,
     Or,
+    Not,
     Mod,
     Rot,
     Call(Stage1Callee, u8),
@@ -66,6 +67,7 @@ impl Stage1Instruction {
             | Self::LessThanOrEqual
             | Self::And
             | Self::Or
+            | Self::Not
             | Self::Mod
             | Self::Rot
             | Self::Halt
@@ -358,6 +360,7 @@ impl Stage1Compiler {
             "<=" => Stage1Instruction::LessThanOrEqual,
             "and" => Stage1Instruction::And,
             "or" => Stage1Instruction::Or,
+            "not" => Stage1Instruction::Not,
             "mod" => Stage1Instruction::Mod,
             _ => unreachable!("unknown operator: {}", operator),
         };

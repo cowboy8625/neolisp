@@ -11,14 +11,6 @@
    (+ x y)) ; -> 444
 ```
 
-### not
-- returns the opposite of the first argument
-- arguments type: `Bool`
-- example:
-```lisp
-(print 10)
-```
-
 ### typeof
 - returns the type of the first argument
 - argument type: `Any`

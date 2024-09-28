@@ -271,6 +271,17 @@ impl Machine {
                     _ => panic!("invalid types for Or"),
                 }
             }
+            Instruction::Not => {
+                let Some(value) = self.stack.pop() else {
+                    panic!("expected value on stack for Not")
+                };
+                match value {
+                    Value::Bool(b) => {
+                        self.stack.push(Value::Bool(!b));
+                    }
+                    _ => panic!("invalid types for Not"),
+                }
+            }
             Instruction::Mod => {
                 let Some(right) = self.stack.pop() else {
                     panic!("expected value on stack for Mod")

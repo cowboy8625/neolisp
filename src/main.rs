@@ -11,7 +11,7 @@ mod tests;
 mod vm;
 
 const OPERATORS: &[&str] = &[
-    "+", "-", "*", "/", "=", ">", "<", ">=", "<=", "and", "or", "mod",
+    "+", "-", "*", "/", "=", ">", "<", ">=", "<=", "and", "or", "not", "mod",
 ];
 const BUILTINS: &[&str] = &["print", "nth", "length", "assert-eq", "list", "cons", "car"];
 const KEYWORDS: &[&str] = &["var", "let", "fn", "if", "lambda"];

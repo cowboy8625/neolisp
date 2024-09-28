@@ -62,6 +62,7 @@ fn into_instructions(
         Stage1Instruction::LessThanOrEqual => Instruction::LessThanOrEqual,
         Stage1Instruction::And => Instruction::And,
         Stage1Instruction::Or => Instruction::Or,
+        Stage1Instruction::Not => Instruction::Not,
         Stage1Instruction::Mod => Instruction::Mod,
         Stage1Instruction::Rot => Instruction::Rot,
         Stage1Instruction::Call(Stage1Callee::Function, count) => {
