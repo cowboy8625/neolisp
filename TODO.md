@@ -11,24 +11,6 @@
    (+ x y)) ; -> 444
 ```
 
-### last
-- returns a last element in list
-- argument
-   1. List
-- example:
-```lisp
-(last (list 1 2 3)) ; -> 3
-(last "hello") ; -> "o"
-```
-
-### append
-- returns a `List` with elements appended
-- arguments type: `List`
-- example:
-```lisp
-(append (list 1 2) (list 3 4)) ; -> (1 2 3 4)
-```
-
 ### reverse
 - returns a list with elements in reverse order
 - argument type: `List`

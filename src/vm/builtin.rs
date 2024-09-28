@@ -3,6 +3,23 @@ use super::Value;
 use anyhow::Result;
 use std::io::Write;
 
+pub fn nlvm_append(machine: &mut Machine, count: u8) -> Result<()> {
+    // (append (list 1 2) (list 3 4)) => (1 2 3 4)
+    if count != 2 {
+        anyhow::bail!("append only support 2 args");
+    }
+    let Some(Value::List(mut list2)) = machine.stack.pop() else {
+        anyhow::bail!("expected list on stack for append")
+    };
+    let Some(Value::List(mut list1)) = machine.stack.pop() else {
+        anyhow::bail!("expected list on stack for append")
+    };
+
+    list1.append(&mut list2);
+    machine.stack.push(Value::List(list1));
+    Ok(())
+}
+
 pub fn nlvm_last(machine: &mut Machine, count: u8) -> Result<()> {
     // (last (list 1 2 3 4)) => 4
     if count != 1 {
