@@ -4,16 +4,16 @@ pub fn decompile(bytes: &[u8]) -> Vec<Instruction> {
     let mut instructions = Vec::new();
 
     while ip < bytes.len() {
-        let instruction = match get_instructions(&bytes, &mut ip) {
+        let instruction = match get_instruction(&bytes, &mut ip) {
             Ok(instruction) => instruction,
-            Err(e) => panic!("{}", e),
+            Err(e) => panic!("{}\n{:#?}", e, instructions),
         };
         instructions.push(instruction);
     }
     instructions
 }
 
-fn get_instructions(bytes: &[u8], ip: &mut usize) -> Result<Instruction, String> {
+pub fn get_instruction(bytes: &[u8], ip: &mut usize) -> Result<Instruction, String> {
     match bytes[*ip] {
         Instruction::START_AT => {
             debug_assert!(bytes[*ip..].len() >= 5);

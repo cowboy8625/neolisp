@@ -1,5 +1,6 @@
 use super::{
-    IState, Stage1Callee, Stage1Data, Stage1Function, Stage1Instruction, Stage1Lambda, Stage1Value,
+    Chunk, IState, Stage1Callee, Stage1Data, Stage1Function, Stage1Instruction, Stage1Lambda,
+    Stage1Value,
 };
 use crate::symbol_table::SymbolTable;
 use crate::vm::{Callee, Instruction, Value};
@@ -12,9 +13,9 @@ fn set_location_of_functions_in_symbol_table(
     for function in functions {
         let name = function.name.as_str();
         symbol_table.set_location(Some(name), name, *location as u32);
-        *location += function.params.len();
-        *location += function.prelude.len();
-        *location += function.body.len();
+        *location += function.params.size();
+        *location += function.prelude.size();
+        *location += function.body.size();
     }
 }
 
@@ -26,17 +27,14 @@ fn set_location_of_lambdas_in_symbol_table(
     for lambda in lambdas {
         let name = lambda.name.as_str();
         symbol_table.set_location(Some(name), name, *location as u32);
-        *location += lambda.params.len();
-        *location += lambda.body.len();
+        *location += lambda.params.size();
+        *location += lambda.body.size();
     }
 }
 
-fn convert_section_to_instructions(
-    symbol_table: &SymbolTable,
-    data: &[Stage1Instruction],
-) -> Vec<Instruction> {
+fn convert_section_to_instructions(symbol_table: &SymbolTable, data: &Chunk) -> Vec<Instruction> {
     let mut instructions: Vec<Instruction> = Vec::new();
-    for instruction in data {
+    for instruction in data.items.iter() {
         into_instructions(symbol_table, instruction, &mut instructions);
     }
     instructions
@@ -118,7 +116,7 @@ pub fn compile_to_instructions(
     symbol_table: &mut SymbolTable,
     data: &Stage1Data,
 ) -> Vec<Instruction> {
-    let mut location = 1;
+    let mut location = 5;
     set_location_of_functions_in_symbol_table(symbol_table, &data.functions, &mut location);
     set_location_of_lambdas_in_symbol_table(symbol_table, &data.lambdas, &mut location);
 

@@ -46,7 +46,8 @@ impl Value {
                 bytes
             }
             Value::String(v) => {
-                let mut bytes = vec![Self::CODE_STRING, v.len() as u8];
+                let mut bytes = vec![Self::CODE_STRING];
+                bytes.extend_from_slice(&(v.len() as u32).to_le_bytes());
                 bytes.extend_from_slice(&v.as_bytes());
                 bytes
             }
@@ -65,6 +66,22 @@ impl Value {
                 bytes
             }
         }
+    }
+
+    pub fn size(&self) -> usize {
+        let conent_size = match self {
+            Value::U8(_) => 1,
+            Value::I32(_) => 4,
+            Value::U32(_) => 4,
+            Value::F32(_) => 4,
+            Value::F64(_) => 8,
+            Value::String(v) => 4 + v.len(),
+            Value::Bool(_) => 1,
+            Value::List(vec) => 4 + vec.iter().map(|v| v.size()).sum::<usize>(),
+            Value::Callable(_) => 4,
+        };
+        // opcode + content
+        1 + conent_size
     }
 }
 

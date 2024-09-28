@@ -11,16 +11,16 @@ pub struct Stage1Data {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Stage1Function {
     pub name: String,
-    pub params: Vec<Stage1Instruction>,
-    pub prelude: Vec<Stage1Instruction>,
-    pub body: Vec<Stage1Instruction>,
+    pub params: Chunk,
+    pub prelude: Chunk,
+    pub body: Chunk,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Stage1Lambda {
     pub name: String,
-    pub params: Vec<Stage1Instruction>,
-    pub body: Vec<Stage1Instruction>,
+    pub params: Chunk,
+    pub body: Chunk,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -43,6 +43,26 @@ pub enum Stage1Instruction {
     JumpIf(usize),
     Jump(usize),
 }
+impl Stage1Instruction {
+    pub fn size(&self) -> usize {
+        match self {
+            Self::Add
+            | Self::Sub
+            | Self::Eq
+            | Self::Or
+            | Self::Rot
+            | Self::Halt
+            | Self::LoadGlobal
+            | Self::LoadLocal
+            | Self::LoadFree
+            | Self::Return => 1,
+            Self::Push(value) => 1 + value.size(),
+            Self::Call(callee, _) => 1 + callee.size() + 1,
+            Self::GetLocal(_) | Self::GetGlobal(_) | Self::GetFree(_) => 2,
+            Self::JumpIf(_) | Self::Jump(_) => 5,
+        }
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum IState {
@@ -56,6 +76,15 @@ pub enum Stage1Callee {
     Builtin(String),
 }
 
+impl Stage1Callee {
+    pub fn size(&self) -> usize {
+        match self {
+            Self::Function => 1,
+            Self::Builtin(name) => 1 + 1 + name.len(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stage1Value {
     U8(u8),
@@ -67,6 +96,53 @@ pub enum Stage1Value {
     Bool(bool),
     List(Vec<Stage1Value>),
     Callable(IState),
+}
+
+impl Stage1Value {
+    pub fn size(&self) -> usize {
+        let conent_size = match self {
+            Self::U8(_) => 1,
+            Self::I32(_) => 4,
+            Self::U32(_) => 4,
+            Self::F32(_) => 4,
+            Self::F64(_) => 8,
+            Self::String(v) => 4 + v.len(),
+            Self::Bool(_) => 1,
+            Self::List(vec) => 4 + vec.iter().map(|v| v.size()).sum::<usize>(),
+            Self::Callable(_) => 4,
+        };
+        // opcode + content
+        1 + conent_size
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Chunk {
+    pub items: Vec<Stage1Instruction>,
+}
+
+impl Chunk {
+    pub fn new() -> Self {
+        Self { items: Vec::new() }
+    }
+
+    pub fn push(&mut self, instruction: Stage1Instruction) {
+        self.items.push(instruction);
+    }
+
+    pub fn extend(&mut self, other: Chunk) {
+        self.items.extend(other.items);
+    }
+
+    pub fn size(&self) -> usize {
+        self.items.iter().map(|i| i.size()).sum()
+    }
+}
+
+impl From<Vec<Stage1Instruction>> for Chunk {
+    fn from(items: Vec<Stage1Instruction>) -> Self {
+        Self { items }
+    }
 }
 
 #[derive(Debug)]
@@ -94,13 +170,13 @@ impl Stage1Compiler {
     }
 
     pub fn compiler(mut self, ast: &[Spanned<Expr>]) -> Stage1Data {
-        let mut instructions = Vec::new();
+        let mut chunk = Chunk::new();
         for expr in ast {
-            self.compile_expr(&mut instructions, expr);
+            self.compile_expr(&mut chunk, expr);
         }
         for function in self.functions.iter_mut() {
             if function.name == "main" {
-                function.prelude.append(&mut instructions);
+                function.prelude.extend(chunk);
                 break;
             }
         }
@@ -111,17 +187,13 @@ impl Stage1Compiler {
         }
     }
 
-    fn compile_expr(&mut self, instructions: &mut Vec<Stage1Instruction>, spanned: &Spanned<Expr>) {
+    fn compile_expr(&mut self, chunk: &mut Chunk, spanned: &Spanned<Expr>) {
         match &spanned.expr {
-            Expr::Bool(value) => {
-                instructions.push(Stage1Instruction::Push(Stage1Value::Bool(*value)))
-            }
-            Expr::String(value) => instructions.push(Stage1Instruction::Push(Stage1Value::String(
+            Expr::Bool(value) => chunk.push(Stage1Instruction::Push(Stage1Value::Bool(*value))),
+            Expr::String(value) => chunk.push(Stage1Instruction::Push(Stage1Value::String(
                 value.to_string(),
             ))),
-            Expr::Number(value) => {
-                instructions.push(Stage1Instruction::Push(Stage1Value::F64(*value)))
-            }
+            Expr::Number(value) => chunk.push(Stage1Instruction::Push(Stage1Value::F64(*value))),
             Expr::Symbol(name) => {
                 let Some(symbol) = self.symbol_table.lookup(name) else {
                     panic!("Variable `{}` is not defined", name);
@@ -129,31 +201,28 @@ impl Stage1Compiler {
 
                 match symbol.kind {
                     SymbolKind::Parameter => {
-                        instructions.push(Stage1Instruction::GetLocal(IState::Set(symbol.id)));
+                        chunk.push(Stage1Instruction::GetLocal(IState::Set(symbol.id)));
                     }
                     SymbolKind::Variable if symbol.scope == SymbolScope::Global => {
-                        instructions.push(Stage1Instruction::GetGlobal(IState::Set(symbol.id)));
+                        chunk.push(Stage1Instruction::GetGlobal(IState::Set(symbol.id)));
                     }
                     SymbolKind::Variable if symbol.scope == SymbolScope::Function => {
-                        instructions.push(Stage1Instruction::GetLocal(IState::Set(symbol.id)));
+                        chunk.push(Stage1Instruction::GetLocal(IState::Set(symbol.id)));
                     }
                     SymbolKind::Variable => todo!("Variable: {}, id: {}", name, symbol.id),
                     SymbolKind::Function => todo!("Function: {}, id: {}", name, symbol.id),
                     SymbolKind::Test => todo!("Test {}", name),
                     SymbolKind::Lambda => todo!("Lambda {}", name),
                     SymbolKind::FreeVariable => {
-                        instructions.push(Stage1Instruction::GetFree(IState::Set(symbol.id)));
+                        chunk.push(Stage1Instruction::GetFree(IState::Set(symbol.id)));
                     }
                 }
             }
-            Expr::List(_) => self.compile_list(instructions, spanned),
-            Expr::Builtin(_, _) => todo!(),
-            Expr::Func(_) => todo!(),
-            Expr::Lambda(_) => todo!(),
+            Expr::List(_) => self.compile_list(chunk, spanned),
         }
     }
 
-    fn compile_list(&mut self, instructions: &mut Vec<Stage1Instruction>, spanned: &Spanned<Expr>) {
+    fn compile_list(&mut self, chunk: &mut Chunk, spanned: &Spanned<Expr>) {
         let Expr::List(list) = &spanned.expr else {
             unreachable!();
         };
@@ -166,35 +235,28 @@ impl Stage1Compiler {
             Expr::Bool(_) => todo!(),
             Expr::String(_) => todo!(),
             Expr::Symbol(name) if KEYWORDS.contains(&name.as_str()) => {
-                self.compile_keyword(instructions, spanned, name)
+                self.compile_keyword(chunk, spanned, name)
             }
             Expr::Symbol(name) if OPERATORS.contains(&name.as_str()) => {
-                self.compile_operator(instructions, spanned)
+                self.compile_operator(chunk, spanned)
             }
             Expr::Symbol(_) => {
-                self.compile_symbol_call(instructions, spanned);
+                self.compile_symbol_call(chunk, spanned);
             }
             Expr::Number(_) => todo!(),
             Expr::List(_) => {
                 let mut count = 0;
                 for item in list.iter().skip(1) {
                     count += 1;
-                    self.compile_expr(instructions, item);
+                    self.compile_expr(chunk, item);
                 }
-                self.compile_list(instructions, first);
-                instructions.push(Stage1Instruction::Call(Stage1Callee::Function, count));
+                self.compile_list(chunk, first);
+                chunk.push(Stage1Instruction::Call(Stage1Callee::Function, count));
             }
-            Expr::Builtin(_, _) => todo!(),
-            Expr::Func(_) => todo!(),
-            Expr::Lambda(_) => todo!(),
         }
     }
 
-    fn compile_symbol_call(
-        &mut self,
-        instructions: &mut Vec<Stage1Instruction>,
-        spanned: &Spanned<Expr>,
-    ) {
+    fn compile_symbol_call(&mut self, chunk: &mut Chunk, spanned: &Spanned<Expr>) {
         let Expr::List(list) = &spanned.expr else {
             unreachable!();
         };
@@ -210,7 +272,7 @@ impl Stage1Compiler {
         if let Some(symbol) = self.symbol_table.lookup(&name) {
             match symbol.kind {
                 SymbolKind::Parameter => {
-                    instructions.push(Stage1Instruction::GetLocal(IState::Set(symbol.id)));
+                    chunk.push(Stage1Instruction::GetLocal(IState::Set(symbol.id)));
                 }
                 _ => {}
             }
@@ -218,24 +280,24 @@ impl Stage1Compiler {
 
         let count = list.len() - 1;
         for spanned in list.iter().skip(1) {
-            self.compile_expr(instructions, spanned);
+            self.compile_expr(chunk, spanned);
         }
 
         if let Some(symbol) = self.symbol_table.lookup(&name) {
             match symbol.kind {
                 SymbolKind::FreeVariable => todo!(),
                 SymbolKind::Variable if symbol.scope == SymbolScope::Global => {
-                    instructions.push(Stage1Instruction::GetGlobal(IState::Set(symbol.id)));
+                    chunk.push(Stage1Instruction::GetGlobal(IState::Set(symbol.id)));
                 }
                 SymbolKind::Variable if symbol.scope == SymbolScope::Function => {
-                    instructions.push(Stage1Instruction::GetLocal(IState::Set(symbol.id)));
+                    chunk.push(Stage1Instruction::GetLocal(IState::Set(symbol.id)));
                 }
                 SymbolKind::Variable if symbol.scope == SymbolScope::Free => {
-                    instructions.push(Stage1Instruction::GetFree(IState::Set(symbol.id)));
+                    chunk.push(Stage1Instruction::GetFree(IState::Set(symbol.id)));
                 }
                 SymbolKind::Parameter => {}
                 SymbolKind::Function => {
-                    instructions.push(Stage1Instruction::Push(Stage1Value::Callable(
+                    chunk.push(Stage1Instruction::Push(Stage1Value::Callable(
                         IState::Unset(name.clone()),
                     )));
                 }
@@ -250,14 +312,10 @@ impl Stage1Compiler {
         } else {
             Stage1Callee::Function
         };
-        instructions.push(Stage1Instruction::Call(callee, count as u8));
+        chunk.push(Stage1Instruction::Call(callee, count as u8));
     }
 
-    fn compile_operator(
-        &mut self,
-        instructions: &mut Vec<Stage1Instruction>,
-        spanned: &Spanned<Expr>,
-    ) {
+    fn compile_operator(&mut self, chunk: &mut Chunk, spanned: &Spanned<Expr>) {
         let Expr::List(list) = &spanned.expr else {
             unreachable!();
         };
@@ -277,30 +335,25 @@ impl Stage1Compiler {
 
         let count = list.len() - 1;
         for spanned in list.iter().skip(1) {
-            self.compile_expr(instructions, spanned);
+            self.compile_expr(chunk, spanned);
         }
         for _ in 0..count - 1 {
-            instructions.push(op.clone());
+            chunk.push(op.clone());
         }
     }
 
-    fn compile_keyword(
-        &mut self,
-        instructions: &mut Vec<Stage1Instruction>,
-        spanned: &Spanned<Expr>,
-        name: &str,
-    ) {
+    fn compile_keyword(&mut self, chunk: &mut Chunk, spanned: &Spanned<Expr>, name: &str) {
         match name {
             "fn" => self.compile_fn(spanned),
-            "lambda" => self.compile_lambda(instructions, spanned),
-            "var" => self.compile_var(instructions, spanned),
-            "if" => self.compile_if(instructions, spanned),
+            "lambda" => self.compile_lambda(chunk, spanned),
+            "var" => self.compile_var(chunk, spanned),
+            "if" => self.compile_if(chunk, spanned),
             // "let", "if"
             _ => unreachable!("unknown keyword: {}", name),
         }
     }
 
-    fn compile_if(&mut self, instructions: &mut Vec<Stage1Instruction>, spanned: &Spanned<Expr>) {
+    fn compile_if(&mut self, chunk: &mut Chunk, spanned: &Spanned<Expr>) {
         const CONDITION: usize = 1;
         const THEN: usize = 2;
         const ELSE: usize = 3;
@@ -314,28 +367,33 @@ impl Stage1Compiler {
 
         // TODO: Not sure how to get the offset here.  Maybe pass a differ vec in to collect the
         // instructions to count for the offset to jump if the condition is false?
-        self.compile_expr(instructions, condition_spanned);
+        self.compile_expr(chunk, condition_spanned);
 
         let Some(then_spanned) = list.get(THEN) else {
             panic!("if without then");
         };
 
-        let mut then_instructions = Vec::new();
-        self.compile_expr(&mut then_instructions, then_spanned);
-        let then_offset = then_instructions.len() + 1;
+        let mut then_chunk = Chunk::new();
+        self.compile_expr(&mut then_chunk, then_spanned);
+        let then_offset = then_chunk.size() + Stage1Instruction::Jump(0).size();
+        // 1. jump to else if false 4
+        // 2. then
+        // 3. jump to end 5
+        // 4. else
+        // 5. end
 
-        let mut else_instructions = Vec::new();
+        let mut else_chunk = Chunk::new();
         if let Some(else_spanned) = list.get(ELSE) {
-            self.compile_expr(&mut else_instructions, else_spanned);
+            self.compile_expr(&mut else_chunk, else_spanned);
         };
-        let else_offset = else_instructions.len();
-        instructions.push(Stage1Instruction::JumpIf(then_offset));
-        instructions.extend(then_instructions);
-        instructions.push(Stage1Instruction::Jump(else_offset));
-        instructions.extend(else_instructions);
+        let else_offset = else_chunk.size();
+        chunk.push(Stage1Instruction::JumpIf(then_offset));
+        chunk.extend(then_chunk);
+        chunk.push(Stage1Instruction::Jump(else_offset));
+        chunk.extend(else_chunk);
     }
 
-    fn compile_var(&mut self, instructions: &mut Vec<Stage1Instruction>, spanned: &Spanned<Expr>) {
+    fn compile_var(&mut self, chunk: &mut Chunk, spanned: &Spanned<Expr>) {
         let Expr::List(list) = &spanned.expr else {
             unreachable!();
         };
@@ -347,7 +405,7 @@ impl Stage1Compiler {
         };
 
         for expr in list.iter().skip(2) {
-            self.compile_expr(instructions, expr);
+            self.compile_expr(chunk, expr);
         }
 
         let Some(symbol) = self.symbol_table.lookup(name) else {
@@ -359,7 +417,7 @@ impl Stage1Compiler {
         } else {
             Stage1Instruction::LoadLocal
         };
-        instructions.push(instruction);
+        chunk.push(instruction);
     }
 
     fn compile_fn(&mut self, spanned: &Spanned<Expr>) {
@@ -393,7 +451,7 @@ impl Stage1Compiler {
             );
         };
 
-        let mut params = Vec::new();
+        let mut params = Chunk::new();
         for param in expr_params.iter() {
             let Expr::Symbol(_) = &param.expr else {
                 panic!("expected symbol for param");
@@ -402,7 +460,7 @@ impl Stage1Compiler {
             params.push(Stage1Instruction::LoadLocal);
         }
 
-        let mut body = Vec::new();
+        let mut body = Chunk::new();
         for expr in list.iter().skip(BODY) {
             self.compile_expr(&mut body, expr);
         }
@@ -418,17 +476,13 @@ impl Stage1Compiler {
 
         self.functions.push(Stage1Function {
             name: name.to_string(),
-            prelude: vec![],
+            prelude: Chunk::new(),
             params,
             body,
         });
     }
 
-    fn compile_lambda(
-        &mut self,
-        instructions: &mut Vec<Stage1Instruction>,
-        spanned: &Spanned<Expr>,
-    ) {
+    fn compile_lambda(&mut self, chunk: &mut Chunk, spanned: &Spanned<Expr>) {
         const PARAMS: usize = 1;
         const BODY: usize = 2;
         let Expr::List(list) = &spanned.expr else {
@@ -460,7 +514,7 @@ impl Stage1Compiler {
             params.push(Stage1Instruction::LoadLocal);
         }
 
-        let mut body = Vec::new();
+        let mut body = Chunk::new();
         for expr in list.iter().skip(BODY) {
             self.compile_expr(&mut body, expr);
         }
@@ -475,8 +529,8 @@ impl Stage1Compiler {
                 } else {
                     Stage1Instruction::GetLocal(IState::Unset(name.to_string()))
                 };
-                instructions.push(instruction);
-                instructions.push(Stage1Instruction::LoadFree);
+                chunk.push(instruction);
+                chunk.push(Stage1Instruction::LoadFree);
             }
         }
 
@@ -485,14 +539,14 @@ impl Stage1Compiler {
 
         self.symbol_table.exit_scope();
 
-        instructions.push(Stage1Instruction::Push(Stage1Value::Callable(
+        chunk.push(Stage1Instruction::Push(Stage1Value::Callable(
             IState::Unset(name.to_string()),
         )));
 
         self.lambdas.push(Stage1Lambda {
             name: name.to_string(),
-            params,
-            body,
+            params: Chunk::from(params),
+            body: Chunk::from(body),
         });
     }
 }
