@@ -14,6 +14,7 @@ const OPERATORS: &[&str] = &[
     "+", "-", "*", "/", "=", ">", "<", ">=", "<=", "and", "or", "not", "mod",
 ];
 const BUILTINS: &[&str] = &[
+    "split",
     "to-string",
     "filter",
     "fold-right",

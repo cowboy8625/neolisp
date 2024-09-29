@@ -41,17 +41,6 @@
 - example:
 ```lisp
 (sleep 1000) ; -> false
-```
-
-### split
-- return list of string split by separator
-- arguments
-   1. `String` separator
-   2. `String` string to split
-- example:
-```lisp
-(split " " "(+ 1 1)") ; ->  ("(+" "1" "1)")
-```
 
 ### join
 - NOT IMPLEMENTED

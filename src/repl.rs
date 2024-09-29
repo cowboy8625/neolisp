@@ -110,6 +110,9 @@ pub fn run(args: Cli) -> Result<()> {
         };
         let mut machine = Machine::new(program);
         machine.run();
+        if let Some(last) = machine.stack.last() {
+            eprintln!("{last:?}");
+        }
     }
     if rl.append_history(&args.history_path).is_err() {
         std::fs::write(&args.history_path, "")?;

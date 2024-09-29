@@ -3,6 +3,25 @@ use super::Value;
 use anyhow::Result;
 use std::io::Write;
 
+pub fn nlvm_split(machine: &mut Machine, count: u8) -> Result<()> {
+    // (split " " "(+ 1 1)") ; ->  ("(+" "1" "1)")
+    if count != 2 {
+        anyhow::bail!("split only support 2 args");
+    }
+    let Some(Value::String(string)) = machine.stack.pop() else {
+        anyhow::bail!("expected string on stack for split")
+    };
+    let Some(Value::String(item)) = machine.stack.pop() else {
+        anyhow::bail!("expected string on stack for split")
+    };
+    let result = string
+        .split(&item)
+        .map(|i| Value::String(i.to_string()))
+        .collect::<Vec<_>>();
+    machine.stack.push(Value::List(result));
+
+    Ok(())
+}
 pub fn nlvm_to_string(machine: &mut Machine, count: u8) -> Result<()> {
     // (to-string 1000) => "1000"
     // TODO: Maybe support for more then one arg?
