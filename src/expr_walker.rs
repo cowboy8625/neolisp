@@ -9,8 +9,12 @@ pub struct VarExpr<'a> {
 
 #[derive(Debug)]
 pub struct TestExpr;
+
 #[derive(Debug)]
-pub struct LoopExpr;
+pub struct LoopExpr<'a> {
+    condition: &'a Spanned<Expr>,
+    body: &'a Spanned<Expr>,
+}
 
 #[derive(Debug)]
 pub struct LambdaExpr<'a> {
@@ -31,7 +35,8 @@ pub trait AstWalker {
     fn handle_builtin(&mut self, _: &str, _: &[Spanned<Expr>]);
     fn handle_function(&mut self, _: &FunctionExpr<'_>);
     fn handle_lambda(&mut self, _: &LambdaExpr<'_>);
-    fn handle_var(&mut self, _: &VarExpr);
+    fn handle_var(&mut self, _: &VarExpr<'_>);
+    fn handle_loop(&mut self, _: &LoopExpr<'_>);
     fn handle_bool(&mut self, _: bool);
     fn handle_string(&mut self, _: &str);
     fn handle_number(&mut self, _: f64);
@@ -188,8 +193,29 @@ pub trait AstWalker {
         self.handle_var(&var);
     }
 
-    fn walk_test(&mut self, _: &[Spanned<Expr>]) {}
-    fn walk_loop(&mut self, _: &[Spanned<Expr>]) {}
+    fn walk_test(&mut self, _: &[Spanned<Expr>]) {
+        todo!()
+    }
+
+    fn walk_loop(&mut self, elements: &[Spanned<Expr>]) {
+        const CONDTION: usize = 1;
+        const BODY: usize = 2;
+        let Some(condtion_spanned) = elements.get(CONDTION) else {
+            // TODO: REPORT ERROR
+            unreachable!();
+        };
+
+        let Some(body_spanned) = elements.get(BODY) else {
+            // TODO: REPORT ERROR
+            unreachable!();
+        };
+
+        let loop_expr = LoopExpr {
+            condition: &condtion_spanned,
+            body: &body_spanned,
+        };
+        self.handle_loop(&loop_expr);
+    }
 
     fn walk_expr(&mut self, spanned: &Spanned<Expr>) {
         match &spanned.expr {
