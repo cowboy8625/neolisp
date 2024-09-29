@@ -2,7 +2,7 @@ use core::panic;
 
 use super::builtin;
 use super::decompile::{decompile, get_instruction};
-use super::instruction::{Callee, Instruction};
+use super::instruction::{Callee, Direction, Instruction};
 use super::value::Value;
 
 const RED: &str = "\x1b[31m";
@@ -379,8 +379,11 @@ impl Machine {
                     self.ip += address;
                 }
             }
-            Instruction::Jump(address) => {
+            Instruction::Jump(Direction::Forward(address)) => {
                 self.ip += address;
+            }
+            Instruction::Jump(Direction::Backward(address)) => {
+                self.ip -= address;
             }
         }
     }

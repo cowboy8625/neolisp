@@ -1,4 +1,4 @@
-use super::{Callee, Instruction, OpCode, Value};
+use super::{Callee, Direction, Instruction, OpCode, Value};
 use num_traits::FromPrimitive;
 pub fn decompile(bytes: &[u8]) -> Vec<Instruction> {
     let mut ip = 0;
@@ -85,11 +85,21 @@ pub fn get_instruction(bytes: &[u8], ip: &mut usize) -> Result<Instruction, Stri
             *ip += 4;
             Ok(Instruction::JumpIf(address as usize))
         }
-        OpCode::Jump => {
-            let address = u32::from_le_bytes(bytes[*ip..*ip + 4].try_into().unwrap());
-            *ip += 4;
-            Ok(Instruction::Jump(address as usize))
-        }
+        OpCode::Jump => match bytes[*ip] {
+            Direction::OPCODE_FORWARD => {
+                *ip += 1;
+                let address = u32::from_le_bytes(bytes[*ip..*ip + 4].try_into().unwrap());
+                *ip += 4;
+                Ok(Instruction::Jump(Direction::Forward(address as usize)))
+            }
+            Direction::OPCODE_BACKWARD => {
+                *ip += 1;
+                let address = u32::from_le_bytes(bytes[*ip..*ip + 4].try_into().unwrap());
+                *ip += 4;
+                Ok(Instruction::Jump(Direction::Backward(address as usize)))
+            }
+            _ => unreachable!(),
+        },
     }
 }
 
@@ -249,10 +259,35 @@ fn test_decompile_jump_if() {
 
 #[test]
 fn test_decompile_jump() {
-    let bytes = vec![OpCode::Jump as u8, 0x10, 0x00, 0x00, 0x00];
+    let bytes = vec![
+        OpCode::Jump as u8,
+        Direction::OPCODE_FORWARD,
+        0x10,
+        0x00,
+        0x00,
+        0x00,
+    ];
 
     let instructions = decompile(&bytes);
-    assert_eq!(instructions, vec![Instruction::Jump(16)]);
+    assert_eq!(
+        instructions,
+        vec![Instruction::Jump(Direction::Forward(16))]
+    );
+
+    let bytes = vec![
+        OpCode::Jump as u8,
+        Direction::OPCODE_BACKWARD,
+        0x10,
+        0x00,
+        0x00,
+        0x00,
+    ];
+
+    let instructions = decompile(&bytes);
+    assert_eq!(
+        instructions,
+        vec![Instruction::Jump(Direction::Backward(16))]
+    );
 }
 
 fn get_value(bytes: &[u8], ip: &mut usize) -> Result<Value, String> {

@@ -1,6 +1,7 @@
 use super::{BUILTINS, KEYWORDS, OPERATORS};
 use crate::ast::{Expr, Spanned};
 use crate::symbol_table::{Scope as SymbolScope, SymbolKind, SymbolTable};
+use crate::vm::Direction;
 
 #[derive(Debug)]
 pub struct Stage1Data {
@@ -50,7 +51,7 @@ pub enum Stage1Instruction {
     LoadFree,
     GetFree(IState),
     JumpIf(usize),
-    Jump(usize),
+    Jump(Direction),
 }
 
 impl Stage1Instruction {
@@ -78,7 +79,8 @@ impl Stage1Instruction {
             Self::Push(value) => 1 + value.size(),
             Self::Call(callee, _) => 1 + callee.size() + 1,
             Self::GetLocal(_) | Self::GetGlobal(_) | Self::GetFree(_) => 2,
-            Self::JumpIf(_) | Self::Jump(_) => 5,
+            Self::JumpIf(_) => 5,
+            Self::Jump(direction) => 1 + direction.size(),
         }
     }
 }
@@ -366,9 +368,43 @@ impl Stage1Compiler {
             "lambda" => self.compile_lambda(chunk, spanned),
             "var" => self.compile_var(chunk, spanned),
             "if" => self.compile_if(chunk, spanned),
-            // "let", "if"
+            "loop" => self.compile_loop(chunk, spanned),
+            // "let"
             _ => unreachable!("unknown keyword: {}", name),
         }
+    }
+
+    fn compile_loop(&mut self, chunk: &mut Chunk, spanned: &Spanned<Expr>) {
+        const CONDITION: usize = 1;
+        const BODY: usize = 2;
+        let Expr::List(list) = &spanned.expr else {
+            unreachable!();
+        };
+
+        let Some(condition_spanned) = list.get(CONDITION) else {
+            panic!("loop requires condition");
+        };
+
+        let mut chunk_condition = Chunk::new();
+        self.compile_expr(&mut chunk_condition, condition_spanned);
+        eprintln!("{:?}\n{:#?}", chunk_condition, condition_spanned);
+
+        let Some(body_spanned) = list.get(BODY) else {
+            panic!("loop without body");
+        };
+
+        let mut body_chunk = Chunk::new();
+        self.compile_expr(&mut body_chunk, body_spanned);
+
+        let body_offset = body_chunk.size();
+        let start_offset = body_offset
+            + chunk_condition.size()
+            + Stage1Instruction::JumpIf(0).size()
+            + Stage1Instruction::Jump(Direction::Backward(0)).size();
+        chunk.extend(chunk_condition);
+        chunk.push(Stage1Instruction::JumpIf(body_offset));
+        chunk.extend(body_chunk);
+        chunk.push(Stage1Instruction::Jump(Direction::Backward(start_offset)));
     }
 
     fn compile_if(&mut self, chunk: &mut Chunk, spanned: &Spanned<Expr>) {
@@ -393,7 +429,7 @@ impl Stage1Compiler {
 
         let mut then_chunk = Chunk::new();
         self.compile_expr(&mut then_chunk, then_spanned);
-        let then_offset = then_chunk.size() + Stage1Instruction::Jump(0).size();
+        let then_offset = then_chunk.size() + Stage1Instruction::Jump(Direction::Forward(0)).size();
         // 1. jump to else if false 4
         // 2. then
         // 3. jump to end 5
@@ -407,7 +443,7 @@ impl Stage1Compiler {
         let else_offset = else_chunk.size();
         chunk.push(Stage1Instruction::JumpIf(then_offset));
         chunk.extend(then_chunk);
-        chunk.push(Stage1Instruction::Jump(else_offset));
+        chunk.push(Stage1Instruction::Jump(Direction::Forward(else_offset)));
         chunk.extend(else_chunk);
     }
 
@@ -588,5 +624,41 @@ fn get_operator_opcode(op: &str) -> Option<Stage1Instruction> {
         "not" => Some(Stage1Instruction::Not),
         "mod" => Some(Stage1Instruction::Mod),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Stage1Instruction::*, *};
+    use crate::parser::parser;
+    use crate::symbol_table::SymbolWalker;
+    use crate::vm::Direction;
+    use chumsky::prelude::Parser;
+    use pretty_assertions::assert_eq;
+    #[test]
+    fn test_loop() {
+        let src = r#"
+(fn main () (loop true (print "Hello World!\n")))
+"#;
+        let ast = parser().parse(src).unwrap();
+        let symbol_table = SymbolWalker::default().walk(&ast).unwrap();
+        let stage1_compiler = Stage1Compiler::new(symbol_table).compiler(&ast);
+        assert_eq!(stage1_compiler.functions.len(), 1, "one function");
+        let main = &stage1_compiler.functions[0];
+        assert_eq!(main.name, "main", "main function name");
+        assert_eq!(main.params, Chunk::new(), "main function params");
+        assert_eq!(main.prelude, Chunk::new(), "main function prelude");
+        assert_eq!(
+            main.body,
+            Chunk::from(vec![
+                Push(Stage1Value::Bool(true)),
+                JumpIf(28),
+                Push(Stage1Value::String("Hello World!\n".to_string())),
+                Call(Stage1Callee::Builtin("print".to_string()), 1),
+                Jump(Direction::Backward(42)),
+                Halt,
+            ]),
+            "main function body"
+        );
     }
 }
