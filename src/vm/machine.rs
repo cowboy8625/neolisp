@@ -432,6 +432,7 @@ impl Machine {
 
     fn builtins(&mut self, name: String, arg_count: u8) {
         match name.as_str() {
+            "slice" => builtin::nlvm_slice(self, arg_count).unwrap(),
             "join" => builtin::nlvm_join(self, arg_count).unwrap(),
             "split" => builtin::nlvm_split(self, arg_count).unwrap(),
             "to-string" => builtin::nlvm_to_string(self, arg_count).unwrap(),

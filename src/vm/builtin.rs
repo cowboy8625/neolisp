@@ -3,6 +3,45 @@ use super::Value;
 use anyhow::Result;
 use std::io::Write;
 
+pub fn nlvm_slice(machine: &mut Machine, count: u8) -> Result<()> {
+    // (slice "abc" 1 2) ; -> "b"
+    // (slice (list 1 2 3) 1 2) ; -> (2)
+    if count != 3 {
+        anyhow::bail!("slice only support 3 args");
+    }
+    let Some(Value::F64(end)) = machine.stack.pop() else {
+        anyhow::bail!("expected int on stack for slice")
+    };
+    let Some(Value::F64(start)) = machine.stack.pop() else {
+        anyhow::bail!("expected int on stack for slice")
+    };
+    let Some(item) = machine.stack.pop() else {
+        anyhow::bail!("expected string or list on stack for slice")
+    };
+
+    match item {
+        Value::String(string) => {
+            let result = string
+                .chars()
+                .skip(start as usize)
+                .take((end - start) as usize)
+                .collect::<String>();
+            machine.stack.push(Value::String(result));
+        }
+        Value::List(list) => {
+            let result = list
+                .iter()
+                .skip(start as usize)
+                .take((end - start) as usize)
+                .cloned()
+                .collect::<Vec<_>>();
+            machine.stack.push(Value::List(result));
+        }
+        _ => panic!("expected string or list on stack for slice"),
+    }
+    Ok(())
+}
+
 pub fn nlvm_join(machine: &mut Machine, count: u8) -> Result<()> {
     // (join " " (list "1" "2" "3")) ; -> "1 2 3"
     if count != 2 {

@@ -76,18 +76,6 @@
 (atom? '(1 2 3)) ; -> false
 ```
 
-### slice
-- return a slice of the list or string
-- arguments
-   1. `String` | `List`
-- example:
-```lisp
-(slice "abc" 1 2) ; -> "b"
-(slice (list 1 2 3) 1 2) ; -> (2)
-```
-
-
-
 ## Adding Help message to function
 
 To add help message to a function, simply add a string after the function parameter in the signature.
