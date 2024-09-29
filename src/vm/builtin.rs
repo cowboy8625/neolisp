@@ -3,6 +3,26 @@ use super::Value;
 use anyhow::Result;
 use std::io::Write;
 
+pub fn nlvm_join(machine: &mut Machine, count: u8) -> Result<()> {
+    // (join " " (list "1" "2" "3")) ; -> "1 2 3"
+    if count != 2 {
+        anyhow::bail!("join only support 2 args");
+    }
+    let Some(Value::List(list)) = machine.stack.pop() else {
+        anyhow::bail!("expected list on stack for join")
+    };
+    let Some(Value::String(string)) = machine.stack.pop() else {
+        anyhow::bail!("expected string on stack for join")
+    };
+    let result = list
+        .iter()
+        .map(|i| i.to_string())
+        .collect::<Vec<_>>()
+        .join(&string);
+    machine.stack.push(Value::String(result));
+    Ok(())
+}
+
 pub fn nlvm_split(machine: &mut Machine, count: u8) -> Result<()> {
     // (split " " "(+ 1 1)") ; ->  ("(+" "1" "1)")
     if count != 2 {

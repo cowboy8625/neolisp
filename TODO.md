@@ -42,17 +42,6 @@
 ```lisp
 (sleep 1000) ; -> false
 
-### join
-- NOT IMPLEMENTED
-- return string joined by separator
-- arguments
-   1. `String` separator
-   2. `List` list of string
-- example:
-```lisp
-(join " " (list "1" "2" "3")) ; -> "1 2 3"
-```
-
 ### do
 - Evaluate all the elements of the list and return the final evaluated element.
 - arguments
