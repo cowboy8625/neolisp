@@ -6,6 +6,6 @@ mod machine;
 mod test;
 mod value;
 pub use decompile::decompile;
-pub use instruction::{Callee, Instruction, OpCode};
+pub use instruction::{Callee, Direction, Instruction, OpCode};
 pub use machine::Machine;
 pub use value::Value;

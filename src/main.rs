@@ -40,7 +40,7 @@ const BUILTINS: &[&str] = &[
     "cons",
     "car",
 ];
-const KEYWORDS: &[&str] = &["var", "let", "fn", "if", "lambda"];
+const KEYWORDS: &[&str] = &["var", "let", "fn", "if", "lambda", "loop"];
 
 use clap::Parser as ClapParser;
 fn main() -> anyhow::Result<()> {

@@ -64,7 +64,7 @@ pub enum Instruction {
     LoadFree,
     GetFree(usize),
     JumpIf(usize),
-    Jump(usize),
+    Jump(Direction),
 }
 
 impl Instruction {
@@ -129,9 +129,9 @@ impl Instruction {
                 bytes.extend_from_slice(&(*address as u32).to_le_bytes());
                 bytes
             }
-            Instruction::Jump(address) => {
+            Instruction::Jump(direction) => {
                 let mut bytes = vec![OpCode::Jump as u8];
-                bytes.extend_from_slice(&(*address as u32).to_le_bytes());
+                bytes.extend_from_slice(&direction.to_bytecode());
                 bytes
             }
         }
@@ -164,7 +164,40 @@ impl Instruction {
             Self::Push(value) => 1 + value.size(),
             Self::Call(callee, _) => 1 + callee.size() + 1,
             Self::GetLocal(_) | Self::GetGlobal(_) | Self::GetFree(_) => 2,
-            Self::JumpIf(_) | Self::Jump(_) => 5,
+            Self::JumpIf(_) => 5,
+            Self::Jump(direction) => 1 + direction.size(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Direction {
+    Forward(usize),
+    Backward(usize),
+}
+
+impl Direction {
+    pub const OPCODE_FORWARD: u8 = 0x00;
+    pub const OPCODE_BACKWARD: u8 = 0x01;
+    pub fn to_bytecode(&self) -> Vec<u8> {
+        match self {
+            Direction::Forward(address) => {
+                let mut bytes = vec![Self::OPCODE_FORWARD];
+                bytes.extend_from_slice(&(*address as u32).to_le_bytes());
+                bytes
+            }
+            Direction::Backward(address) => {
+                let mut bytes = vec![Self::OPCODE_BACKWARD];
+                bytes.extend_from_slice(&(*address as u32).to_le_bytes());
+                bytes
+            }
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        match self {
+            Direction::Forward(_) => 5,
+            Direction::Backward(_) => 5,
         }
     }
 }
@@ -208,7 +241,7 @@ mod tests {
         let i = vec![
             Instruction::Push(Value::String("then\n".to_string())),
             Instruction::Call(Callee::Builtin("print".to_string()), 1),
-            Instruction::Jump(19),
+            Instruction::Jump(Direction::Forward(19)),
         ];
         let size = i.iter().map(|i| i.size()).sum::<usize>();
         eprintln!("{}", size);
@@ -228,7 +261,7 @@ mod tests {
         test_size_vs_bytes_len(Instruction::JumpIf(24));
         test_size_vs_bytes_len(Instruction::Push(Value::String("then\n".to_string())));
         test_size_vs_bytes_len(Instruction::Call(Callee::Builtin("print".to_string()), 1));
-        test_size_vs_bytes_len(Instruction::Jump(19));
+        test_size_vs_bytes_len(Instruction::Jump(Direction::Forward(19)));
         test_size_vs_bytes_len(Instruction::Push(Value::String("else\n".to_string())));
         test_size_vs_bytes_len(Instruction::Call(Callee::Builtin("print".to_string()), 1));
         test_size_vs_bytes_len(Instruction::Halt);
