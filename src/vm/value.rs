@@ -83,6 +83,20 @@ impl Value {
         // opcode + content
         1 + conent_size
     }
+
+    pub fn type_of(&self) -> String {
+        match self {
+            Self::U8(_) => "u8".to_string(),
+            Self::I32(_) => "i32".to_string(),
+            Self::U32(_) => "u32".to_string(),
+            Self::F32(_) => "f32".to_string(),
+            Self::F64(_) => "f64".to_string(),
+            Self::String(_) => "String".to_string(),
+            Self::Bool(_) => "Bool".to_string(),
+            Self::List(_) => "List".to_string(),
+            Self::Callable(_) => "Function".to_string(),
+        }
+    }
 }
 
 impl std::fmt::Display for Value {

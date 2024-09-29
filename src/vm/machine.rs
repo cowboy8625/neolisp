@@ -121,6 +121,40 @@ impl Machine {
                     _ => panic!("invalid types for Add"),
                 }
             }
+            Instruction::Mul => {
+                let Some(right) = self.stack.pop() else {
+                    panic!("expected value on stack for Mul")
+                };
+                let Some(left) = self.stack.pop() else {
+                    panic!("expected value on stack for Mul")
+                };
+                match (left, right) {
+                    (Value::I32(left), Value::I32(right)) => {
+                        self.stack.push(Value::I32(left * right));
+                    }
+                    (Value::F64(left), Value::F64(right)) => {
+                        self.stack.push(Value::F64(left * right));
+                    }
+                    _ => panic!("invalid types for Mul"),
+                }
+            }
+            Instruction::Div => {
+                let Some(right) = self.stack.pop() else {
+                    panic!("expected value on stack for Div")
+                };
+                let Some(left) = self.stack.pop() else {
+                    panic!("expected value on stack for Div")
+                };
+                match (left, right) {
+                    (Value::I32(left), Value::I32(right)) => {
+                        self.stack.push(Value::I32(left / right));
+                    }
+                    (Value::F64(left), Value::F64(right)) => {
+                        self.stack.push(Value::F64(left / right));
+                    }
+                    _ => panic!("invalid types for Div"),
+                }
+            }
             Instruction::Eq => {
                 let Some(right) = self.stack.pop() else {
                     panic!("expected value on stack for Eq")
@@ -141,6 +175,88 @@ impl Machine {
                     _ => panic!("invalid types for Add"),
                 }
             }
+            Instruction::GreaterThan => {
+                let Some(right) = self.stack.pop() else {
+                    panic!("expected value on stack for Greater Than")
+                };
+                let Some(left) = self.stack.pop() else {
+                    panic!("expected value on stack for Greater Than")
+                };
+                match (left, right) {
+                    (Value::I32(left), Value::I32(right)) => {
+                        self.stack.push(Value::Bool(left > right));
+                    }
+                    (Value::F64(left), Value::F64(right)) => {
+                        self.stack.push(Value::Bool(left > right));
+                    }
+                    _ => panic!("invalid types for Greater Than"),
+                }
+            }
+            Instruction::LessThan => {
+                let Some(right) = self.stack.pop() else {
+                    panic!("expected value on stack for Less Than")
+                };
+                let Some(left) = self.stack.pop() else {
+                    panic!("expected value on stack for Less Than")
+                };
+                match (left, right) {
+                    (Value::I32(left), Value::I32(right)) => {
+                        self.stack.push(Value::Bool(left < right));
+                    }
+                    (Value::F64(left), Value::F64(right)) => {
+                        self.stack.push(Value::Bool(left < right));
+                    }
+                    _ => panic!("invalid types for Less Than"),
+                }
+            }
+            Instruction::GreaterThanOrEqual => {
+                let Some(right) = self.stack.pop() else {
+                    panic!("expected value on stack for Greater Than or Equal")
+                };
+                let Some(left) = self.stack.pop() else {
+                    panic!("expected value on stack for Greater Than or Equal")
+                };
+                match (left, right) {
+                    (Value::I32(left), Value::I32(right)) => {
+                        self.stack.push(Value::Bool(left >= right));
+                    }
+                    (Value::F64(left), Value::F64(right)) => {
+                        self.stack.push(Value::Bool(left >= right));
+                    }
+                    _ => panic!("invalid types for Greater Than or Equal"),
+                }
+            }
+            Instruction::LessThanOrEqual => {
+                let Some(right) = self.stack.pop() else {
+                    panic!("expected value on stack for Less Than or Equal")
+                };
+                let Some(left) = self.stack.pop() else {
+                    panic!("expected value on stack for Less Than or Equal")
+                };
+                match (left, right) {
+                    (Value::I32(left), Value::I32(right)) => {
+                        self.stack.push(Value::Bool(left <= right));
+                    }
+                    (Value::F64(left), Value::F64(right)) => {
+                        self.stack.push(Value::Bool(left <= right));
+                    }
+                    _ => panic!("invalid types for Greater Less or Equal"),
+                }
+            }
+            Instruction::And => {
+                let Some(right) = self.stack.pop() else {
+                    panic!("expected value on stack for Or")
+                };
+                let Some(left) = self.stack.pop() else {
+                    panic!("expected value on stack for Or")
+                };
+                match (left, right) {
+                    (Value::Bool(left), Value::Bool(right)) => {
+                        self.stack.push(Value::Bool(left && right));
+                    }
+                    _ => panic!("invalid types for Or"),
+                }
+            }
             Instruction::Or => {
                 let Some(right) = self.stack.pop() else {
                     panic!("expected value on stack for Or")
@@ -153,6 +269,34 @@ impl Machine {
                         self.stack.push(Value::Bool(left || right));
                     }
                     _ => panic!("invalid types for Or"),
+                }
+            }
+            Instruction::Not => {
+                let Some(value) = self.stack.pop() else {
+                    panic!("expected value on stack for Not")
+                };
+                match value {
+                    Value::Bool(b) => {
+                        self.stack.push(Value::Bool(!b));
+                    }
+                    _ => panic!("invalid types for Not"),
+                }
+            }
+            Instruction::Mod => {
+                let Some(right) = self.stack.pop() else {
+                    panic!("expected value on stack for Mod")
+                };
+                let Some(left) = self.stack.pop() else {
+                    panic!("expected value on stack for Mod")
+                };
+                match (left, right) {
+                    (Value::I32(left), Value::I32(right)) => {
+                        self.stack.push(Value::I32(left % right));
+                    }
+                    (Value::F64(left), Value::F64(right)) => {
+                        self.stack.push(Value::F64(left % right));
+                    }
+                    _ => panic!("invalid types for Mod"),
                 }
             }
             Instruction::Rot => {
@@ -246,6 +390,22 @@ impl Machine {
             self.run_once();
         }
     }
+
+    pub fn call(&mut self, address: usize, arg_count: usize) {
+        self.new_local_stack();
+        self.stack.push(Value::U32(self.ip as u32));
+        self.ip = address;
+        self.bring_to_top_of_stack(arg_count);
+        loop {
+            let mut ip = self.ip;
+            let Some(Instruction::Return) = get_instruction(&self.program, &mut ip).ok() else {
+                self.run_once();
+                continue;
+            };
+            self.run_once();
+            break;
+        }
+    }
 }
 
 impl Machine {
@@ -272,10 +432,27 @@ impl Machine {
 
     fn builtins(&mut self, name: String, arg_count: u8) {
         match name.as_str() {
+            "sleep" => builtin::nlvm_sleep(self, arg_count).unwrap(),
+            "atom?" => builtin::nlvm_is_atom(self, arg_count).unwrap(),
+            "number?" => builtin::nlvm_is_number(self, arg_count).unwrap(),
+            "slice" => builtin::nlvm_slice(self, arg_count).unwrap(),
+            "join" => builtin::nlvm_join(self, arg_count).unwrap(),
+            "split" => builtin::nlvm_split(self, arg_count).unwrap(),
+            "to-string" => builtin::nlvm_to_string(self, arg_count).unwrap(),
+            "filter" => builtin::nlvm_filter(self, arg_count).unwrap(),
+            "fold-right" => builtin::nlvm_fold_right(self, arg_count).unwrap(),
+            "fold" => builtin::nlvm_fold(self, arg_count).unwrap(),
+            "map" => builtin::nlvm_map(self, arg_count).unwrap(),
+            "nth" => builtin::nlvm_nth(self, arg_count).unwrap(),
+            "reverse" => builtin::nlvm_reverse(self, arg_count).unwrap(),
+            "append" => builtin::nlvm_append(self, arg_count).unwrap(),
+            "last" => builtin::nlvm_last(self, arg_count).unwrap(),
+            "cdr" => builtin::nlvm_cdr(self, arg_count).unwrap(),
+            "typeof" => builtin::nlvm_typeof(self, arg_count).unwrap(),
             "print" => builtin::nlvm_print(self, arg_count).unwrap(),
-            "nth" => builtin::nth(self, arg_count).unwrap(),
             "length" => builtin::length(self, arg_count).unwrap(),
             "assert-eq" => builtin::nlvm_assert_eq(self, arg_count).unwrap(),
+            "assert" => builtin::nlvm_assert(self, arg_count).unwrap(),
             "list" => builtin::list(self, arg_count).unwrap(),
             "cons" => builtin::cons(self, arg_count).unwrap(),
             "car" => builtin::car(self, arg_count).unwrap(),

@@ -30,8 +30,17 @@ pub enum Stage1Instruction {
     Push(Stage1Value),
     Add,
     Sub,
+    Mul,
+    Div,
     Eq,
+    GreaterThan,
+    LessThan,
+    GreaterThanOrEqual,
+    LessThanOrEqual,
+    And,
     Or,
+    Not,
+    Mod,
     Rot,
     Call(Stage1Callee, u8),
     LoadLocal,
@@ -43,13 +52,23 @@ pub enum Stage1Instruction {
     JumpIf(usize),
     Jump(usize),
 }
+
 impl Stage1Instruction {
     pub fn size(&self) -> usize {
         match self {
             Self::Add
             | Self::Sub
+            | Self::Mul
+            | Self::Div
             | Self::Eq
+            | Self::GreaterThan
+            | Self::LessThan
+            | Self::GreaterThanOrEqual
+            | Self::LessThanOrEqual
+            | Self::And
             | Self::Or
+            | Self::Not
+            | Self::Mod
             | Self::Rot
             | Self::Halt
             | Self::LoadGlobal
@@ -210,7 +229,11 @@ impl Stage1Compiler {
                         chunk.push(Stage1Instruction::GetLocal(IState::Set(symbol.id)));
                     }
                     SymbolKind::Variable => todo!("Variable: {}, id: {}", name, symbol.id),
-                    SymbolKind::Function => todo!("Function: {}, id: {}", name, symbol.id),
+                    SymbolKind::Function => {
+                        chunk.push(Stage1Instruction::Push(Stage1Value::Callable(
+                            IState::Unset(name.clone()),
+                        )));
+                    }
                     SymbolKind::Test => todo!("Test {}", name),
                     SymbolKind::Lambda => todo!("Lambda {}", name),
                     SymbolKind::FreeVariable => {
@@ -276,6 +299,8 @@ impl Stage1Compiler {
                 }
                 _ => {}
             }
+        } else if !BUILTINS.contains(&name.as_str()) {
+            panic!("{} is not defined", name);
         };
 
         let count = list.len() - 1;
@@ -325,13 +350,8 @@ impl Stage1Compiler {
         let Expr::Symbol(operator) = &operator_spanned.expr else {
             unreachable!();
         };
-        let op = match operator.as_str() {
-            "+" => Stage1Instruction::Add,
-            "-" => Stage1Instruction::Sub,
-            "=" => Stage1Instruction::Eq,
-            "or" => Stage1Instruction::Or,
-            _ => unreachable!("unknown operator: {}", operator),
-        };
+
+        let op = get_operator_opcode(operator.as_str()).expect("unknown operator");
 
         let count = list.len() - 1;
         for spanned in list.iter().skip(1) {
@@ -548,5 +568,27 @@ impl Stage1Compiler {
             params: Chunk::from(params),
             body: Chunk::from(body),
         });
+    }
+}
+
+fn get_operator_opcode(op: &str) -> Option<Stage1Instruction> {
+    // NOTE: When implementing a new operator if this step is skipped the compiler will crash
+    // here reminding you to add the new operator to this list. ONLY if you added the operator
+    // to the OPERATORS list in main.rs
+    match op {
+        "+" => Some(Stage1Instruction::Add),
+        "-" => Some(Stage1Instruction::Sub),
+        "*" => Some(Stage1Instruction::Mul),
+        "/" => Some(Stage1Instruction::Div),
+        "=" => Some(Stage1Instruction::Eq),
+        ">" => Some(Stage1Instruction::GreaterThan),
+        "<" => Some(Stage1Instruction::LessThan),
+        ">=" => Some(Stage1Instruction::GreaterThanOrEqual),
+        "<=" => Some(Stage1Instruction::LessThanOrEqual),
+        "and" => Some(Stage1Instruction::And),
+        "or" => Some(Stage1Instruction::Or),
+        "not" => Some(Stage1Instruction::Not),
+        "mod" => Some(Stage1Instruction::Mod),
+        _ => None,
     }
 }

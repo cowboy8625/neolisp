@@ -385,11 +385,7 @@ impl SymbolWalker {
                 .push(ErrorKind::MissingFnBody(params_element.span.clone()));
             return;
         };
-        let Expr::List(_) = &body_element.expr else {
-            self.errors
-                .push(ErrorKind::ExpectedFnBodyToBeList(body_element.clone()));
-            return;
-        };
+        self.walk_expr(table, body_element);
 
         // Handle the body
         self.walk_expr(table, body_element);
@@ -523,16 +519,7 @@ impl SymbolWalker {
                 .push(ErrorKind::MissingFnBody(params_element.span.clone()));
             return;
         };
-        let Expr::List(body) = &body_element.expr else {
-            self.errors
-                .push(ErrorKind::ExpectedFnBodyToBeList(body_element.clone()));
-            return;
-        };
-
-        // Handle the body
-        for element in body.iter() {
-            self.walk_expr(table, element);
-        }
+        self.walk_expr(table, body_element);
 
         let symbol = Symbol {
             id,

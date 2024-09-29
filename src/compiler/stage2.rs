@@ -53,8 +53,17 @@ fn into_instructions(
         }
         Stage1Instruction::Add => Instruction::Add,
         Stage1Instruction::Sub => Instruction::Sub,
+        Stage1Instruction::Mul => Instruction::Mul,
+        Stage1Instruction::Div => Instruction::Div,
         Stage1Instruction::Eq => Instruction::Eq,
+        Stage1Instruction::GreaterThan => Instruction::GreaterThan,
+        Stage1Instruction::LessThan => Instruction::LessThan,
+        Stage1Instruction::GreaterThanOrEqual => Instruction::GreaterThanOrEqual,
+        Stage1Instruction::LessThanOrEqual => Instruction::LessThanOrEqual,
+        Stage1Instruction::And => Instruction::And,
         Stage1Instruction::Or => Instruction::Or,
+        Stage1Instruction::Not => Instruction::Not,
+        Stage1Instruction::Mod => Instruction::Mod,
         Stage1Instruction::Rot => Instruction::Rot,
         Stage1Instruction::Call(Stage1Callee::Function, count) => {
             Instruction::Call(Callee::Function, *count)

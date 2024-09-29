@@ -342,10 +342,10 @@ fn test_main_if_else() {
         main.body,
         Chunk::from(vec![
             Push(Stage1Value::Bool(true)),
-            JumpIf(3),
+            JumpIf(25),
             Push(Stage1Value::String("then\n".to_string())),
             Call(Stage1Callee::Builtin("print".to_string()), 1),
-            Jump(2),
+            Jump(20),
             Push(Stage1Value::String("else\n".to_string())),
             Call(Stage1Callee::Builtin("print".to_string()), 1),
             Halt,
