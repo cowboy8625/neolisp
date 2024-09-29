@@ -3,6 +3,18 @@ use super::Value;
 use anyhow::Result;
 use std::io::Write;
 
+pub fn nlvm_sleep(machine: &mut Machine, count: u8) -> Result<()> {
+    // (sleep 1000) ; -> false
+    if count != 1 {
+        anyhow::bail!("sleep only support 1 arg");
+    }
+    let Some(Value::F64(value)) = machine.stack.pop() else {
+        anyhow::bail!("expected number on stack for sleep")
+    };
+    std::thread::sleep(std::time::Duration::from_millis(value as u64));
+    Ok(())
+}
+
 pub fn nlvm_is_atom(machine: &mut Machine, count: u8) -> Result<()> {
     // (atom? 10) ; -> true
     // (atom? "10") ; -> true

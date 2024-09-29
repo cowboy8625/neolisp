@@ -432,6 +432,7 @@ impl Machine {
 
     fn builtins(&mut self, name: String, arg_count: u8) {
         match name.as_str() {
+            "sleep" => builtin::nlvm_sleep(self, arg_count).unwrap(),
             "atom?" => builtin::nlvm_is_atom(self, arg_count).unwrap(),
             "number?" => builtin::nlvm_is_number(self, arg_count).unwrap(),
             "slice" => builtin::nlvm_slice(self, arg_count).unwrap(),

@@ -34,14 +34,6 @@
 (assert (> 1 2) "1 is not greater than 2")
 ```
 
-### sleep
-- returns false
-- arguments
-   1. `Number` time to sleep in milliseconds
-- example:
-```lisp
-(sleep 1000) ; -> false
-
 ### do
 - Evaluate all the elements of the list and return the final evaluated element.
 - arguments
