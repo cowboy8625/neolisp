@@ -51,18 +51,6 @@
 (do (print "hello")(+ 321 123)) ; -> 444
 ```
 
-### number?
-- return true if the argument is a number
-- arguments
-   1. `Any`
-- example:
-```lisp
-(number? 10) ; -> true
-(number? "10") ; -> true
-(number? "abc") ; -> false
-(number? '(1 2 3)) ; -> false
-```
-
 ### atom?
 - NOT IMPLEMENTED
 - return true if the argument is an atom

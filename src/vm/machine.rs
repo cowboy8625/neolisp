@@ -432,6 +432,7 @@ impl Machine {
 
     fn builtins(&mut self, name: String, arg_count: u8) {
         match name.as_str() {
+            "number?" => builtin::nlvm_is_number(self, arg_count).unwrap(),
             "slice" => builtin::nlvm_slice(self, arg_count).unwrap(),
             "join" => builtin::nlvm_join(self, arg_count).unwrap(),
             "split" => builtin::nlvm_split(self, arg_count).unwrap(),

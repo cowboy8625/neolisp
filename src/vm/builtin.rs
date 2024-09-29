@@ -2,6 +2,24 @@ use super::Machine;
 use super::Value;
 use anyhow::Result;
 use std::io::Write;
+pub fn nlvm_is_number(machine: &mut Machine, count: u8) -> Result<()> {
+    // (number? 10) ; -> true
+    // (number? "10") ; -> true
+    // (number? "abc") ; -> false
+    // (number? '(1 2 3)) ; -> false
+    if count != 1 {
+        anyhow::bail!("number? only support 1 arg");
+    }
+    let Some(item) = machine.stack.pop() else {
+        anyhow::bail!("expected number on stack for number?")
+    };
+    let result = matches!(
+        item,
+        Value::F64(_) | Value::U32(_) | Value::I32(_) | Value::F32(_) | Value::U8(_)
+    );
+    machine.stack.push(Value::Bool(result));
+    Ok(())
+}
 
 pub fn nlvm_slice(machine: &mut Machine, count: u8) -> Result<()> {
     // (slice "abc" 1 2) ; -> "b"
