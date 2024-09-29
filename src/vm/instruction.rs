@@ -100,7 +100,7 @@ impl Instruction {
             Instruction::Call(callee, count) => {
                 let mut bytes = vec![OpCode::Call as u8];
                 bytes.extend_from_slice(&callee.to_bytecode());
-                bytes.push(*count as u8);
+                bytes.push(*count);
                 bytes
             }
             Instruction::LoadLocal => vec![OpCode::LoadLocal as u8],

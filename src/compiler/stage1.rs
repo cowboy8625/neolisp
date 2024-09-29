@@ -293,12 +293,9 @@ impl Stage1Compiler {
             unreachable!();
         };
 
-        if let Some(symbol) = self.symbol_table.lookup(&name) {
-            match symbol.kind {
-                SymbolKind::Parameter => {
-                    chunk.push(Stage1Instruction::GetLocal(IState::Set(symbol.id)));
-                }
-                _ => {}
+        if let Some(symbol) = self.symbol_table.lookup(name) {
+            if symbol.kind == SymbolKind::Parameter {
+                chunk.push(Stage1Instruction::GetLocal(IState::Set(symbol.id)));
             }
         } else if !BUILTINS.contains(&name.as_str()) {
             panic!("{} is not defined", name);
@@ -309,7 +306,7 @@ impl Stage1Compiler {
             self.compile_expr(chunk, spanned);
         }
 
-        if let Some(symbol) = self.symbol_table.lookup(&name) {
+        if let Some(symbol) = self.symbol_table.lookup(name) {
             match symbol.kind {
                 SymbolKind::FreeVariable => todo!(),
                 SymbolKind::Variable if symbol.scope == SymbolScope::Global => {
@@ -567,7 +564,7 @@ impl Stage1Compiler {
         self.lambdas.push(Stage1Lambda {
             name: name.to_string(),
             params: Chunk::from(params),
-            body: Chunk::from(body),
+            body,
         });
     }
 }

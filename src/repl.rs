@@ -32,7 +32,7 @@ impl rustyline::ConditionalEventHandler for ShouldRunIfThereIsANewLine {
             }
         }
 
-        if stack > 0 || stack < 0 {
+        if stack != 0 {
             Some(Cmd::Newline)
         } else {
             Some(Cmd::AcceptLine)

@@ -26,11 +26,7 @@ pub fn nlvm_is_atom(machine: &mut Machine, count: u8) -> Result<()> {
     let Some(item) = machine.stack.pop() else {
         anyhow::bail!("expected atom on stack for atom?")
     };
-    let result = match item {
-        Value::List(_) => false,
-        Value::Callable(_) => false,
-        _ => true,
-    };
+    let result = !matches!(item, Value::List(_) | Value::Callable(_));
     machine.stack.push(Value::Bool(result));
     Ok(())
 }

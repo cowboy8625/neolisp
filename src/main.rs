@@ -50,7 +50,7 @@ fn main() -> anyhow::Result<()> {
         cli::Commands::Build { decompile, file } => build(file, decompile),
         cli::Commands::Run { repl, .. } if repl => {
             repl::run(args)?;
-            return Ok(());
+            Ok(())
         }
         cli::Commands::Run {
             breakpoints,
@@ -109,7 +109,7 @@ fn run(file: Option<String>, breakpoints: Vec<usize>, decompile: bool) -> anyhow
 }
 
 fn display_instructions(program: &[u8]) {
-    let instructions = vm::decompile(&program);
+    let instructions = vm::decompile(program);
     let mut offset = 0;
     for int in instructions.iter() {
         eprintln!("{offset:02X} {offset:>2}  {:?}", int);

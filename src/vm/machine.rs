@@ -71,7 +71,7 @@ impl Machine {
         };
 
         match instruction {
-            Instruction::StartAt(address) => self.ip = address as usize,
+            Instruction::StartAt(address) => self.ip = address,
             Instruction::Noop => {}
             Instruction::Halt => self.is_running = false,
             Instruction::Return => {

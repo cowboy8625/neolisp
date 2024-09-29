@@ -5,7 +5,7 @@ pub fn decompile(bytes: &[u8]) -> Vec<Instruction> {
     let mut instructions = Vec::new();
 
     while ip < bytes.len() {
-        let instruction = match get_instruction(&bytes, &mut ip) {
+        let instruction = match get_instruction(bytes, &mut ip) {
             Ok(instruction) => instruction,
             Err(e) => panic!("{}\n{:#?}", e, instructions),
         };

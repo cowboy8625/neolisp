@@ -48,7 +48,7 @@ impl Value {
             Value::String(v) => {
                 let mut bytes = vec![Self::CODE_STRING];
                 bytes.extend_from_slice(&(v.len() as u32).to_le_bytes());
-                bytes.extend_from_slice(&v.as_bytes());
+                bytes.extend_from_slice(v.as_bytes());
                 bytes
             }
             Value::Bool(v) => vec![Self::CODE_BOOL, if *v { 1 } else { 0 }],

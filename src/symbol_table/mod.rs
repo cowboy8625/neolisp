@@ -223,7 +223,7 @@ impl SymbolWalker {
         for spanned in ast.iter() {
             self.walk_expr(&mut table, spanned);
         }
-        if self.errors.len() > 0 {
+        if !self.errors.is_empty() {
             return Err(Errors {
                 errors: self.errors,
             });
@@ -427,7 +427,7 @@ impl SymbolWalker {
             return;
         };
 
-        let kind = if let Expr::List(body) = &body_element.expr {
+        if let Expr::List(body) = &body_element.expr {
             if starts_with(body, "lambda") {
                 self.is_in_lambda = true;
             }
@@ -532,7 +532,7 @@ impl SymbolWalker {
         };
 
         table.insert(name.clone(), symbol);
-        table.exit_new_scope(Some(&name));
+        table.exit_new_scope(Some(name));
 
         self.current_scope = scope;
         self.local_counter = old_local_counter;

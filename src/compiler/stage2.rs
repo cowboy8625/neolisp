@@ -140,20 +140,20 @@ pub fn compile_to_instructions(
     instructions.push(Instruction::StartAt(start_location as usize));
     for function in &data.functions {
         symbol_table.enter_scope(&function.name);
-        let params = convert_section_to_instructions(&symbol_table, &function.params);
+        let params = convert_section_to_instructions(symbol_table, &function.params);
         instructions.extend(params);
-        let prelude = convert_section_to_instructions(&symbol_table, &function.prelude);
+        let prelude = convert_section_to_instructions(symbol_table, &function.prelude);
         instructions.extend(prelude);
-        let body = convert_section_to_instructions(&symbol_table, &function.body);
+        let body = convert_section_to_instructions(symbol_table, &function.body);
         instructions.extend(body);
         symbol_table.exit_scope();
     }
 
     for lambda in &data.lambdas {
         symbol_table.enter_scope(&lambda.name);
-        let params = convert_section_to_instructions(&symbol_table, &lambda.params);
+        let params = convert_section_to_instructions(symbol_table, &lambda.params);
         instructions.extend(params);
-        let body = convert_section_to_instructions(&symbol_table, &lambda.body);
+        let body = convert_section_to_instructions(symbol_table, &lambda.body);
         instructions.extend(body);
         symbol_table.exit_scope();
     }
