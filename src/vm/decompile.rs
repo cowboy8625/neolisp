@@ -29,7 +29,6 @@ pub fn get_instruction(bytes: &[u8], ip: &mut usize) -> Result<Instruction, Stri
 
     match opcode {
         OpCode::StartAt => {
-            debug_assert!(bytes[*ip..].len() >= 5);
             let address = u32::from_le_bytes(bytes[*ip..*ip + 4].try_into().unwrap());
             *ip += 4;
             Ok(Instruction::StartAt(address as usize))
