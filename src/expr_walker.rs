@@ -2,7 +2,11 @@ use super::{BUILTINS, KEYWORDS, OPERATORS};
 use crate::ast::{Expr, Spanned};
 
 #[derive(Debug)]
-pub struct VarExpr;
+pub struct VarExpr<'a> {
+    name: &'a Spanned<Expr>,
+    body: &'a Spanned<Expr>,
+}
+
 #[derive(Debug)]
 pub struct TestExpr;
 #[derive(Debug)]
@@ -159,7 +163,31 @@ pub trait AstWalker {
         self.handle_function(&function);
     }
 
-    fn walk_var(&mut self, _: &[Spanned<Expr>]) {}
+    fn walk_var(&mut self, elements: &[Spanned<Expr>]) {
+        const NAME: usize = 1;
+        const BODY: usize = 2;
+
+        let Some(name_spanned) = elements.get(NAME) else {
+            // TODO: REPORT ERROR
+            unreachable!();
+        };
+        let Expr::Symbol(_) = &name_spanned.expr else {
+            // TODO: REPORT ERROR
+            unreachable!();
+        };
+
+        let Some(body_spanned) = elements.get(BODY) else {
+            // TODO: REPORT ERROR
+            unreachable!();
+        };
+
+        let var = VarExpr {
+            name: name_spanned,
+            body: body_spanned,
+        };
+        self.handle_var(&var);
+    }
+
     fn walk_test(&mut self, _: &[Spanned<Expr>]) {}
     fn walk_loop(&mut self, _: &[Spanned<Expr>]) {}
 
