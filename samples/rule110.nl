@@ -4,7 +4,7 @@
 (fn range (n)
     (if (> n 0)
       (cons (- n 1) (range (- n 1)))
-      '()))
+      (list)))
 
 ; (assert-eq (list 3 2 1 0) (range 4) "range n: 4 return (3 2 1 0)")
 ; (assert-eq (list 0 1 2 3) (reverse (range 4)) "range n: 4 return (0 1 2 3)")
@@ -107,7 +107,7 @@
 ; Loop
 (fn main ()
   (let
-    ((grid (append (map (lambda (x) 0) (range 100)) '(1)))
+    ((grid (append (map (lambda (x) 0) (range 100)) (list 1)))
     (is-running true))
     (loop is-running
       (var grid (next-generation grid))

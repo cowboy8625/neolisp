@@ -3,6 +3,21 @@ use super::Value;
 use anyhow::Result;
 use std::io::Write;
 
+pub fn nlvm_to_string(machine: &mut Machine, count: u8) -> Result<()> {
+    // (to-string 1000) => "1000"
+    // TODO: Maybe support for more then one arg?
+    if count != 1 {
+        anyhow::bail!("to-string only support 1 args");
+    }
+
+    let Some(value) = machine.stack.pop() else {
+        panic!("expected value on stack for to-string")
+    };
+    machine.stack.push(Value::String(value.to_string()));
+
+    Ok(())
+}
+
 pub fn nlvm_filter(machine: &mut Machine, count: u8) -> Result<()> {
     // (filter (lambda (x) (> x 1)) (list 1 2 3)) ; -> (2 3)
     if count != 2 {

@@ -43,15 +43,6 @@
 (sleep 1000) ; -> false
 ```
 
-### to-string
-- return string representation in string form
-- arguments
-   1. `Number`, `Boolean`, `List`
-- example:
-```lisp
-(to-string 1000) ; -> "1000"
-```
-
 ### split
 - return list of string split by separator
 - arguments
