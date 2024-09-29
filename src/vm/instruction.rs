@@ -179,16 +179,16 @@ pub enum Direction {
 impl Direction {
     pub const OPCODE_FORWARD: u8 = 0x00;
     pub const OPCODE_BACKWARD: u8 = 0x01;
-    pub fn to_bytecode(&self) -> Vec<u8> {
+    pub fn to_bytecode(self) -> Vec<u8> {
         match self {
             Direction::Forward(address) => {
                 let mut bytes = vec![Self::OPCODE_FORWARD];
-                bytes.extend_from_slice(&(*address as u32).to_le_bytes());
+                bytes.extend_from_slice(&(address as u32).to_le_bytes());
                 bytes
             }
             Direction::Backward(address) => {
                 let mut bytes = vec![Self::OPCODE_BACKWARD];
-                bytes.extend_from_slice(&(*address as u32).to_le_bytes());
+                bytes.extend_from_slice(&(address as u32).to_le_bytes());
                 bytes
             }
         }
