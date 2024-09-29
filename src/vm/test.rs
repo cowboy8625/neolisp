@@ -1,4 +1,3 @@
-use super::*;
 use crate::compiler;
 use crate::parser::parser;
 use crate::symbol_table::SymbolWalker;

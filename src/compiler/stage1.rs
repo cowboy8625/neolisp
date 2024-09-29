@@ -104,6 +104,7 @@ impl Stage1Callee {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stage1Value {
     U8(u8),
