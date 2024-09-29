@@ -295,7 +295,6 @@
 ```
 
 ### fold-right
-- **NOT IMPLEMENTED**
 - returns the result of applying a function to each element of a list in reverse order
 - arguments
    1. `Function`
@@ -378,7 +377,6 @@
 ```
 
 ### join
-- NOT IMPLEMENTED
 - return string joined by separator
 - arguments
    1. `String` separator
@@ -410,7 +408,6 @@
 ```
 
 ### atom?
-- NOT IMPLEMENTED
 - return true if the argument is an atom
 - arguments
    1. `Any`

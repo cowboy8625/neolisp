@@ -51,19 +51,6 @@
 (do (print "hello")(+ 321 123)) ; -> 444
 ```
 
-### atom?
-- NOT IMPLEMENTED
-- return true if the argument is an atom
-- arguments
-   1. `Any`
-- example:
-```lisp
-(atom? 10) ; -> true
-(atom? "10") ; -> true
-(atom? "abc") ; -> true
-(atom? '(1 2 3)) ; -> false
-```
-
 ## Adding Help message to function
 
 To add help message to a function, simply add a string after the function parameter in the signature.

@@ -2,6 +2,27 @@ use super::Machine;
 use super::Value;
 use anyhow::Result;
 use std::io::Write;
+
+pub fn nlvm_is_atom(machine: &mut Machine, count: u8) -> Result<()> {
+    // (atom? 10) ; -> true
+    // (atom? "10") ; -> true
+    // (atom? "abc") ; -> true
+    // (atom? '(1 2 3)) ; -> false
+    if count != 1 {
+        anyhow::bail!("atom? only support 1 arg");
+    }
+    let Some(item) = machine.stack.pop() else {
+        anyhow::bail!("expected atom on stack for atom?")
+    };
+    let result = match item {
+        Value::List(_) => false,
+        Value::Callable(_) => false,
+        _ => true,
+    };
+    machine.stack.push(Value::Bool(result));
+    Ok(())
+}
+
 pub fn nlvm_is_number(machine: &mut Machine, count: u8) -> Result<()> {
     // (number? 10) ; -> true
     // (number? "10") ; -> true
