@@ -452,6 +452,7 @@ impl Machine {
             "print" => builtin::nlvm_print(self, arg_count).unwrap(),
             "length" => builtin::length(self, arg_count).unwrap(),
             "assert-eq" => builtin::nlvm_assert_eq(self, arg_count).unwrap(),
+            "assert" => builtin::nlvm_assert(self, arg_count).unwrap(),
             "list" => builtin::list(self, arg_count).unwrap(),
             "cons" => builtin::cons(self, arg_count).unwrap(),
             "car" => builtin::car(self, arg_count).unwrap(),

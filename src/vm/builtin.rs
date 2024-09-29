@@ -423,6 +423,26 @@ pub fn nlvm_assert_eq(machine: &mut Machine, count: u8) -> Result<()> {
 
     Ok(())
 }
+
+pub fn nlvm_assert(machine: &mut Machine, count: u8) -> Result<()> {
+    // (assert (> 1 2) "1 is not greater than 2")
+    if count != 2 {
+        anyhow::bail!("assert only support 2 args");
+    }
+    let Some(Value::String(message)) = machine.stack.pop() else {
+        anyhow::bail!("expected string on stack for assert")
+    };
+    let Some(Value::Bool(value)) = machine.stack.pop() else {
+        anyhow::bail!("expected boolean on stack for assert")
+    };
+    if !value {
+        let _ = writeln!(std::io::stderr(), "{message}");
+        std::process::exit(1);
+    }
+
+    Ok(())
+}
+
 pub fn list(machine: &mut Machine, count: u8) -> Result<()> {
     let mut items = Vec::new();
     for _ in 0..count {

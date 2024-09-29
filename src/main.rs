@@ -35,6 +35,7 @@ const BUILTINS: &[&str] = &[
     "nth",
     "length",
     "assert-eq",
+    "assert",
     "list",
     "cons",
     "car",

@@ -1,3 +1,4 @@
+- LANGUAGE FEATURE
 ### let
 - binds a list of values to symbols in the current scope and returns the last evaluated value
 - arguments
@@ -11,6 +12,7 @@
    (+ x y)) ; -> 444
 ```
 
+- LANGUAGE FEATURE
 ### loop
 - returns the result of last iteration
 - arguments
@@ -24,16 +26,7 @@
     (var x (+ x 1))))
 ```
 
-### assert
-- throws an error if the condition is false
-- arguments
-   1. `Boolean` condition
-   2. `String` optional error message
-- example:
-```lisp
-(assert (> 1 2) "1 is not greater than 2")
-```
-
+- LANGUAGE FEATURE
 ### do
 - Evaluate all the elements of the list and return the final evaluated element.
 - arguments
@@ -43,6 +36,7 @@
 (do (print "hello")(+ 321 123)) ; -> 444
 ```
 
+- LANGUAGE FEATURE
 ## Adding Help message to function
 
 To add help message to a function, simply add a string after the function parameter in the signature.
