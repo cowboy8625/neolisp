@@ -1,10 +1,8 @@
-#![allow(dead_code)]
-#![allow(unused)]
 #[cfg(test)]
 mod test;
 
-use super::{BUILTINS, KEYWORDS, OPERATORS};
-use crate::ast::{Expr, Span, Spanned};
+use crate::ast::{Expr, Spanned};
+use crate::expr_walker::{AstWalker, FunctionExpr, LambdaExpr, LoopExpr, VarExpr};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -121,54 +119,20 @@ impl SymbolTable {
         self.global_scope.get(name)
     }
 
-    /// Lookup symbols within a specific function scope
-    pub fn lookup_in_function(&self, function_name: &str, symbol_name: &str) -> Option<&Symbol> {
-        if let Some(func_scope) = self.function_scopes.get(function_name) {
-            func_scope.get(symbol_name)
-        } else {
-            None
-        }
-    }
-
-    /// List all global symbols (for later stages)
-    pub fn get_global_symbols(&self) -> &HashMap<String, Symbol> {
-        &self.global_scope
-    }
-
     /// Get the symbol table for a function scope after analysis
     pub fn get_function_scope(&self, function_name: &str) -> Option<&HashMap<String, Symbol>> {
         self.function_scopes.get(function_name)
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum ErrorKind {
-    Parse(String),
-    MissingFnName(Span),
-    MissingFnParams(Span),
-    MissingFnBody(Span),
-    MissingVarName(Span),
-    MissingVarExpression(Span),
-    ExpectedFnNameToBeSymbol(Spanned<Expr>),
-    ExpectedFnParamsToBeList(Spanned<Expr>),
-    ExpectedFnBodyToBeList(Spanned<Expr>),
-    ExpectedVarNameToBeSymbol(Spanned<Expr>),
-    Unimplemented(Spanned<Expr>),
-}
-
-#[derive(Debug)]
-pub struct Errors {
-    pub errors: Vec<ErrorKind>,
-}
-
 #[derive(Debug, Clone, PartialEq, Default)]
 pub enum SymbolType {
     #[default]
     Dynamic,
-    Bool,
-    Int,
-    Float,
-    String,
+    // Bool,
+    // Int,
+    // Float,
+    // String,
     Function(Vec<SymbolType>, Box<SymbolType>), // (params, return type)
 }
 
@@ -178,19 +142,17 @@ pub enum SymbolKind {
     Variable,
     Parameter,
     Function,
-    Test,
+    // Test,
     Lambda,
-    // Constant,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
-pub enum Scope {
+pub enum SymbolScope {
     #[default]
     Global,
     Function,
     Free,
-    Test,
-    // Block(u32),
+    // Test,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -200,146 +162,61 @@ pub struct Symbol {
     pub name: String,
     pub symbol_type: SymbolType,
     pub kind: SymbolKind,
-    pub scope: Scope,
+    pub scope: SymbolScope,
     pub scope_level: u32,
     pub location: Option<u32>,
 }
 
 #[derive(Debug, Default)]
-pub struct SymbolWalker {
-    current_scope: Scope,
+pub struct SymbolTableBuilder {
+    current_scope: SymbolScope,
     lambda_counter: usize,
-    global_counter: usize,
     local_counter: usize,
     free_counter: usize,
     is_in_lambda: bool,
-    errors: Vec<ErrorKind>,
 }
 
-impl SymbolWalker {
-    pub fn walk(mut self, ast: &[Spanned<Expr>]) -> Result<SymbolTable, Errors> {
+impl SymbolTableBuilder {
+    pub fn build(&mut self, ast: &[Spanned<Expr>]) -> SymbolTable {
         let mut table = SymbolTable::new();
-
-        for spanned in ast.iter() {
-            self.walk_expr(&mut table, spanned);
-        }
-        if !self.errors.is_empty() {
-            return Err(Errors {
-                errors: self.errors,
-            });
-        }
-
-        Ok(table)
+        self.walk(&mut table, ast);
+        table
     }
 
-    fn walk_expr(&mut self, table: &mut SymbolTable, spanned: &Spanned<Expr>) {
-        let current_scope_level = table.get_scope_level() as u32;
-        match &spanned.expr {
-            Expr::Symbol(name) if KEYWORDS.contains(&name.as_str()) => {}
-            Expr::Symbol(name) if OPERATORS.contains(&name.as_str()) => {}
-            Expr::Symbol(name) if BUILTINS.contains(&name.as_str()) => {}
-            Expr::Symbol(name) => match table.lookup(name.as_str()).cloned() {
-                Some(symbol) if symbol.scope_level < current_scope_level && self.is_in_lambda => {
-                    if let Some(last) = table.scope_stack.last_mut() {
-                        for (name, other_symbol) in last {
-                            if name != &symbol.name && other_symbol.id > 0 {
-                                other_symbol.id -= 1;
-                            }
-                        }
-                    }
-                    table.insert(
-                        name.clone(),
-                        Symbol {
-                            id: self.get_free_id(),
-                            name: name.to_string(),
-                            symbol_type: symbol.symbol_type.clone(),
-                            kind: SymbolKind::FreeVariable,
-                            scope: Scope::Free,
-                            scope_level: current_scope_level,
-                            location: None,
-                        },
-                    );
-                }
-                Some(symbol) => {}
-                None => {
-                    // eprintln!("Symbol not found: {}", name);
-                    // eprintln!("{:#?}", table);
-                    // self.errors.push(ErrorKind::Unimplemented(spanned.clone()));
-                }
-            },
-            Expr::List(elements) if starts_with(elements, "var") => {
-                self.walk_var(table, elements, &spanned.span);
-                self.current_scope = Scope::Global;
-            }
-            Expr::List(elements) if starts_with(elements, "fn") => {
-                self.walk_fn(table, elements, &spanned.span);
-                self.current_scope = Scope::Global;
-            }
-            Expr::List(elements) if starts_with(elements, "test") => {
-                self.walk_test(table, elements, &spanned.span);
-                self.current_scope = Scope::Global;
-            }
-            Expr::List(list) if starts_with(list, "lambda") => {
-                let old_scope = self.current_scope;
-                self.walk_lambda(table, list, &spanned.span);
-                self.current_scope = old_scope;
-            }
-            Expr::List(list) => self.walk_list(table, list),
-            _ => {}
+    fn get_free_id(&mut self) -> usize {
+        let id = self.free_counter;
+        self.free_counter += 1;
+        id
+    }
+}
+
+impl AstWalker<SymbolTable> for SymbolTableBuilder {
+    fn get_lambda_name(&mut self) -> String {
+        let name = format!("lambda_{}", self.lambda_counter);
+        self.lambda_counter += 1;
+        name
+    }
+
+    fn handle_operator(&mut self, table: &mut SymbolTable, _: &str, expr: &[Spanned<Expr>]) {
+        for spanned in expr.iter().skip(1) {
+            self.walk_expr(table, spanned);
         }
     }
 
-    fn walk_list(&mut self, table: &mut SymbolTable, list: &[Spanned<Expr>]) {
-        for item in list.iter() {
-            self.walk_expr(table, item);
+    fn handle_builtin(&mut self, table: &mut SymbolTable, _: &str, expr: &[Spanned<Expr>]) {
+        for spanned in expr.iter().skip(1) {
+            self.walk_expr(table, spanned);
         }
     }
 
-    fn walk_test(&mut self, table: &mut SymbolTable, elements: &[Spanned<Expr>], span: &Span) {
-        // NOTE: We know that the first element is the "test" keyword
-
+    fn handle_function(&mut self, table: &mut SymbolTable, function: &FunctionExpr) {
         let scope = self.current_scope;
-        self.current_scope = Scope::Test;
-        // Name of the Test
-        let Some(name_element) = elements.get(1) else {
-            self.errors.push(ErrorKind::MissingVarName(span.clone()));
+        self.current_scope = SymbolScope::Function;
+
+        let Expr::Symbol(name) = &function.name.expr else {
+            // TODO: REPORT ERROR
             return;
         };
-
-        let name = match &name_element.expr {
-            Expr::Symbol(name) => name,
-            Expr::String(name) => name,
-            _ => {
-                self.errors
-                    .push(ErrorKind::ExpectedVarNameToBeSymbol(name_element.clone()));
-                return;
-            }
-        };
-
-        for element in elements.iter().skip(2) {
-            self.walk_expr(table, element);
-        }
-
-        let symbol = Symbol {
-            id: table.get_id(),
-            name: name.clone(),
-            symbol_type: SymbolType::Dynamic,
-            kind: SymbolKind::Test,
-            scope,
-            scope_level: table.get_scope_level() as u32,
-            location: None,
-        };
-
-        table.insert(name.clone(), symbol);
-    }
-
-    fn walk_lambda(&mut self, table: &mut SymbolTable, elements: &[Spanned<Expr>], span: &Span) {
-        let scope = self.current_scope;
-        self.current_scope = Scope::Function;
-
-        let name = format!("lambda_{}", self.lambda_counter);
-
-        self.lambda_counter += 1;
 
         let old_local_counter = self.local_counter;
         self.local_counter = 0;
@@ -347,23 +224,17 @@ impl SymbolWalker {
         table.enter_new_scope();
 
         // Parameters of the function
-        let Some(params_element) = elements.get(1) else {
-            self.errors.push(ErrorKind::MissingFnParams(span.clone()));
-            return;
-        };
-        let Expr::List(params) = &params_element.expr else {
-            self.errors
-                .push(ErrorKind::ExpectedFnParamsToBeList(params_element.clone()));
-            return;
+        let Expr::List(params) = &function.params.expr else {
+            // NOTE: This is unreachable code as we already checked this in AstWalker
+            unreachable!();
         };
 
         // Handle the params
         let mut params_symbol_types = Vec::new();
-        for (i, param) in params.iter().enumerate() {
+        for param in params.iter() {
             let expr = &param.expr;
             let Expr::Symbol(param_name) = expr else {
-                self.errors
-                    .push(ErrorKind::ExpectedFnParamsToBeList(params_element.clone()));
+                // TODO: REPORT ERROR
                 return;
             };
             params_symbol_types.push(SymbolType::Dynamic);
@@ -380,15 +251,66 @@ impl SymbolWalker {
         }
 
         // Body of the function
-        let Some(body_element) = elements.get(2) else {
-            self.errors
-                .push(ErrorKind::MissingFnBody(params_element.span.clone()));
-            return;
-        };
-        self.walk_expr(table, body_element);
+        self.walk_expr(table, function.body);
 
-        // Handle the body
-        self.walk_expr(table, body_element);
+        let symbol = Symbol {
+            id,
+            name: name.to_string(),
+            symbol_type: SymbolType::Function(params_symbol_types, Box::new(SymbolType::Dynamic)),
+            kind: SymbolKind::Function,
+            scope,
+            scope_level: table.get_scope_level() as u32,
+            location: None,
+        };
+
+        table.insert(function.name.to_string(), symbol);
+        table.exit_new_scope(Some(name));
+
+        self.current_scope = scope;
+        self.local_counter = old_local_counter;
+    }
+
+    fn handle_lambda(&mut self, table: &mut SymbolTable, lambda: &LambdaExpr) {
+        self.is_in_lambda = true;
+        let scope = self.current_scope;
+        self.current_scope = SymbolScope::Function;
+
+        let name = self.get_lambda_name();
+
+        let old_local_counter = self.local_counter;
+        self.local_counter = 0;
+        let id = table.get_id();
+        table.enter_new_scope();
+
+        // Parameters of the function
+        let Expr::List(params) = &lambda.params.expr else {
+            // NOTE: This is unreachable code as we already checked this in AstWalker
+            unreachable!();
+        };
+
+        // Handle the params
+        let mut params_symbol_types = Vec::new();
+        for param in params.iter() {
+            let expr = &param.expr;
+            let Expr::Symbol(param_name) = expr else {
+                // TODO: REPORT ERROR
+                panic!("expected symbol in lambda params, got: {expr:?}");
+            };
+            params_symbol_types.push(SymbolType::Dynamic);
+            let symbol = Symbol {
+                id: table.get_id(),
+                name: param_name.clone(),
+                symbol_type: SymbolType::Dynamic,
+                kind: SymbolKind::Parameter,
+                scope: self.current_scope,
+                scope_level: table.get_scope_level() as u32,
+                location: None,
+            };
+            table.insert(param_name.clone(), symbol);
+        }
+
+        // Body of the function
+        self.walk_expr(table, lambda.body);
 
         let symbol = Symbol {
             id,
@@ -402,48 +324,18 @@ impl SymbolWalker {
 
         table.insert(name.clone(), symbol);
         table.exit_new_scope(Some(&name));
-
+        self.current_scope = scope;
         self.local_counter = old_local_counter;
+        self.is_in_lambda = false;
     }
 
-    fn walk_var(&mut self, table: &mut SymbolTable, elements: &[Spanned<Expr>], span: &Span) {
-        // NOTE: We know that the first element is the "var" keyword
-
-        // Name of the Variable
-        let Some(name_element) = elements.get(1) else {
-            self.errors.push(ErrorKind::MissingVarName(span.clone()));
-            return;
-        };
-        let Expr::Symbol(name) = &name_element.expr else {
-            self.errors
-                .push(ErrorKind::ExpectedVarNameToBeSymbol(name_element.clone()));
-            return;
+    fn handle_var(&mut self, table: &mut SymbolTable, var: &VarExpr) {
+        let Expr::Symbol(name) = &var.name.expr else {
+            // TODO: REPORT ERROR
+            panic!("var name must be a symbol");
         };
 
-        // Body of the Variable
-        let Some(body_element) = elements.get(2) else {
-            self.errors
-                .push(ErrorKind::MissingVarExpression(name_element.span.clone()));
-            return;
-        };
-
-        if let Expr::List(body) = &body_element.expr {
-            if starts_with(body, "lambda") {
-                self.is_in_lambda = true;
-            }
-        };
-
-        self.walk_expr(table, body_element);
-
-        if self.is_in_lambda {
-            self.is_in_lambda = false;
-        }
-
-        let var_counter = if self.current_scope == Scope::Global {
-            self.global_counter
-        } else {
-            self.local_counter
-        };
+        self.walk_expr(table, var.body);
 
         let symbol = Symbol {
             id: table.get_id(),
@@ -458,101 +350,63 @@ impl SymbolWalker {
         table.insert(name.clone(), symbol);
     }
 
-    fn walk_fn(&mut self, table: &mut SymbolTable, elements: &[Spanned<Expr>], span: &Span) {
-        // NOTE: We know that the first element is the "fn" keyword
+    fn handle_loop(&mut self, table: &mut SymbolTable, loop_expr: &LoopExpr) {
+        self.walk_expr(table, loop_expr.condition);
+        self.walk_expr(table, loop_expr.body);
+    }
 
-        // Name of the function
-        let Some(name_element) = elements.get(1) else {
-            self.errors.push(ErrorKind::MissingFnName(span.clone()));
-            return;
-        };
-        let Expr::Symbol(name) = &name_element.expr else {
-            self.errors
-                .push(ErrorKind::ExpectedFnNameToBeSymbol(name_element.clone()));
-            return;
-        };
-
-        let scope = self.current_scope;
-        self.current_scope = Scope::Function;
-
-        let old_local_counter = self.local_counter;
-        self.local_counter = 0;
-        let id = table.get_id();
-        table.enter_new_scope();
-
-        // Parameters of the function
-        let Some(params_element) = elements.get(2) else {
-            self.errors.push(ErrorKind::MissingFnParams(span.clone()));
-            return;
-        };
-        let Expr::List(params) = &params_element.expr else {
-            self.errors
-                .push(ErrorKind::ExpectedFnParamsToBeList(params_element.clone()));
-            return;
-        };
-
-        // Handle the params
-        let mut params_symbol_types = Vec::new();
-        for param in params.iter() {
-            let expr = &param.expr;
-            let Expr::Symbol(param_name) = expr else {
-                self.errors
-                    .push(ErrorKind::ExpectedFnParamsToBeList(params_element.clone()));
-                return;
-            };
-            params_symbol_types.push(SymbolType::Dynamic);
-            let symbol = Symbol {
-                id: table.get_id(),
-                name: param_name.clone(),
-                symbol_type: SymbolType::Dynamic,
-                kind: SymbolKind::Parameter,
-                scope: self.current_scope,
-                scope_level: table.get_scope_level() as u32,
-                location: None,
-            };
-            table.insert(param_name.clone(), symbol);
+    fn handle_symbol(&mut self, table: &mut SymbolTable, name: &str) {
+        let current_scope_level = table.get_scope_level() as u32;
+        match table.lookup(name).cloned() {
+            Some(symbol) if symbol.scope_level < current_scope_level && self.is_in_lambda => {
+                if let Some(last) = table.scope_stack.last_mut() {
+                    for (name, other_symbol) in last {
+                        if name != &symbol.name && other_symbol.id > 0 {
+                            other_symbol.id -= 1;
+                        }
+                    }
+                }
+                table.insert(
+                    name.to_string(),
+                    Symbol {
+                        // TODO: I think table.get_id() needs to be on SymbolTableBuilder like
+                        // self.get_free_id()
+                        id: self.get_free_id(),
+                        name: name.to_string(),
+                        symbol_type: symbol.symbol_type.clone(),
+                        kind: SymbolKind::FreeVariable,
+                        scope: SymbolScope::Free,
+                        scope_level: current_scope_level,
+                        location: None,
+                    },
+                );
+            }
+            _ => {}
         }
-
-        // Body of the function
-        let Some(body_element) = elements.get(3) else {
-            self.errors
-                .push(ErrorKind::MissingFnBody(params_element.span.clone()));
-            return;
-        };
-        self.walk_expr(table, body_element);
-
-        let symbol = Symbol {
-            id,
-            name: name.clone(),
-            symbol_type: SymbolType::Function(params_symbol_types, Box::new(SymbolType::Dynamic)),
-            kind: SymbolKind::Function,
-            scope,
-            scope_level: table.get_scope_level() as u32,
-            location: None,
-        };
-
-        table.insert(name.clone(), symbol);
-        table.exit_new_scope(Some(name));
-
-        self.current_scope = scope;
-        self.local_counter = old_local_counter;
     }
 
-    fn get_free_id(&mut self) -> usize {
-        let id = self.free_counter;
-        self.free_counter += 1;
-        id
-    }
+    // ----------- START NOT USED -----------
+    fn handle_bool(&mut self, _: &mut SymbolTable, _: bool) {}
+    fn handle_string(&mut self, _: &mut SymbolTable, _: &str) {}
+    fn handle_number(&mut self, _: &mut SymbolTable, _: f64) {}
+    // -----------  END NOT USED  -----------
 }
 
-fn starts_with(elements: &[Spanned<Expr>], start: &str) -> bool {
-    if let Some(Spanned {
-        expr: Expr::Symbol(symbol),
-        ..
-    }) = elements.first()
-    {
-        symbol == start
-    } else {
-        false
-    }
-}
+// fn starts_with(elements: &[Spanned<Expr>], start: &str) -> bool {
+//     if let Some(Spanned {
+//         expr: Expr::Symbol(symbol),
+//         ..
+//     }) = elements.first()
+//     {
+//         symbol == start
+//     } else {
+//         false
+//     }
+// }
+//
+// fn is_lambda(spanned: &Spanned<Expr>) -> bool {
+//     let Expr::List(elements) = &spanned.expr else {
+//         return false;
+//     };
+//     starts_with(elements, "lambda")
+// }

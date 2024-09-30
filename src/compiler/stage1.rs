@@ -1,6 +1,6 @@
 use super::{BUILTINS, KEYWORDS, OPERATORS};
 use crate::ast::{Expr, Spanned};
-use crate::symbol_table::{Scope as SymbolScope, SymbolKind, SymbolTable};
+use crate::symbol_table::{SymbolKind, SymbolScope, SymbolTable};
 use crate::vm::Direction;
 
 #[derive(Debug)]
@@ -237,7 +237,7 @@ impl Stage1Compiler {
                             IState::Unset(name.clone()),
                         )));
                     }
-                    SymbolKind::Test => todo!("Test {}", name),
+                    // SymbolKind::Test => todo!("Test {}", name),
                     SymbolKind::Lambda => todo!("Lambda {}", name),
                     SymbolKind::FreeVariable => {
                         chunk.push(Stage1Instruction::GetFree(IState::Set(symbol.id)));
@@ -326,7 +326,7 @@ impl Stage1Compiler {
                         IState::Unset(name.clone()),
                     )));
                 }
-                SymbolKind::Test => todo!(),
+                // SymbolKind::Test => todo!(),
                 SymbolKind::Lambda => todo!(),
                 _ => todo!(),
             }
@@ -631,7 +631,7 @@ fn get_operator_opcode(op: &str) -> Option<Stage1Instruction> {
 mod tests {
     use super::{Stage1Instruction::*, *};
     use crate::parser::parser;
-    use crate::symbol_table::SymbolWalker;
+    use crate::symbol_table::SymbolTableBuilder;
     use crate::vm::Direction;
     use chumsky::prelude::Parser;
     use pretty_assertions::assert_eq;
@@ -641,7 +641,7 @@ mod tests {
 (fn main () (loop true (print "Hello World!\n")))
 "#;
         let ast = parser().parse(src).unwrap();
-        let symbol_table = SymbolWalker::default().walk(&ast).unwrap();
+        let symbol_table = SymbolTableBuilder::default().build(&ast);
         let stage1_compiler = Stage1Compiler::new(symbol_table).compiler(&ast);
         assert_eq!(stage1_compiler.functions.len(), 1, "one function");
         let main = &stage1_compiler.functions[0];

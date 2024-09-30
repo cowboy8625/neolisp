@@ -13,7 +13,7 @@ fn test_table_creation() {
 (fn main () (print ((add 123) 321) "\n"))
 "#;
     let ast = parser().parse(src).unwrap();
-    let symbol_table = SymbolWalker::default().walk(&ast).unwrap();
+    let symbol_table = SymbolTableBuilder::default().build(&ast);
     eprintln!("{:#?}", symbol_table);
     assert_eq!(
         symbol_table.lookup("add"),
@@ -22,7 +22,7 @@ fn test_table_creation() {
             name: "add".to_string(),
             symbol_type: SymbolType::Dynamic,
             kind: SymbolKind::Variable,
-            scope: Scope::Global,
+            scope: SymbolScope::Global,
             scope_level: 0,
             location: None,
         })
@@ -34,7 +34,7 @@ fn test_table_creation() {
             name: "main".to_string(),
             symbol_type: SymbolType::Function(vec![], Box::new(SymbolType::Dynamic)),
             kind: SymbolKind::Function,
-            scope: Scope::Global,
+            scope: SymbolScope::Global,
             scope_level: 1,
             location: None,
         })
@@ -49,7 +49,7 @@ fn test_table_creation() {
                 Box::new(SymbolType::Dynamic)
             ),
             kind: SymbolKind::Lambda,
-            scope: Scope::Global,
+            scope: SymbolScope::Global,
             scope_level: 1,
             location: None,
         })
@@ -64,7 +64,7 @@ fn test_table_creation() {
                 Box::new(SymbolType::Dynamic)
             ),
             kind: SymbolKind::Lambda,
-            scope: Scope::Function,
+            scope: SymbolScope::Function,
             scope_level: 2,
             location: None,
         })
