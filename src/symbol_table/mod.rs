@@ -2,7 +2,9 @@
 mod test;
 
 use crate::ast::{Expr, Spanned};
-use crate::expr_walker::{AstWalker, CallExpr, FunctionExpr, LambdaExpr, LoopExpr, VarExpr};
+use crate::expr_walker::{
+    AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LoopExpr, VarExpr,
+};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -333,6 +335,14 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         self.walk_expr(table, call.callee);
         for arg in call.args.iter() {
             self.walk_expr(table, arg);
+        }
+    }
+
+    fn handle_if_else(&mut self, table: &mut SymbolTable, if_else: &IfElseExpr) {
+        self.walk_expr(table, if_else.condition);
+        self.walk_expr(table, if_else.then);
+        if let Some(else_body) = if_else.otherwise {
+            self.walk_expr(table, else_body);
         }
     }
 

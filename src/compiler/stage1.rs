@@ -1,5 +1,7 @@
 use crate::ast::{Expr, Spanned};
-use crate::expr_walker::{AstWalker, CallExpr, FunctionExpr, LambdaExpr, LoopExpr, VarExpr};
+use crate::expr_walker::{
+    AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LoopExpr, VarExpr,
+};
 use crate::symbol_table::{SymbolKind, SymbolScope, SymbolTable};
 use crate::vm::Direction;
 
@@ -357,6 +359,24 @@ impl<'a> AstWalker<Chunk> for Stage1Compiler<'a> {
         self.walk_expr(chunk, call.callee);
 
         chunk.push(Stage1Instruction::Call(Stage1Callee::Function, arg_count));
+    }
+
+    fn handle_if_else(&mut self, chunk: &mut Chunk, if_else: &IfElseExpr) {
+        self.walk_expr(chunk, if_else.condition);
+
+        let mut then_chunk = Chunk::new();
+        self.walk_expr(&mut then_chunk, if_else.then);
+        let then_offset = then_chunk.size() + Stage1Instruction::Jump(Direction::Forward(0)).size();
+
+        let mut else_chunk = Chunk::new();
+        if let Some(else_spanned) = if_else.otherwise.as_ref() {
+            self.walk_expr(&mut else_chunk, else_spanned);
+        };
+        let else_offset = else_chunk.size();
+        chunk.push(Stage1Instruction::JumpIf(then_offset));
+        chunk.extend(then_chunk);
+        chunk.push(Stage1Instruction::Jump(Direction::Forward(else_offset)));
+        chunk.extend(else_chunk);
     }
 
     fn handle_var(&mut self, chunk: &mut Chunk, var: &VarExpr) {
