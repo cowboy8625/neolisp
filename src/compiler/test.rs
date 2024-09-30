@@ -65,8 +65,8 @@ fn test_main_var_lambda() {
     assert_eq!(
         main.body,
         Chunk::from(vec![
-            Push(Stage1Value::F64(123.0)),
             Push(Stage1Value::F64(321.0)),
+            Push(Stage1Value::F64(123.0)),
             GetGlobal(IState::Set(0)),
             Call(Stage1Callee::Function, 2),
             Call(Stage1Callee::Builtin("print".to_string()), 1),
@@ -199,8 +199,8 @@ fn test_main_call_lambda() {
     assert_eq!(
         main.body,
         Chunk::from(vec![
-            Push(Stage1Value::F64(123.0)),
             Push(Stage1Value::F64(321.0)),
+            Push(Stage1Value::F64(123.0)),
             Push(Stage1Value::Callable(IState::Unset("lambda_0".to_string()))),
             Call(Stage1Callee::Function, 2),
             Push(Stage1Value::String("\n".to_string())),
@@ -262,8 +262,8 @@ fn test_main_applying_lambda() {
         apply.body,
         Chunk::from(vec![
             // FIXME: Swap ordering
-            GetLocal(IState::Set(0)),
             GetLocal(IState::Set(1)),
+            GetLocal(IState::Set(0)),
             Call(Stage1Callee::Function, 1),
             Rot,
             Return
@@ -284,8 +284,8 @@ fn test_main_applying_lambda() {
     assert_eq!(
         main.body,
         Chunk::from(vec![
-            Push(Stage1Value::Callable(IState::Unset("lambda_0".to_string()))),
             Push(Stage1Value::F64(123.0)),
+            Push(Stage1Value::Callable(IState::Unset("lambda_0".to_string()))),
             Push(Stage1Value::Callable(IState::Unset("apply".to_string()))),
             Call(Stage1Callee::Function, 2),
             Push(Stage1Value::String("\n".to_string())),
