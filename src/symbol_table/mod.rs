@@ -2,7 +2,7 @@
 mod test;
 
 use crate::ast::{Expr, Spanned};
-use crate::expr_walker::{AstWalker, FunctionExpr, LambdaExpr, LoopExpr, VarExpr};
+use crate::expr_walker::{AstWalker, CallExpr, FunctionExpr, LambdaExpr, LoopExpr, VarExpr};
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -327,6 +327,13 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         self.current_scope = scope;
         self.local_counter = old_local_counter;
         self.is_in_lambda = false;
+    }
+
+    fn handle_call(&mut self, table: &mut SymbolTable, call: &CallExpr) {
+        self.walk_expr(table, call.callee);
+        for arg in call.args.iter() {
+            self.walk_expr(table, arg);
+        }
     }
 
     fn handle_var(&mut self, table: &mut SymbolTable, var: &VarExpr) {

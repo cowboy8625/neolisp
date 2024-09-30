@@ -319,8 +319,8 @@ impl Machine {
                         }
                         value => {
                             panic!(
-                                "expected value on stack for function call but got {:?}",
-                                value
+                                "expected value on stack for function call but got {:?} {:#?}",
+                                value, self.stack
                             )
                         }
                     };

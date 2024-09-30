@@ -12,8 +12,8 @@ fn test_main_var() {
 (fn main () (print num))
 ";
     let ast = parser().parse(src).unwrap();
-    let symbol_table = SymbolTableBuilder::default().build(&ast);
-    let stage1_compiler = Stage1Compiler::new(symbol_table).compiler(&ast);
+    let mut symbol_table = SymbolTableBuilder::default().build(&ast);
+    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
     assert_eq!(main.name, "main", "main function name");
@@ -46,8 +46,8 @@ fn test_main_var_lambda() {
 (fn main () (print (add 123 321)))
 ";
     let ast = parser().parse(src).unwrap();
-    let symbol_table = SymbolTableBuilder::default().build(&ast);
-    let stage1_compiler = Stage1Compiler::new(symbol_table).compiler(&ast);
+    let mut symbol_table = SymbolTableBuilder::default().build(&ast);
+    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
     // Checking function
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
@@ -104,8 +104,8 @@ fn test_main_var_lambda_curry() {
 (fn main () (print ((add 123) 321)))
 ";
     let ast = parser().parse(src).unwrap();
-    let symbol_table = SymbolTableBuilder::default().build(&ast);
-    let stage1_compiler = Stage1Compiler::new(symbol_table).compiler(&ast);
+    let mut symbol_table = SymbolTableBuilder::default().build(&ast);
+    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
     // Checking function
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
@@ -183,8 +183,8 @@ fn test_main_call_lambda() {
 (fn main () (print ((lambda (x y) (+ x y)) 123 321) "\n"))
 "#;
     let ast = parser().parse(src).unwrap();
-    let symbol_table = SymbolTableBuilder::default().build(&ast);
-    let stage1_compiler = Stage1Compiler::new(symbol_table).compiler(&ast);
+    let mut symbol_table = SymbolTableBuilder::default().build(&ast);
+    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
     // Checking function
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
@@ -240,8 +240,8 @@ fn test_main_applying_lambda() {
 (fn main () (print (apply (lambda (x) (+ x 321)) 123) "\n"))
 "#;
     let ast = parser().parse(src).unwrap();
-    let symbol_table = SymbolTableBuilder::default().build(&ast);
-    let stage1_compiler = Stage1Compiler::new(symbol_table).compiler(&ast);
+    let mut symbol_table = SymbolTableBuilder::default().build(&ast);
+    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
 
     // Checking function apply
     assert_eq!(stage1_compiler.functions.len(), 2, "two functions");
@@ -324,8 +324,8 @@ fn test_main_if_else() {
 (fn main () (if true (print "then\n") (print "else\n")))
 "#;
     let ast = parser().parse(src).unwrap();
-    let symbol_table = SymbolTableBuilder::default().build(&ast);
-    let stage1_compiler = Stage1Compiler::new(symbol_table).compiler(&ast);
+    let mut symbol_table = SymbolTableBuilder::default().build(&ast);
+    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
 
     // Checking function apply
     assert_eq!(stage1_compiler.functions.len(), 1, "one functions");
