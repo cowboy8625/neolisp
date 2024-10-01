@@ -5,6 +5,7 @@ where
     T: std::fmt::Display + std::fmt::Debug + Clone,
 {
     pub expr: T,
+    #[allow(dead_code)]
     pub span: Span,
 }
 

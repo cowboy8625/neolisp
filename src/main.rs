@@ -3,6 +3,7 @@ mod cli;
 mod compiler;
 mod docs;
 mod error;
+mod expr_walker;
 mod parser;
 mod repl;
 mod symbol_table;

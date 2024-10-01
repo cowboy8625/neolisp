@@ -1,6 +1,6 @@
 use super::{Chunk, IState, Stage1Callee, Stage1Compiler, Stage1Instruction::*, Stage1Value};
 use crate::parser::parser;
-use crate::symbol_table::SymbolWalker;
+use crate::symbol_table::SymbolTableBuilder;
 use crate::vm::Direction;
 use chumsky::prelude::Parser;
 use pretty_assertions::assert_eq;
@@ -12,8 +12,8 @@ fn test_main_var() {
 (fn main () (print num))
 ";
     let ast = parser().parse(src).unwrap();
-    let symbol_table = SymbolWalker::default().walk(&ast).unwrap();
-    let stage1_compiler = Stage1Compiler::new(symbol_table).compiler(&ast);
+    let mut symbol_table = SymbolTableBuilder::default().build(&ast);
+    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
     assert_eq!(main.name, "main", "main function name");
@@ -46,8 +46,8 @@ fn test_main_var_lambda() {
 (fn main () (print (add 123 321)))
 ";
     let ast = parser().parse(src).unwrap();
-    let symbol_table = SymbolWalker::default().walk(&ast).unwrap();
-    let stage1_compiler = Stage1Compiler::new(symbol_table).compiler(&ast);
+    let mut symbol_table = SymbolTableBuilder::default().build(&ast);
+    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
     // Checking function
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
@@ -65,8 +65,8 @@ fn test_main_var_lambda() {
     assert_eq!(
         main.body,
         Chunk::from(vec![
-            Push(Stage1Value::F64(123.0)),
             Push(Stage1Value::F64(321.0)),
+            Push(Stage1Value::F64(123.0)),
             GetGlobal(IState::Set(0)),
             Call(Stage1Callee::Function, 2),
             Call(Stage1Callee::Builtin("print".to_string()), 1),
@@ -104,8 +104,8 @@ fn test_main_var_lambda_curry() {
 (fn main () (print ((add 123) 321)))
 ";
     let ast = parser().parse(src).unwrap();
-    let symbol_table = SymbolWalker::default().walk(&ast).unwrap();
-    let stage1_compiler = Stage1Compiler::new(symbol_table).compiler(&ast);
+    let mut symbol_table = SymbolTableBuilder::default().build(&ast);
+    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
     // Checking function
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
@@ -183,8 +183,8 @@ fn test_main_call_lambda() {
 (fn main () (print ((lambda (x y) (+ x y)) 123 321) "\n"))
 "#;
     let ast = parser().parse(src).unwrap();
-    let symbol_table = SymbolWalker::default().walk(&ast).unwrap();
-    let stage1_compiler = Stage1Compiler::new(symbol_table).compiler(&ast);
+    let mut symbol_table = SymbolTableBuilder::default().build(&ast);
+    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
     // Checking function
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
@@ -199,8 +199,8 @@ fn test_main_call_lambda() {
     assert_eq!(
         main.body,
         Chunk::from(vec![
-            Push(Stage1Value::F64(123.0)),
             Push(Stage1Value::F64(321.0)),
+            Push(Stage1Value::F64(123.0)),
             Push(Stage1Value::Callable(IState::Unset("lambda_0".to_string()))),
             Call(Stage1Callee::Function, 2),
             Push(Stage1Value::String("\n".to_string())),
@@ -240,8 +240,8 @@ fn test_main_applying_lambda() {
 (fn main () (print (apply (lambda (x) (+ x 321)) 123) "\n"))
 "#;
     let ast = parser().parse(src).unwrap();
-    let symbol_table = SymbolWalker::default().walk(&ast).unwrap();
-    let stage1_compiler = Stage1Compiler::new(symbol_table).compiler(&ast);
+    let mut symbol_table = SymbolTableBuilder::default().build(&ast);
+    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
 
     // Checking function apply
     assert_eq!(stage1_compiler.functions.len(), 2, "two functions");
@@ -262,8 +262,8 @@ fn test_main_applying_lambda() {
         apply.body,
         Chunk::from(vec![
             // FIXME: Swap ordering
-            GetLocal(IState::Set(0)),
             GetLocal(IState::Set(1)),
+            GetLocal(IState::Set(0)),
             Call(Stage1Callee::Function, 1),
             Rot,
             Return
@@ -284,8 +284,8 @@ fn test_main_applying_lambda() {
     assert_eq!(
         main.body,
         Chunk::from(vec![
-            Push(Stage1Value::Callable(IState::Unset("lambda_0".to_string()))),
             Push(Stage1Value::F64(123.0)),
+            Push(Stage1Value::Callable(IState::Unset("lambda_0".to_string()))),
             Push(Stage1Value::Callable(IState::Unset("apply".to_string()))),
             Call(Stage1Callee::Function, 2),
             Push(Stage1Value::String("\n".to_string())),
@@ -324,8 +324,8 @@ fn test_main_if_else() {
 (fn main () (if true (print "then\n") (print "else\n")))
 "#;
     let ast = parser().parse(src).unwrap();
-    let symbol_table = SymbolWalker::default().walk(&ast).unwrap();
-    let stage1_compiler = Stage1Compiler::new(symbol_table).compiler(&ast);
+    let mut symbol_table = SymbolTableBuilder::default().build(&ast);
+    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
 
     // Checking function apply
     assert_eq!(stage1_compiler.functions.len(), 1, "one functions");
