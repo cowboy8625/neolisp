@@ -274,7 +274,7 @@ impl<'a> AstWalker<Chunk> for Stage1Compiler<'a> {
         }
 
         let mut body = Chunk::new();
-        self.walk_expr(&mut body, &function.body);
+        self.walk_expr(&mut body, function.body);
 
         if name == "main" {
             body.push(Stage1Instruction::Halt);
@@ -315,7 +315,7 @@ impl<'a> AstWalker<Chunk> for Stage1Compiler<'a> {
 
         let mut body = Chunk::new();
         self.symbol_table.enter_scope(&name);
-        self.walk_expr(&mut body, &lambda.body);
+        self.walk_expr(&mut body, lambda.body);
         self.symbol_table.exit_scope();
 
         let Some(local_scope) = self.symbol_table.get_function_scope(&name) else {

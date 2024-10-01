@@ -253,8 +253,8 @@ pub trait AstWalker<T> {
         };
 
         let loop_expr = LoopExpr {
-            condition: &condtion_spanned,
-            body: &body_spanned,
+            condition: condtion_spanned,
+            body: body_spanned,
         };
         self.handle_loop(t, &loop_expr);
     }
@@ -262,8 +262,8 @@ pub trait AstWalker<T> {
     fn walk_expr(&mut self, t: &mut T, spanned: &Spanned<Expr>) {
         match &spanned.expr {
             Expr::Bool(value) => self.handle_bool(t, *value),
-            Expr::String(string) => self.handle_string(t, &string),
-            Expr::Symbol(symbol) => self.handle_symbol(t, &symbol),
+            Expr::String(string) => self.handle_string(t, string),
+            Expr::Symbol(symbol) => self.handle_symbol(t, symbol),
             Expr::Number(number) => self.handle_number(t, *number),
             Expr::List(vec) => self.walk_list(t, vec),
         }
