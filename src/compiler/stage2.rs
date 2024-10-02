@@ -55,7 +55,7 @@ fn into_instructions(
         Stage1Instruction::Sub(c) => Instruction::Sub(*c),
         Stage1Instruction::Mul(c) => Instruction::Mul(*c),
         Stage1Instruction::Div(c) => Instruction::Div(*c),
-        Stage1Instruction::Eq => Instruction::Eq,
+        Stage1Instruction::Eq(c) => Instruction::Eq(*c),
         Stage1Instruction::GreaterThan => Instruction::GreaterThan,
         Stage1Instruction::LessThan => Instruction::LessThan,
         Stage1Instruction::GreaterThanOrEqual => Instruction::GreaterThanOrEqual,

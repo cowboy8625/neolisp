@@ -151,25 +151,10 @@ impl Machine {
                 }
                 self.stack.push(left);
             }
-            Instruction::Eq => {
-                let Some(right) = self.stack.pop() else {
-                    panic!("expected value on stack for Eq")
-                };
-                let Some(left) = self.stack.pop() else {
-                    panic!("expected value on stack for Eq")
-                };
-                match (left, right) {
-                    (Value::I32(left), Value::I32(right)) => {
-                        self.stack.push(Value::Bool(left == right));
-                    }
-                    (Value::F64(left), Value::F64(right)) => {
-                        self.stack.push(Value::Bool(left == right));
-                    }
-                    (Value::String(left), Value::String(right)) => {
-                        self.stack.push(Value::Bool(left == right));
-                    }
-                    _ => panic!("invalid types for Eq"),
-                }
+            Instruction::Eq(count) => {
+                let args = self.stack.split_off(self.stack.len() - count as usize);
+                let value = args.iter().all(|x| x == &args[0]);
+                self.stack.push(Value::Bool(value));
             }
             Instruction::GreaterThan => {
                 let Some(right) = self.stack.pop() else {

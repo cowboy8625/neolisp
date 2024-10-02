@@ -60,7 +60,11 @@ pub fn get_instruction(bytes: &[u8], ip: &mut usize) -> Result<Instruction, Stri
             *ip += 1;
             Ok(Instruction::Div(count))
         }
-        OpCode::Eq => Ok(Instruction::Eq),
+        OpCode::Eq => {
+            let count = bytes[*ip];
+            *ip += 1;
+            Ok(Instruction::Eq(count))
+        }
         OpCode::GreaterThan => Ok(Instruction::GreaterThan),
         OpCode::LessThan => Ok(Instruction::LessThan),
         OpCode::GreaterThanOrEqual => Ok(Instruction::GreaterThanOrEqual),
@@ -265,10 +269,10 @@ mod tests {
 
     #[test]
     fn test_decompile_eq() {
-        let bytes = vec![OpCode::Eq as u8];
+        let bytes = vec![OpCode::Eq as u8, 0x03];
 
         let instructions = decompile(&bytes);
-        assert_eq!(instructions, vec![Instruction::Eq]);
+        assert_eq!(instructions, vec![Instruction::Eq(3)]);
     }
 
     #[test]
