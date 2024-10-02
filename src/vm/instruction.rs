@@ -43,7 +43,7 @@ pub enum Instruction {
     Return,
     Push(Value),
     Add(u8),
-    Sub,
+    Sub(u8),
     Mul,
     Div,
     Eq,
@@ -84,7 +84,7 @@ impl Instruction {
                 bytes
             }
             Instruction::Add(count) => vec![OpCode::Add as u8, *count],
-            Instruction::Sub => vec![OpCode::Sub as u8],
+            Instruction::Sub(count) => vec![OpCode::Sub as u8, *count],
             Instruction::Mul => vec![OpCode::Mul as u8],
             Instruction::Div => vec![OpCode::Div as u8],
             Instruction::Eq => vec![OpCode::Eq as u8],
@@ -141,9 +141,8 @@ impl Instruction {
         // NOTE: if anything changes here update to Stage1Instruction.size as well
         match self {
             Self::StartAt(_) => 5,
-            Self::Add(_) => 2,
-            Self::Sub
-            | Self::Mul
+            Self::Add(_) | Self::Sub(_) => 2,
+            Self::Mul
             | Self::Div
             | Self::Eq
             | Self::GreaterThan

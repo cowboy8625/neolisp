@@ -33,7 +33,7 @@ pub enum Stage1Instruction {
     Return,
     Push(Stage1Value),
     Add(u8),
-    Sub,
+    Sub(u8),
     Mul,
     Div,
     Eq,
@@ -60,9 +60,8 @@ pub enum Stage1Instruction {
 impl Stage1Instruction {
     pub fn size(&self) -> usize {
         match self {
-            Self::Add(_) => 2,
-            Self::Sub
-            | Self::Mul
+            Self::Add(_) | Self::Sub(_) => 2,
+            Self::Mul
             | Self::Div
             | Self::Eq
             | Self::GreaterThan
@@ -492,7 +491,7 @@ fn get_operator_opcode(op: &str, count: u8) -> Option<Stage1Instruction> {
     // to the OPERATORS list in main.rs
     match op {
         "+" => Some(Stage1Instruction::Add(count)),
-        "-" => Some(Stage1Instruction::Sub),
+        "-" => Some(Stage1Instruction::Sub(count)),
         "*" => Some(Stage1Instruction::Mul),
         "/" => Some(Stage1Instruction::Div),
         "=" => Some(Stage1Instruction::Eq),

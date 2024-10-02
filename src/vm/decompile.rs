@@ -45,7 +45,11 @@ pub fn get_instruction(bytes: &[u8], ip: &mut usize) -> Result<Instruction, Stri
             *ip += 1;
             Ok(Instruction::Add(count))
         }
-        OpCode::Sub => Ok(Instruction::Sub),
+        OpCode::Sub => {
+            let count = bytes[*ip];
+            *ip += 1;
+            Ok(Instruction::Sub(count))
+        }
         OpCode::Mul => Ok(Instruction::Mul),
         OpCode::Div => Ok(Instruction::Div),
         OpCode::Eq => Ok(Instruction::Eq),
@@ -245,10 +249,10 @@ mod tests {
 
     #[test]
     fn test_decompile_sub() {
-        let bytes = vec![OpCode::Sub as u8];
+        let bytes = vec![OpCode::Sub as u8, 0x03];
 
         let instructions = decompile(&bytes);
-        assert_eq!(instructions, vec![Instruction::Sub]);
+        assert_eq!(instructions, vec![Instruction::Sub(3)]);
     }
 
     #[test]
