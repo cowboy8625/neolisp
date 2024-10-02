@@ -12,10 +12,11 @@ use rustyline::{Cmd, Editor, EventHandler, KeyCode, KeyEvent, Modifiers, Result}
 use rustyline::{Completer, Helper, Highlighter, Hinter, Validator};
 const HELP: &str = r#"
 commands
-:q|e|exit|quit            - quit
-:help                     - show this help message
-:clear                    - clear the terminal screen
-:help-doc <function name> - with a give function name will return the help documentation
+:q|e|exit|quit             - quit
+:help                      - show this help message
+:clear                     - clear the terminal screen
+:help-doc <function name>  - with a give function name will return the help documentation
+:output-mode <ast|op|eval> - set the output mode
 "#;
 struct ShouldRunIfThereIsANewLine;
 
