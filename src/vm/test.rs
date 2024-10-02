@@ -36,6 +36,13 @@ check_return_when!(
     "(>= 9 9 6 7 8)",
     Value::Bool(true)
 );
+
+check_return_when!(
+    less_than_or_eqal_instrction,
+    "(<= 2 2 3 5)",
+    Value::Bool(true)
+);
+
 check_return_when!(
     lambda_is_called,
     "(((lambda (x) (lambda (y) (+ x y))) 1) 3)",

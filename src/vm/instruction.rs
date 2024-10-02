@@ -50,7 +50,7 @@ pub enum Instruction {
     GreaterThan(u8),
     LessThan(u8),
     GreaterThanOrEqual(u8),
-    LessThanOrEqual,
+    LessThanOrEqual(u8),
     And,
     Or,
     Not,
@@ -93,7 +93,7 @@ impl Instruction {
             Instruction::GreaterThanOrEqual(count) => {
                 vec![OpCode::GreaterThanOrEqual as u8, *count]
             }
-            Instruction::LessThanOrEqual => vec![OpCode::LessThanOrEqual as u8],
+            Instruction::LessThanOrEqual(count) => vec![OpCode::LessThanOrEqual as u8, *count],
             Instruction::And => vec![OpCode::And as u8],
             Instruction::Or => vec![OpCode::Or as u8],
             Instruction::Not => vec![OpCode::Not as u8],
@@ -150,9 +150,9 @@ impl Instruction {
             | Self::Eq(_)
             | Self::GreaterThan(_)
             | Self::LessThan(_)
-            | Self::GreaterThanOrEqual(_) => 2,
-            Self::LessThanOrEqual
-            | Self::And
+            | Self::GreaterThanOrEqual(_)
+            | Self::LessThanOrEqual(_) => 2,
+            Self::And
             | Self::Or
             | Self::Not
             | Self::Mod

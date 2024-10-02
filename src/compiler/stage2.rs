@@ -59,7 +59,7 @@ fn into_instructions(
         Stage1Instruction::GreaterThan(c) => Instruction::GreaterThan(*c),
         Stage1Instruction::LessThan(c) => Instruction::LessThan(*c),
         Stage1Instruction::GreaterThanOrEqual(c) => Instruction::GreaterThanOrEqual(*c),
-        Stage1Instruction::LessThanOrEqual => Instruction::LessThanOrEqual,
+        Stage1Instruction::LessThanOrEqual(c) => Instruction::LessThanOrEqual(*c),
         Stage1Instruction::And => Instruction::And,
         Stage1Instruction::Or => Instruction::Or,
         Stage1Instruction::Not => Instruction::Not,
