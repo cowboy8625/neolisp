@@ -28,6 +28,12 @@ pub enum Commands {
         breakpoints: Vec<usize>,
         #[arg(short = 'd', long, default_value_t = false)]
         decompile: bool,
+        #[arg(
+            long,
+            help = "compile with no main function as entry point",
+            default_value_t = false
+        )]
+        no_main: bool,
         file: Option<String>,
     },
     Test {

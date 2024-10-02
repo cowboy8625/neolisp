@@ -1,8 +1,9 @@
+use super::CompilerOptions;
 use crate::ast::{Expr, Spanned};
 use crate::expr_walker::{
     AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LoopExpr, VarExpr,
 };
-use crate::symbol_table::{SymbolKind, SymbolScope, SymbolTable};
+use crate::symbol_table::{Symbol, SymbolKind, SymbolScope, SymbolTable, SymbolType};
 use crate::vm::Direction;
 
 #[derive(Debug)]
@@ -194,12 +195,37 @@ impl<'a> Stage1Compiler<'a> {
         chunk
     }
 
-    pub fn compile(mut self, ast: &[Spanned<Expr>]) -> Stage1Data {
+    pub fn compile(mut self, ast: &[Spanned<Expr>], options: &CompilerOptions) -> Stage1Data {
         let mut chunk = Chunk::new();
         self.walk(&mut chunk, ast);
+
+        if options.no_main {
+            let mut body = Chunk::new();
+            body.push(Stage1Instruction::Halt);
+            self.functions.push(Stage1Function {
+                name: "main".to_string(),
+                params: Chunk::new(),
+                prelude: Chunk::new(),
+                body,
+            });
+
+            self.symbol_table.enter_new_scope();
+            let symbol = Symbol {
+                id: self.symbol_table.get_id(),
+                name: "main".to_string(),
+                symbol_type: SymbolType::Function(Vec::new(), Box::new(SymbolType::Dynamic)),
+                kind: SymbolKind::Function,
+                scope: SymbolScope::Global,
+                scope_level: self.symbol_table.get_scope_level() as u32,
+                location: None,
+            };
+
+            self.symbol_table.insert("main".to_string(), symbol);
+            self.symbol_table.exit_new_scope(Some("main"));
+        }
         for function in self.functions.iter_mut() {
             if function.name == "main" {
-                function.prelude.extend(chunk);
+                function.prelude.extend(chunk.clone());
                 break;
             }
         }
@@ -961,7 +987,8 @@ mod tests {
 "#;
         let ast = parser().parse(src).unwrap();
         let mut symbol_table = SymbolTableBuilder::default().build(&ast);
-        let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
+        let stage1_compiler =
+            Stage1Compiler::new(&mut symbol_table).compile(&ast, &CompilerOptions::default());
         assert_eq!(stage1_compiler.functions.len(), 1, "one function");
         let main = &stage1_compiler.functions[0];
         assert_eq!(main.name, "main", "main function name");

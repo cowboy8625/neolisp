@@ -1,4 +1,5 @@
 use crate::cli::Cli;
+use crate::compiler::CompilerOptions;
 use crate::docs;
 use crate::vm::Machine;
 use rustyline::config::Configurer;
@@ -101,7 +102,7 @@ pub fn run(args: Cli) -> Result<()> {
             _ => (),
         }
 
-        let program = match crate::compiler::compile(&input) {
+        let program = match crate::compiler::compile(&input, &CompilerOptions::default()) {
             Ok(v) => v,
             Err(e) => {
                 println!("{e}");

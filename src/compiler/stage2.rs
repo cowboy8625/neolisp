@@ -12,7 +12,9 @@ fn set_location_of_functions_in_symbol_table(
 ) {
     for function in functions {
         let name = function.name.as_str();
+        eprintln!("Compiling to instructions for {name}...");
         symbol_table.set_location(Some(name), name, *location as u32);
+        eprintln!("...");
         *location += function.params.size();
         *location += function.prelude.size();
         *location += function.body.size();
@@ -138,6 +140,7 @@ pub fn compile_to_instructions(
     };
 
     instructions.push(Instruction::StartAt(start_location as usize));
+    // TODO: MAYBE we need to insert a main function if no_main is true
     for function in &data.functions {
         symbol_table.enter_scope(&function.name);
         let params = convert_section_to_instructions(symbol_table, &function.params);

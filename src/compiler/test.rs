@@ -1,4 +1,6 @@
-use super::{Chunk, IState, Stage1Callee, Stage1Compiler, Stage1Instruction::*, Stage1Value};
+use super::{
+    Chunk, CompilerOptions, IState, Stage1Callee, Stage1Compiler, Stage1Instruction::*, Stage1Value,
+};
 use crate::parser::parser;
 use crate::symbol_table::SymbolTableBuilder;
 use crate::vm::Direction;
@@ -13,7 +15,8 @@ fn test_main_var() {
 ";
     let ast = parser().parse(src).unwrap();
     let mut symbol_table = SymbolTableBuilder::default().build(&ast);
-    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
+    let stage1_compiler =
+        Stage1Compiler::new(&mut symbol_table).compile(&ast, &CompilerOptions::default());
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
     assert_eq!(main.name, "main", "main function name");
@@ -47,7 +50,8 @@ fn test_main_var_lambda() {
 ";
     let ast = parser().parse(src).unwrap();
     let mut symbol_table = SymbolTableBuilder::default().build(&ast);
-    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
+    let stage1_compiler =
+        Stage1Compiler::new(&mut symbol_table).compile(&ast, &CompilerOptions::default());
     // Checking function
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
@@ -105,7 +109,8 @@ fn test_main_var_lambda_curry() {
 ";
     let ast = parser().parse(src).unwrap();
     let mut symbol_table = SymbolTableBuilder::default().build(&ast);
-    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
+    let stage1_compiler =
+        Stage1Compiler::new(&mut symbol_table).compile(&ast, &CompilerOptions::default());
     // Checking function
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
@@ -184,7 +189,8 @@ fn test_main_call_lambda() {
 "#;
     let ast = parser().parse(src).unwrap();
     let mut symbol_table = SymbolTableBuilder::default().build(&ast);
-    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
+    let stage1_compiler =
+        Stage1Compiler::new(&mut symbol_table).compile(&ast, &CompilerOptions::default());
     // Checking function
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
@@ -241,7 +247,8 @@ fn test_main_applying_lambda() {
 "#;
     let ast = parser().parse(src).unwrap();
     let mut symbol_table = SymbolTableBuilder::default().build(&ast);
-    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
+    let stage1_compiler =
+        Stage1Compiler::new(&mut symbol_table).compile(&ast, &CompilerOptions::default());
 
     // Checking function apply
     assert_eq!(stage1_compiler.functions.len(), 2, "two functions");
@@ -325,7 +332,8 @@ fn test_main_if_else() {
 "#;
     let ast = parser().parse(src).unwrap();
     let mut symbol_table = SymbolTableBuilder::default().build(&ast);
-    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
+    let stage1_compiler =
+        Stage1Compiler::new(&mut symbol_table).compile(&ast, &CompilerOptions::default());
 
     // Checking function apply
     assert_eq!(stage1_compiler.functions.len(), 1, "one functions");

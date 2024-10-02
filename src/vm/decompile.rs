@@ -71,7 +71,6 @@ pub fn get_instruction(bytes: &[u8], ip: &mut usize) -> Result<Instruction, Stri
             // FIXME: GetGlobaL probably sould have a u32
             let index = bytes[*ip];
             *ip += 1;
-            eprintln!("GetGlobal: {}", index);
             Ok(Instruction::GetGlobal(index as usize))
         }
         OpCode::LoadFree => Ok(Instruction::LoadFree),
