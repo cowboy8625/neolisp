@@ -80,6 +80,20 @@ fn test_equals_instrction() {
 }
 
 #[test]
+fn test_greater_than_instrction() {
+    let src = r#"
+    (> 5 3 2)
+    "#;
+
+    let program = test_compile(src);
+    let mut machine = Machine::new(program);
+
+    machine.run();
+    assert_eq!(machine.stack.len(), 1);
+    assert_eq!(machine.stack[0], Value::Bool(true));
+}
+
+#[test]
 fn test_lambda() {
     let src = r#"
     (((lambda (x) (lambda (y) (+ x y))) 1) 3)
@@ -136,7 +150,7 @@ fn test_to_bytecode() {
     );
     assert_eq!(
         instructions[3].to_bytecode(),
-        vec![OpCode::Mul as u8],
+        vec![OpCode::Mul as u8, 0x02],
         "{:?}",
         instructions[3]
     );
