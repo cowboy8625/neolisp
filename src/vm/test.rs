@@ -38,7 +38,7 @@ fn test_sub_instrction() {
 }
 
 #[test]
-fn test_mul_instrction() {
+fn test_multiply_instrction() {
     let src = r#"
     (* 123 321)
     "#;
@@ -52,7 +52,7 @@ fn test_mul_instrction() {
 }
 
 #[test]
-fn test_div_instrction() {
+fn test_divide_instrction() {
     let src = r#"
     (/ 444 2 2)
     "#;
@@ -66,7 +66,7 @@ fn test_div_instrction() {
 }
 
 #[test]
-fn test_eq_instrction() {
+fn test_equals_instrction() {
     let src = r#"
     (= 2 2 2)
     "#;
