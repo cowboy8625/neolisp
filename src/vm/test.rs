@@ -9,117 +9,38 @@ fn test_compile(src: &str) -> Vec<u8> {
     compile(src, &options).unwrap()
 }
 
-#[test]
-fn test_add_instrction() {
-    let src = r#"
-    (+ 123 321)
-    "#;
+macro_rules! check_return_when {
+    ($name:ident, $src:expr, $expected:expr) => {
+        #[test]
+        fn $name() {
+            let program = test_compile($src);
+            let mut machine = Machine::new(program);
 
-    let program = test_compile(src);
-    let mut machine = Machine::new(program);
-
-    machine.run();
-    assert_eq!(machine.stack.len(), 1);
-    assert_eq!(machine.stack[0], Value::F64(444.));
+            machine.run();
+            assert_eq!(machine.stack.len(), 1);
+            assert_eq!(machine.stack[0], $expected);
+        }
+    };
 }
 
-#[test]
-fn test_sub_instrction() {
-    let src = r#"
-    (- 123 321)
-    "#;
+check_return_when!(add_instrction, "(+ 123 321)", Value::F64(444.));
+check_return_when!(sub_instrction, "(- 123 321)", Value::F64(-198.));
+check_return_when!(multiply_instrction, "(* 123 321)", Value::F64(39483.));
+check_return_when!(divide_instrction, "(/ 444 2 2)", Value::F64(111.));
+check_return_when!(equals_instrction, "(= 2 2 2)", Value::Bool(true));
+check_return_when!(greater_than_instrction, "(> 5 3 2)", Value::Bool(true));
+check_return_when!(less_than_instrction, "(< 2 3 5)", Value::Bool(true));
 
-    let program = test_compile(src);
-    let mut machine = Machine::new(program);
-
-    machine.run();
-    assert_eq!(machine.stack.len(), 1);
-    assert_eq!(machine.stack[0], Value::F64(-198.));
-}
-
-#[test]
-fn test_multiply_instrction() {
-    let src = r#"
-    (* 123 321)
-    "#;
-
-    let program = test_compile(src);
-    let mut machine = Machine::new(program);
-
-    machine.run();
-    assert_eq!(machine.stack.len(), 1);
-    assert_eq!(machine.stack[0], Value::F64(39483.));
-}
-
-#[test]
-fn test_divide_instrction() {
-    let src = r#"
-    (/ 444 2 2)
-    "#;
-
-    let program = test_compile(src);
-    let mut machine = Machine::new(program);
-
-    machine.run();
-    assert_eq!(machine.stack.len(), 1);
-    assert_eq!(machine.stack[0], Value::F64(111.));
-}
-
-#[test]
-fn test_equals_instrction() {
-    let src = r#"
-    (= 2 2 2)
-    "#;
-
-    let program = test_compile(src);
-    let mut machine = Machine::new(program);
-
-    machine.run();
-    assert_eq!(machine.stack.len(), 1);
-    assert_eq!(machine.stack[0], Value::Bool(true));
-}
-
-#[test]
-fn test_greater_than_instrction() {
-    let src = r#"
-    (> 5 3 2)
-    "#;
-
-    let program = test_compile(src);
-    let mut machine = Machine::new(program);
-
-    machine.run();
-    assert_eq!(machine.stack.len(), 1);
-    assert_eq!(machine.stack[0], Value::Bool(true));
-}
-
-#[test]
-fn test_less_than_instrction() {
-    let src = r#"
-    (< 2 3 5)
-    "#;
-
-    let program = test_compile(src);
-    let mut machine = Machine::new(program);
-
-    machine.run();
-    assert_eq!(machine.stack.len(), 1);
-    assert_eq!(machine.stack[0], Value::Bool(true));
-}
-
-#[test]
-fn test_lambda() {
-    let src = r#"
-    (((lambda (x) (lambda (y) (+ x y))) 1) 3)
-    "#;
-    let program = test_compile(src);
-    let mut machine = Machine::new(program);
-
-    machine.run();
-    eprintln!("{:#?}", machine.stack);
-    assert_eq!(machine.stack.len(), 1);
-    assert_eq!(machine.stack[0], Value::F64(4.));
-}
+check_return_when!(
+    greater_than_or_equal_instrction,
+    "(>= 9 9 6 7 8)",
+    Value::Bool(true)
+);
+check_return_when!(
+    lambda_is_called,
+    "(((lambda (x) (lambda (y) (+ x y))) 1) 3)",
+    Value::F64(4.)
+);
 
 // #[test]
 // fn test_lambda_calculus() {
