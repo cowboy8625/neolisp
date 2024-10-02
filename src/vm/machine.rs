@@ -201,19 +201,14 @@ impl Machine {
                 });
                 self.stack.push(Value::Bool(value));
             }
-            Instruction::And => {
-                let Some(right) = self.stack.pop() else {
-                    panic!("expected value on stack for Or")
-                };
-                let Some(left) = self.stack.pop() else {
-                    panic!("expected value on stack for Or")
-                };
-                match (left, right) {
-                    (Value::Bool(left), Value::Bool(right)) => {
-                        self.stack.push(Value::Bool(left && right));
-                    }
-                    _ => panic!("invalid types for Or"),
-                }
+            Instruction::And(count) => {
+                let args = self.stack.split_off(self.stack.len() - count as usize);
+                let left = &args[0];
+                let value = args.iter().skip(1).all(|right| match (left, right) {
+                    (Value::Bool(l), Value::Bool(r)) => *l && *r,
+                    _ => panic!("invalid types for And"),
+                });
+                self.stack.push(Value::Bool(value));
             }
             Instruction::Or => {
                 let Some(right) = self.stack.pop() else {
