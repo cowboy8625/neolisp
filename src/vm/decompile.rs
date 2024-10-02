@@ -50,7 +50,11 @@ pub fn get_instruction(bytes: &[u8], ip: &mut usize) -> Result<Instruction, Stri
             *ip += 1;
             Ok(Instruction::Sub(count))
         }
-        OpCode::Mul => Ok(Instruction::Mul),
+        OpCode::Mul => {
+            let count = bytes[*ip];
+            *ip += 1;
+            Ok(Instruction::Mul(count))
+        }
         OpCode::Div => Ok(Instruction::Div),
         OpCode::Eq => Ok(Instruction::Eq),
         OpCode::GreaterThan => Ok(Instruction::GreaterThan),
