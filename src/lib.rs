@@ -39,4 +39,6 @@ pub mod expr_walker;
 pub mod parser;
 pub mod repl;
 pub mod symbol_table;
+#[cfg(test)]
+mod tests;
 pub mod vm;

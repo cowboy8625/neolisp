@@ -12,7 +12,9 @@ pub use stage1::{
 };
 
 pub fn compile(src: &str, options: &CompilerOptions) -> anyhow::Result<Vec<u8>> {
-    let ast = parser().parse(src).unwrap();
+    let ast = parser()
+        .parse(src)
+        .map_err(|e| anyhow::anyhow!(e.iter().map(|e| format!("{e}\n")).collect::<String>()))?;
     let mut symbol_table = SymbolTableBuilder::default().build(&ast);
     let stage1_data = Stage1Compiler::new(&mut symbol_table).compile(&ast, options);
     let instructions = stage2::compile_to_instructions(&mut symbol_table, &stage1_data);
@@ -23,7 +25,6 @@ pub fn compile(src: &str, options: &CompilerOptions) -> anyhow::Result<Vec<u8>> 
     Ok(program)
 }
 
-#[cfg(test)]
 pub fn compile_to_instructions(
     src: &str,
     options: &CompilerOptions,
@@ -33,6 +34,14 @@ pub fn compile_to_instructions(
     let stage1_data = Stage1Compiler::new(&mut symbol_table).compile(&ast, options);
     let instructions = stage2::compile_to_instructions(&mut symbol_table, &stage1_data);
     Ok(instructions)
+}
+
+pub fn simple_display_instructions(instructions: &[crate::vm::Instruction]) {
+    let mut offset = 0;
+    for int in instructions.iter() {
+        eprintln!("{offset:02X} {offset:>2}  {:?}", int);
+        offset += int.size();
+    }
 }
 
 #[derive(Debug, Default)]

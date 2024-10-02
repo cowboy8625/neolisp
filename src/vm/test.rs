@@ -38,6 +38,34 @@ fn test_sub_instrction() {
 }
 
 #[test]
+fn test_mul_instrction() {
+    let src = r#"
+    (* 123 321)
+    "#;
+
+    let program = test_compile(src);
+    let mut machine = Machine::new(program);
+
+    machine.run();
+    assert_eq!(machine.stack.len(), 1);
+    assert_eq!(machine.stack[0], Value::F64(39483.));
+}
+
+#[test]
+fn test_div_instrction() {
+    let src = r#"
+    (/ 222 2)
+    "#;
+
+    let program = test_compile(src);
+    let mut machine = Machine::new(program);
+
+    machine.run();
+    assert_eq!(machine.stack.len(), 1);
+    assert_eq!(machine.stack[0], Value::F64(111.));
+}
+
+#[test]
 fn test_lambda() {
     let src = r#"
     (((lambda (x) (lambda (y) (+ x y))) 1) 3)

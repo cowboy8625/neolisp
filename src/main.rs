@@ -1,21 +1,26 @@
 use neolisp::{
-    cli::{Cli, Commands},
-    compiler::{compile, CompilerOptions},
+    cli::{Cli, Command},
+    compiler::{compile, simple_display_instructions, CompilerOptions},
     repl,
-    vm::{decompile, Machine},
+    vm::{self, Machine},
 };
 
 use clap::Parser as ClapParser;
 fn main() -> anyhow::Result<()> {
     let args = Cli::parse();
 
-    match args.command {
-        Commands::Build { decompile, file } => build(file, decompile, &CompilerOptions::default()),
-        Commands::Run { repl, .. } if repl => {
+    let Some(command) = args.command.clone() else {
+        repl::run(args)?;
+        return Ok(());
+    };
+
+    match command {
+        Command::Build { decompile, file } => build(file, decompile, &CompilerOptions::default()),
+        Command::Run { repl, .. } if repl => {
             repl::run(args)?;
             Ok(())
         }
-        Commands::Run {
+        Command::Run {
             breakpoints,
             decompile,
             file,
@@ -25,7 +30,7 @@ fn main() -> anyhow::Result<()> {
             let options = CompilerOptions { no_main };
             run(file, breakpoints, decompile, &options)
         }
-        Commands::Test { file: _ } => todo!(),
+        Command::Test { file: _ } => todo!(),
     }
 }
 
@@ -41,7 +46,8 @@ fn build(file: Option<String>, decompile: bool, options: &CompilerOptions) -> an
     eprintln!("Compiled to {} bytes", program.len());
 
     if decompile {
-        display_instructions(&program);
+        let instructions = vm::decompile(&program);
+        simple_display_instructions(&instructions);
         return Ok(());
     }
     // Save to file
@@ -78,13 +84,4 @@ fn run(
     eprintln!("Running...");
     machine.run();
     Ok(())
-}
-
-fn display_instructions(program: &[u8]) {
-    let instructions = decompile(program);
-    let mut offset = 0;
-    for int in instructions.iter() {
-        eprintln!("{offset:02X} {offset:>2}  {:?}", int);
-        offset += int.size();
-    }
 }

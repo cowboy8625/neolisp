@@ -12,10 +12,10 @@ pub struct Cli {
     #[arg(short, long, default_value_t = EditMode::Vi)]
     pub editor_mode: EditMode,
     #[command(subcommand)]
-    pub command: Commands,
+    pub command: Option<Command>,
 }
-#[derive(Debug, Subcommand)]
-pub enum Commands {
+#[derive(Debug, Subcommand, Clone)]
+pub enum Command {
     Build {
         #[arg(short = 'd', long, default_value_t = false)]
         decompile: bool,
