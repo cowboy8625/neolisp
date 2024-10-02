@@ -26,7 +26,7 @@ fn test_main_var() {
         Chunk::from(vec![
             Push(Stage1Value::F64(1.0)),
             Push(Stage1Value::F64(2.0)),
-            Add,
+            Add(2),
             LoadGlobal,
         ]),
         "main function prelude"
@@ -93,7 +93,7 @@ fn test_main_var_lambda() {
         Chunk::from(vec![
             GetLocal(IState::Set(0)),
             GetLocal(IState::Set(1)),
-            Add,
+            Add(2),
             Rot,
             Return
         ]),
@@ -174,7 +174,7 @@ fn test_main_var_lambda_curry() {
         Chunk::from(vec![
             GetFree(IState::Set(0)),
             GetLocal(IState::Set(0)),
-            Add,
+            Add(2),
             Rot,
             Return
         ]),
@@ -231,7 +231,7 @@ fn test_main_call_lambda() {
         Chunk::from(vec![
             GetLocal(IState::Set(0)),
             GetLocal(IState::Set(1)),
-            Add,
+            Add(2),
             Rot,
             Return
         ]),
@@ -317,7 +317,7 @@ fn test_main_applying_lambda() {
         Chunk::from(vec![
             GetLocal(IState::Set(0)),
             Push(Stage1Value::F64(321.0)),
-            Add,
+            Add(2),
             Rot,
             Return
         ]),

@@ -40,7 +40,11 @@ pub fn get_instruction(bytes: &[u8], ip: &mut usize) -> Result<Instruction, Stri
             let value = get_value(bytes, ip)?;
             Ok(Instruction::Push(value))
         }
-        OpCode::Add => Ok(Instruction::Add),
+        OpCode::Add => {
+            let count = bytes[*ip];
+            *ip += 1;
+            Ok(Instruction::Add(count))
+        }
         OpCode::Sub => Ok(Instruction::Sub),
         OpCode::Mul => Ok(Instruction::Mul),
         OpCode::Div => Ok(Instruction::Div),
@@ -233,10 +237,10 @@ mod tests {
 
     #[test]
     fn test_decompile_add() {
-        let bytes = vec![OpCode::Add as u8];
+        let bytes = vec![OpCode::Add as u8, 0x02];
 
         let instructions = decompile(&bytes);
-        assert_eq!(instructions, vec![Instruction::Add]);
+        assert_eq!(instructions, vec![Instruction::Add(2)]);
     }
 
     #[test]

@@ -42,7 +42,7 @@ pub enum Instruction {
     Halt,
     Return,
     Push(Value),
-    Add,
+    Add(u8),
     Sub,
     Mul,
     Div,
@@ -83,7 +83,7 @@ impl Instruction {
                 bytes.extend_from_slice(&value.to_bytecode());
                 bytes
             }
-            Instruction::Add => vec![OpCode::Add as u8],
+            Instruction::Add(count) => vec![OpCode::Add as u8, *count],
             Instruction::Sub => vec![OpCode::Sub as u8],
             Instruction::Mul => vec![OpCode::Mul as u8],
             Instruction::Div => vec![OpCode::Div as u8],
@@ -141,8 +141,8 @@ impl Instruction {
         // NOTE: if anything changes here update to Stage1Instruction.size as well
         match self {
             Self::StartAt(_) => 5,
-            Self::Add
-            | Self::Sub
+            Self::Add(_) => 2,
+            Self::Sub
             | Self::Mul
             | Self::Div
             | Self::Eq

@@ -84,25 +84,24 @@ impl Machine {
             Instruction::Push(value) => {
                 self.stack.push(value.clone());
             }
-            Instruction::Add => {
-                let Some(right) = self.stack.pop() else {
-                    panic!("expected value on stack for Add")
-                };
-                let Some(left) = self.stack.pop() else {
-                    panic!("expected value on stack for Add")
-                };
-                match (left, right) {
-                    (Value::I32(left), Value::I32(right)) => {
-                        self.stack.push(Value::I32(left + right));
+            Instruction::Add(count) => {
+                let args = self.stack.split_off(self.stack.len() - count as usize);
+                let mut left = args[0].clone();
+                for right in args.iter().skip(1) {
+                    match (left, right) {
+                        (Value::I32(l), Value::I32(r)) => {
+                            left = Value::I32(l + r);
+                        }
+                        (Value::F64(l), Value::F64(r)) => {
+                            left = Value::F64(l + r);
+                        }
+                        (Value::String(l), Value::String(r)) => {
+                            left = Value::String(format!("{l}{r}"));
+                        }
+                        _ => panic!("invalid types for Add"),
                     }
-                    (Value::F64(left), Value::F64(right)) => {
-                        self.stack.push(Value::F64(left + right));
-                    }
-                    (Value::String(left), Value::String(right)) => {
-                        self.stack.push(Value::String(format!("{}{}", left, right)));
-                    }
-                    _ => panic!("invalid types for Add"),
                 }
+                self.stack.push(left);
             }
             Instruction::Sub => {
                 let Some(right) = self.stack.pop() else {

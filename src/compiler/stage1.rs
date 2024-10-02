@@ -32,7 +32,7 @@ pub enum Stage1Instruction {
     Halt,
     Return,
     Push(Stage1Value),
-    Add,
+    Add(u8),
     Sub,
     Mul,
     Div,
@@ -60,8 +60,8 @@ pub enum Stage1Instruction {
 impl Stage1Instruction {
     pub fn size(&self) -> usize {
         match self {
-            Self::Add
-            | Self::Sub
+            Self::Add(_) => 2,
+            Self::Sub
             | Self::Mul
             | Self::Div
             | Self::Eq
@@ -245,19 +245,15 @@ impl<'a> AstWalker<Chunk> for Stage1Compiler<'a> {
     }
 
     fn handle_operator(&mut self, chunk: &mut Chunk, symbol: &str, operator: &OperatorExpr) {
-        let Some(op) = get_operator_opcode(symbol) else {
+        let Some(op) = get_operator_opcode(symbol, operator.args.len() as u8) else {
             // TODO: REPORT ERROR
             panic!("unknown operator: {}", symbol);
         };
 
-        let mut counter = 0;
         for spanned in operator.args.iter() {
             self.walk_expr(chunk, spanned);
-            counter += 1;
-            if counter >= 2 {
-                chunk.push(op.clone());
-            }
         }
+        chunk.push(op);
     }
 
     fn handle_builtin(&mut self, chunk: &mut Chunk, name: &str, spanned: &[Spanned<Expr>]) {
@@ -490,12 +486,12 @@ impl<'a> AstWalker<Chunk> for Stage1Compiler<'a> {
     }
 }
 
-fn get_operator_opcode(op: &str) -> Option<Stage1Instruction> {
+fn get_operator_opcode(op: &str, count: u8) -> Option<Stage1Instruction> {
     // NOTE: When implementing a new operator if this step is skipped the compiler will crash
     // here reminding you to add the new operator to this list. ONLY if you added the operator
     // to the OPERATORS list in main.rs
     match op {
-        "+" => Some(Stage1Instruction::Add),
+        "+" => Some(Stage1Instruction::Add(count)),
         "-" => Some(Stage1Instruction::Sub),
         "*" => Some(Stage1Instruction::Mul),
         "/" => Some(Stage1Instruction::Div),
