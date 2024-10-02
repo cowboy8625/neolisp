@@ -172,7 +172,7 @@ impl Machine {
                     (Value::String(left), Value::String(right)) => {
                         self.stack.push(Value::Bool(left == right));
                     }
-                    _ => panic!("invalid types for Add"),
+                    _ => panic!("invalid types for Eq"),
                 }
             }
             Instruction::GreaterThan => {

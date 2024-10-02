@@ -2,6 +2,12 @@ use super::{BUILTINS, KEYWORDS, OPERATORS};
 use crate::ast::{Expr, Spanned};
 
 #[derive(Debug)]
+pub struct OperatorExpr<'a> {
+    pub operator: &'a Spanned<Expr>,
+    pub args: &'a [&'a Spanned<Expr>],
+}
+
+#[derive(Debug)]
 pub struct VarExpr<'a> {
     pub name: &'a Spanned<Expr>,
     pub body: &'a Spanned<Expr>,
@@ -44,7 +50,7 @@ pub struct IfElseExpr<'a> {
 
 pub trait AstWalker<T> {
     fn get_lambda_name(&mut self) -> String;
-    fn handle_operator(&mut self, _: &mut T, _: &str, _: &[Spanned<Expr>]);
+    fn handle_operator(&mut self, _: &mut T, _: &str, _: &OperatorExpr);
     fn handle_builtin(&mut self, _: &mut T, _: &str, _: &[Spanned<Expr>]);
     fn handle_function(&mut self, _: &mut T, _: &FunctionExpr);
     fn handle_lambda(&mut self, _: &mut T, _: &LambdaExpr);
@@ -65,7 +71,7 @@ pub trait AstWalker<T> {
 
         match &first.expr {
             Expr::Symbol(symbol) if OPERATORS.contains(&symbol.as_str()) => {
-                self.handle_operator(t, symbol, exprs)
+                self.walk_operator(t, symbol, exprs)
             }
             Expr::Symbol(symbol) if KEYWORDS.contains(&symbol.as_str()) => {
                 self.walk_keyword(t, symbol, exprs)
@@ -81,6 +87,25 @@ pub trait AstWalker<T> {
             Expr::Number(_) => panic!("numbers are not callable"),
             _ => self.walk_callable(t, exprs),
         }
+    }
+
+    fn walk_operator(&mut self, t: &mut T, symbol: &str, exprs: &[Spanned<Expr>]) {
+        const OPERATOR: usize = 0;
+        const ARGS: usize = 1;
+
+        let Some(operator) = exprs.get(OPERATOR) else {
+            // TODO: REPORT ERROR
+            panic!("expected operator");
+        };
+
+        let args = exprs.iter().skip(ARGS).collect::<Vec<_>>();
+
+        let operator = OperatorExpr {
+            operator,
+            args: &args,
+        };
+
+        self.handle_operator(t, symbol, &operator)
     }
 
     fn walk_callable(&mut self, t: &mut T, exprs: &[Spanned<Expr>]) {

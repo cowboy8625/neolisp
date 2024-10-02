@@ -1,7 +1,7 @@
 use super::CompilerOptions;
 use crate::ast::{Expr, Spanned};
 use crate::expr_walker::{
-    AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LoopExpr, VarExpr,
+    AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LoopExpr, OperatorExpr, VarExpr,
 };
 use crate::symbol_table::{Symbol, SymbolKind, SymbolScope, SymbolTable, SymbolType};
 use crate::vm::Direction;
@@ -244,17 +244,14 @@ impl<'a> AstWalker<Chunk> for Stage1Compiler<'a> {
         name
     }
 
-    fn handle_operator(&mut self, chunk: &mut Chunk, operator: &str, list: &[Spanned<Expr>]) {
-        // HACK: This is a sign of a poor design. We probably need to return some kind of
-        // struct Operactor<'a> { op: &'a Spanned<Expr>, args: Vec<&'a Spanned<Expr>> }
-        const ARGS: usize = 1;
-        let Some(op) = get_operator_opcode(operator) else {
+    fn handle_operator(&mut self, chunk: &mut Chunk, symbol: &str, operator: &OperatorExpr) {
+        let Some(op) = get_operator_opcode(symbol) else {
             // TODO: REPORT ERROR
-            panic!("unknown operator: {}", operator);
+            panic!("unknown operator: {}", symbol);
         };
 
         let mut counter = 0;
-        for spanned in list.iter().skip(ARGS) {
+        for spanned in operator.args.iter() {
             self.walk_expr(chunk, spanned);
             counter += 1;
             if counter >= 2 {

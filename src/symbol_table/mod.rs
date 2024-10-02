@@ -3,7 +3,7 @@ mod test;
 
 use crate::ast::{Expr, Spanned};
 use crate::expr_walker::{
-    AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LoopExpr, VarExpr,
+    AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LoopExpr, OperatorExpr, VarExpr,
 };
 use std::collections::HashMap;
 
@@ -199,8 +199,8 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         name
     }
 
-    fn handle_operator(&mut self, table: &mut SymbolTable, _: &str, expr: &[Spanned<Expr>]) {
-        for spanned in expr.iter().skip(1) {
+    fn handle_operator(&mut self, table: &mut SymbolTable, _: &str, operator_expr: &OperatorExpr) {
+        for spanned in operator_expr.args.iter() {
             self.walk_expr(table, spanned);
         }
     }

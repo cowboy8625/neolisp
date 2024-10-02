@@ -54,7 +54,7 @@ fn test_mul_instrction() {
 #[test]
 fn test_div_instrction() {
     let src = r#"
-    (/ 222 2)
+    (/ 444 2 2)
     "#;
 
     let program = test_compile(src);
@@ -63,6 +63,20 @@ fn test_div_instrction() {
     machine.run();
     assert_eq!(machine.stack.len(), 1);
     assert_eq!(machine.stack[0], Value::F64(111.));
+}
+
+#[test]
+fn test_eq_instrction() {
+    let src = r#"
+    (= 2 2 2)
+    "#;
+
+    let program = test_compile(src);
+    let mut machine = Machine::new(program);
+
+    machine.run();
+    assert_eq!(machine.stack.len(), 1);
+    assert_eq!(machine.stack[0], Value::Bool(true));
 }
 
 #[test]
