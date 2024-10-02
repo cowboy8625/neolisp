@@ -245,18 +245,21 @@ impl<'a> AstWalker<Chunk> for Stage1Compiler<'a> {
     }
 
     fn handle_operator(&mut self, chunk: &mut Chunk, operator: &str, list: &[Spanned<Expr>]) {
+        // HACK: This is a sign of a poor design. We probably need to return some kind of
+        // struct Operactor<'a> { op: &'a Spanned<Expr>, args: Vec<&'a Spanned<Expr>> }
         const ARGS: usize = 1;
         let Some(op) = get_operator_opcode(operator) else {
             // TODO: REPORT ERROR
             panic!("unknown operator: {}", operator);
         };
 
-        let count = list.len() - 1;
+        let mut counter = 0;
         for spanned in list.iter().skip(ARGS) {
             self.walk_expr(chunk, spanned);
-        }
-        for _ in 0..count - 1 {
-            chunk.push(op.clone());
+            counter += 1;
+            if counter >= 2 {
+                chunk.push(op.clone());
+            }
         }
     }
 
