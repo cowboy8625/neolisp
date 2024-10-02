@@ -38,7 +38,7 @@ pub enum Stage1Instruction {
     Div(u8),
     Eq(u8),
     GreaterThan(u8),
-    LessThan,
+    LessThan(u8),
     GreaterThanOrEqual,
     LessThanOrEqual,
     And,
@@ -65,9 +65,9 @@ impl Stage1Instruction {
             | Self::Mul(_)
             | Self::Div(_)
             | Self::Eq(_)
-            | Self::GreaterThan(_) => 2,
-            Self::LessThan
-            | Self::GreaterThanOrEqual
+            | Self::GreaterThan(_)
+            | Self::LessThan(_) => 2,
+            Self::GreaterThanOrEqual
             | Self::LessThanOrEqual
             | Self::And
             | Self::Or
@@ -497,7 +497,7 @@ fn get_operator_opcode(op: &str, count: u8) -> Option<Stage1Instruction> {
         "/" => Some(Stage1Instruction::Div(count)),
         "=" => Some(Stage1Instruction::Eq(count)),
         ">" => Some(Stage1Instruction::GreaterThan(count)),
-        "<" => Some(Stage1Instruction::LessThan),
+        "<" => Some(Stage1Instruction::LessThan(count)),
         ">=" => Some(Stage1Instruction::GreaterThanOrEqual),
         "<=" => Some(Stage1Instruction::LessThanOrEqual),
         "and" => Some(Stage1Instruction::And),

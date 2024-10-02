@@ -171,22 +171,15 @@ impl Machine {
                 });
                 self.stack.push(Value::Bool(value));
             }
-            Instruction::LessThan => {
-                let Some(right) = self.stack.pop() else {
-                    panic!("expected value on stack for Less Than")
-                };
-                let Some(left) = self.stack.pop() else {
-                    panic!("expected value on stack for Less Than")
-                };
-                match (left, right) {
-                    (Value::I32(left), Value::I32(right)) => {
-                        self.stack.push(Value::Bool(left < right));
-                    }
-                    (Value::F64(left), Value::F64(right)) => {
-                        self.stack.push(Value::Bool(left < right));
-                    }
+            Instruction::LessThan(count) => {
+                let args = self.stack.split_off(self.stack.len() - count as usize);
+                let left = &args[0];
+                let value = args.iter().skip(1).all(|right| match (left, right) {
+                    (Value::I32(l), Value::I32(r)) => l < r,
+                    (Value::F64(l), Value::F64(r)) => l < r,
                     _ => panic!("invalid types for Less Than"),
-                }
+                });
+                self.stack.push(Value::Bool(value));
             }
             Instruction::GreaterThanOrEqual => {
                 let Some(right) = self.stack.pop() else {

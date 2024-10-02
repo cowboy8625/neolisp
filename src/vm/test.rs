@@ -94,6 +94,20 @@ fn test_greater_than_instrction() {
 }
 
 #[test]
+fn test_less_than_instrction() {
+    let src = r#"
+    (< 2 3 5)
+    "#;
+
+    let program = test_compile(src);
+    let mut machine = Machine::new(program);
+
+    machine.run();
+    assert_eq!(machine.stack.len(), 1);
+    assert_eq!(machine.stack[0], Value::Bool(true));
+}
+
+#[test]
 fn test_lambda() {
     let src = r#"
     (((lambda (x) (lambda (y) (+ x y))) 1) 3)

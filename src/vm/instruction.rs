@@ -48,7 +48,7 @@ pub enum Instruction {
     Div(u8),
     Eq(u8),
     GreaterThan(u8),
-    LessThan,
+    LessThan(u8),
     GreaterThanOrEqual,
     LessThanOrEqual,
     And,
@@ -89,7 +89,7 @@ impl Instruction {
             Instruction::Div(count) => vec![OpCode::Div as u8, *count],
             Instruction::Eq(count) => vec![OpCode::Eq as u8, *count],
             Instruction::GreaterThan(count) => vec![OpCode::GreaterThan as u8, *count],
-            Instruction::LessThan => vec![OpCode::LessThan as u8],
+            Instruction::LessThan(count) => vec![OpCode::LessThan as u8, *count],
             Instruction::GreaterThanOrEqual => vec![OpCode::GreaterThanOrEqual as u8],
             Instruction::LessThanOrEqual => vec![OpCode::LessThanOrEqual as u8],
             Instruction::And => vec![OpCode::And as u8],
@@ -146,9 +146,9 @@ impl Instruction {
             | Self::Mul(_)
             | Self::Div(_)
             | Self::Eq(_)
-            | Self::GreaterThan(_) => 2,
-            Self::LessThan
-            | Self::GreaterThanOrEqual
+            | Self::GreaterThan(_)
+            | Self::LessThan(_) => 2,
+            Self::GreaterThanOrEqual
             | Self::LessThanOrEqual
             | Self::And
             | Self::Or
