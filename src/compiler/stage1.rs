@@ -250,6 +250,18 @@ impl<'a> AstWalker<Chunk> for Stage1Compiler<'a> {
             panic!("unknown operator: {}", symbol);
         };
 
+        match op {
+            Stage1Instruction::Not if operator.args.len() != 1 => {
+                // TODO: REPORT ERROR
+                panic!("not function requires 1 argument only");
+            }
+            Stage1Instruction::Mod if operator.args.len() != 2 => {
+                // TODO: REPORT ERROR
+                panic!("mod function requires 2 argument only");
+            }
+            _ => {}
+        }
+
         for spanned in operator.args.iter() {
             self.walk_expr(chunk, spanned);
         }

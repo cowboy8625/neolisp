@@ -63,6 +63,10 @@ check_return_when!(
     Value::Bool(true)
 );
 
+check_return_when!(not_instruction_true, "(not false)", Value::Bool(true));
+check_return_when!(not_instruction_false, "(not true)", Value::Bool(false));
+check_return_when!(mod_instruction, "(mod 3 2 3)", Value::Bool(false));
+
 check_return_when!(
     lambda_is_called,
     "(((lambda (x) (lambda (y) (+ x y))) 1) 3)",
