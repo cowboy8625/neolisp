@@ -170,7 +170,10 @@ impl Machine {
                 (Value::String(l), Value::String(r)) => {
                     left = Value::String(format!("{l}{r}"));
                 }
-                _ => panic!("invalid types for Add"),
+                (lhs, rhs) => panic!(
+                    "invalid types for Add: {lhs:?} and {rhs:?}, {:#?}",
+                    self.stack
+                ),
             }
         }
         self.stack.push(left);

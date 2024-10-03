@@ -29,3 +29,11 @@ path = "src/lib.rs"
 [[bench]]
 name = "fibonacci"
 harness = false
+
+[[bench]]
+name = "machine_operator"
+harness = false
+
+[[bench]]
+name = "machine_function_call"
+harness = false

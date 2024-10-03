@@ -12,7 +12,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
       n
       (+ (fib (- n 1)) (fib (- n 2)))))
 
-(fn main () (print (fib 30) "\n"))
+(fn main () (fib 30))
 "#;
 
     let options = CompilerOptions::default();
