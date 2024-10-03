@@ -33,7 +33,6 @@ pub fn get_instruction(bytes: &[u8], ip: &mut usize) -> Result<Instruction, Stri
             *ip += 4;
             Ok(Instruction::StartAt(address as usize))
         }
-        OpCode::Noop => Ok(Instruction::Noop),
         OpCode::Halt => Ok(Instruction::Halt),
         OpCode::Return => Ok(Instruction::Return),
         OpCode::Push => {
@@ -250,11 +249,6 @@ mod tests {
         test_decompile_start_at,
         vec![OpCode::StartAt as u8, 0x01, 0x00, 0x00, 0x00],
         vec![Instruction::StartAt(1)]
-    );
-    test_decompile!(
-        test_decompile_noop,
-        vec![OpCode::Noop as u8],
-        vec![Instruction::Noop]
     );
     test_decompile!(
         test_decompile_halt,

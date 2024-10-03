@@ -20,7 +20,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         b.iter(|| {
             let program = compile(&src, &options).unwrap();
             let mut machine = Machine::new(black_box(program));
-            machine.run();
+            machine.run().unwrap();
         })
     });
 }

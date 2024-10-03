@@ -4,11 +4,12 @@ use crate::compiler::{compile_to_instructions, simple_display_instructions};
 use crate::docs;
 use crate::parser::parser;
 use crate::vm::Machine;
+use anyhow::Result;
 use chumsky::prelude::Parser;
 use rustyline::config::Configurer;
 use rustyline::highlight::MatchingBracketHighlighter;
 use rustyline::validate::MatchingBracketValidator;
-use rustyline::{Cmd, Editor, EventHandler, KeyCode, KeyEvent, Modifiers, Result};
+use rustyline::{Cmd, Editor, EventHandler, KeyCode, KeyEvent, Modifiers};
 use rustyline::{Completer, Helper, Highlighter, Hinter, Validator};
 const HELP: &str = r#"
 commands
@@ -154,7 +155,7 @@ pub fn run(args: Cli) -> Result<()> {
                     }
                 };
                 let mut machine = Machine::new(program);
-                machine.run();
+                machine.run()?;
                 if let Some(last) = machine.stack.last() {
                     eprintln!("{last}");
                 }

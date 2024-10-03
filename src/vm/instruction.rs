@@ -6,7 +6,6 @@ use num_derive::{FromPrimitive, ToPrimitive};
 #[derive(Debug, Clone, PartialEq, FromPrimitive, ToPrimitive)]
 pub enum OpCode {
     StartAt,
-    Noop,
     Halt,
     Return,
     Push,
@@ -38,7 +37,6 @@ pub enum OpCode {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Instruction {
     StartAt(usize),
-    Noop,
     Halt,
     Return,
     Push(Value),
@@ -75,7 +73,6 @@ impl Instruction {
                 bytes.extend_from_slice(&(*v as u32).to_le_bytes());
                 bytes
             }
-            Instruction::Noop => vec![OpCode::Noop as u8],
             Instruction::Halt => vec![OpCode::Halt as u8],
             Instruction::Return => vec![OpCode::Return as u8],
             Instruction::Push(value) => {
@@ -157,7 +154,6 @@ impl Instruction {
             Self::Not
             | Self::Mod
             | Self::Rot
-            | Self::Noop
             | Self::Halt
             | Self::LoadGlobal
             | Self::LoadLocal

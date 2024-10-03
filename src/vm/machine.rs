@@ -2,8 +2,11 @@ use core::panic;
 
 use super::builtin;
 use super::decompile::{decompile, get_instruction};
-use super::instruction::{Callee, Direction, Instruction};
+use super::instruction::{Callee, Direction, Instruction, OpCode};
 use super::value::Value;
+use num_traits::FromPrimitive;
+
+use anyhow::{anyhow, Result};
 
 const RED: &str = "\x1b[31m";
 const GREEN: &str = "\x1b[32m";
@@ -52,300 +55,61 @@ impl Machine {
         self.breakpoints.push(ip);
     }
 
-    pub fn run_once(&mut self) {
+    pub fn run_once(&mut self) -> Result<()> {
         match self.debug_mode {
             DebugMode::Off if self.breakpoints.contains(&self.ip) => {
                 self.debug_mode = DebugMode::Pause;
-                return;
+                return Ok(());
             }
             DebugMode::Pause => {
                 self.debugger();
-                return;
+                return Ok(());
             }
             DebugMode::Step => self.debug_mode = DebugMode::Pause,
             _ => (),
         }
 
-        let Some(instruction) = get_instruction(&self.program, &mut self.ip).ok() else {
-            panic!("ip out of bounds")
-        };
+        let opcode = self.get_op_code()?;
 
-        match instruction {
-            Instruction::StartAt(address) => self.ip = address,
-            Instruction::Noop => {}
-            Instruction::Halt => self.is_running = false,
-            Instruction::Return => {
-                let Some(Value::U32(address)) = self.stack.pop() else {
-                    panic!("expected value on stack for return")
-                };
-                self.ip = address as usize;
-                self.leaving_local_stack();
-            }
-            Instruction::Push(value) => {
-                self.stack.push(value.clone());
-            }
-            Instruction::Add(count) => {
-                let args = self.stack.split_off(self.stack.len() - count as usize);
-                let mut left = args[0].clone();
-                for right in args.iter().skip(1) {
-                    match (left, right) {
-                        (Value::I32(l), Value::I32(r)) => {
-                            left = Value::I32(l + r);
-                        }
-                        (Value::F64(l), Value::F64(r)) => {
-                            left = Value::F64(l + r);
-                        }
-                        (Value::String(l), Value::String(r)) => {
-                            left = Value::String(format!("{l}{r}"));
-                        }
-                        _ => panic!("invalid types for Add"),
-                    }
-                }
-                self.stack.push(left);
-            }
-            Instruction::Sub(count) => {
-                let args = self.stack.split_off(self.stack.len() - count as usize);
-                let mut left = args[0].clone();
-                for right in args.iter().skip(1) {
-                    match (left, right) {
-                        (Value::I32(l), Value::I32(r)) => {
-                            left = Value::I32(l - r);
-                        }
-                        (Value::F64(l), Value::F64(r)) => {
-                            left = Value::F64(l - r);
-                        }
-                        _ => panic!("invalid types for Sub"),
-                    }
-                }
-                self.stack.push(left);
-            }
-            Instruction::Mul(count) => {
-                let args = self.stack.split_off(self.stack.len() - count as usize);
-                let mut left = args[0].clone();
-                for right in args.iter().skip(1) {
-                    match (left, right) {
-                        (Value::I32(l), Value::I32(r)) => {
-                            left = Value::I32(l * r);
-                        }
-                        (Value::F64(l), Value::F64(r)) => {
-                            left = Value::F64(l * r);
-                        }
-                        _ => panic!("invalid types for Mul"),
-                    }
-                }
-                self.stack.push(left);
-            }
-            Instruction::Div(count) => {
-                let args = self.stack.split_off(self.stack.len() - count as usize);
-                let mut left = args[0].clone();
-                for right in args.iter().skip(1) {
-                    match (left, right) {
-                        (Value::I32(l), Value::I32(r)) => {
-                            left = Value::I32(l / r);
-                        }
-                        (Value::F64(l), Value::F64(r)) => {
-                            left = Value::F64(l / r);
-                        }
-                        _ => panic!("invalid types for Div"),
-                    }
-                }
-                self.stack.push(left);
-            }
-            Instruction::Eq(count) => {
-                let args = self.stack.split_off(self.stack.len() - count as usize);
-                let left = &args[0];
-                let value = args.iter().skip(1).all(|right| match (left, right) {
-                    (Value::I32(l), Value::I32(r)) => l == r,
-                    (Value::F64(l), Value::F64(r)) => l == r,
-                    _ => panic!("invalid types for Less Than"),
-                });
-                self.stack.push(Value::Bool(value));
-            }
-            Instruction::GreaterThan(count) => {
-                let args = self.stack.split_off(self.stack.len() - count as usize);
-                let left = &args[0];
-                let value = args.iter().skip(1).all(|right| match (left, right) {
-                    (Value::I32(l), Value::I32(r)) => l > r,
-                    (Value::F64(l), Value::F64(r)) => l > r,
-                    _ => panic!("invalid types for Less Than"),
-                });
-                self.stack.push(Value::Bool(value));
-            }
-            Instruction::LessThan(count) => {
-                let args = self.stack.split_off(self.stack.len() - count as usize);
-                let left = &args[0];
-                let value = args.iter().skip(1).all(|right| match (left, right) {
-                    (Value::I32(l), Value::I32(r)) => l < r,
-                    (Value::F64(l), Value::F64(r)) => l < r,
-                    _ => panic!("invalid types for Less Than"),
-                });
-                self.stack.push(Value::Bool(value));
-            }
-            Instruction::GreaterThanOrEqual(count) => {
-                let args = self.stack.split_off(self.stack.len() - count as usize);
-                let left = &args[0];
-                let value = args.iter().skip(1).all(|right| match (left, right) {
-                    (Value::I32(l), Value::I32(r)) => l >= r,
-                    (Value::F64(l), Value::F64(r)) => l >= r,
-                    _ => panic!("invalid types for Greater Than Or Equal"),
-                });
-                self.stack.push(Value::Bool(value));
-            }
-            Instruction::LessThanOrEqual(count) => {
-                let args = self.stack.split_off(self.stack.len() - count as usize);
-                let left = &args[0];
-                let value = args.iter().skip(1).all(|right| match (left, right) {
-                    (Value::I32(l), Value::I32(r)) => l <= r,
-                    (Value::F64(l), Value::F64(r)) => l <= r,
-                    _ => panic!("invalid types for Less Than Or Equal"),
-                });
-                self.stack.push(Value::Bool(value));
-            }
-            Instruction::And(count) => {
-                let args = self.stack.split_off(self.stack.len() - count as usize);
-                let left = &args[0];
-                let value = args.iter().skip(1).all(|right| match (left, right) {
-                    (Value::Bool(l), Value::Bool(r)) => *l && *r,
-                    _ => panic!("invalid types for And"),
-                });
-                self.stack.push(Value::Bool(value));
-            }
-            Instruction::Or(count) => {
-                let args = self.stack.split_off(self.stack.len() - count as usize);
-                let left = &args[0];
-                let value = args
-                    .iter()
-                    .skip(1)
-                    .fold(false, |acc, right| match (left, right) {
-                        (Value::Bool(l), Value::Bool(r)) => acc || *l || *r,
-                        _ => panic!("invalid types for Or"),
-                    });
-                self.stack.push(Value::Bool(value));
-            }
-            Instruction::Not => {
-                let Some(value) = self.stack.pop() else {
-                    panic!("expected value on stack for Not")
-                };
-                match value {
-                    Value::Bool(b) => {
-                        self.stack.push(Value::Bool(!b));
-                    }
-                    _ => panic!("invalid types for Not"),
-                }
-            }
-            Instruction::Mod => {
-                let Some(right) = self.stack.pop() else {
-                    panic!("expected value on stack for Mod")
-                };
-                let Some(left) = self.stack.pop() else {
-                    panic!("expected value on stack for Mod")
-                };
-                match (left, right) {
-                    (Value::I32(left), Value::I32(right)) => {
-                        self.stack.push(Value::I32(left % right));
-                    }
-                    (Value::F64(left), Value::F64(right)) => {
-                        self.stack.push(Value::F64(left % right));
-                    }
-                    _ => panic!("invalid types for Mod"),
-                }
-            }
-            Instruction::Rot => {
-                let Some(right) = self.stack.pop() else {
-                    panic!("expected value on stack for rot")
-                };
-                let Some(left) = self.stack.pop() else {
-                    panic!("expected value on stack for rot")
-                };
-                self.stack.push(right);
-                self.stack.push(left);
-            }
-            Instruction::Call(callee, arg_count) => match callee.clone() {
-                Callee::Function => {
-                    let count = arg_count as usize;
-                    let address = match self.stack.pop() {
-                        Some(Value::Callable(address)) => address,
-                        None => {
-                            panic!("expected value on stack for function call but stack is empty")
-                        }
-                        value => {
-                            panic!(
-                                "expected value on stack for function call but got {:?} {:#?}",
-                                value, self.stack
-                            )
-                        }
-                    };
-
-                    self.new_local_stack();
-                    self.stack.push(Value::U32(self.ip as u32));
-                    self.ip = address;
-                    self.bring_to_top_of_stack(count);
-                }
-                Callee::Builtin(name) => self.builtins(name.clone(), arg_count),
-            },
-            Instruction::LoadLocal => {
-                let Some(value) = self.stack.pop() else {
-                    panic!("expected value on stack for LoadLocal")
-                };
-
-                self.push_local(value);
-            }
-            Instruction::GetLocal(index) => {
-                let Some(value) = self.get_local(index) else {
-                    panic!("expected value on stack for GetLocal")
-                };
-                self.stack.push(value.clone());
-            }
-            Instruction::LoadGlobal => {
-                let Some(value) = self.stack.pop() else {
-                    panic!("expected value on stack for LoadGlobal")
-                };
-
-                self.global_stack.push(value);
-            }
-            Instruction::GetGlobal(index) => {
-                let Some(value) = self.global_stack.get(index) else {
-                    panic!("expected value on stack for GetGlobal")
-                };
-                self.stack.push(value.clone());
-            }
-            Instruction::LoadFree => {
-                let Some(value) = self.stack.pop() else {
-                    panic!("expected value on stack for LoadFree")
-                };
-
-                self.free_stack.push(value);
-            }
-            Instruction::GetFree(index) => {
-                let Some(value) = self.free_stack.get(index) else {
-                    panic!("expected value on stack for GetFree")
-                };
-                self.stack.push(value.clone());
-            }
-            Instruction::JumpIf(address) => {
-                let Some(value) = self.stack.pop() else {
-                    panic!("expected value on stack for JumpIf")
-                };
-                if value == Value::Bool(false) {
-                    self.ip += address;
-                }
-            }
-            Instruction::Jump(Direction::Forward(address)) => {
-                self.ip += address;
-            }
-            Instruction::Jump(Direction::Backward(address)) => {
-                self.ip -= address;
-            }
+        match opcode {
+            OpCode::StartAt => self.instruction_start_at(),
+            OpCode::Halt => self.instruction_halt(),
+            OpCode::Return => self.instruction_return(),
+            OpCode::Push => self.instruction_push(),
+            OpCode::Add => self.instruction_add(),
+            OpCode::Sub => self.instruction_sub(),
+            OpCode::Mul => self.instruction_mul(),
+            OpCode::Div => self.instruction_div(),
+            OpCode::Eq => self.instruction_eq(),
+            OpCode::GreaterThan => self.instruction_greater_than(),
+            OpCode::LessThan => self.instruction_less_than(),
+            OpCode::GreaterThanOrEqual => self.instruction_greater_than_or_equal(),
+            OpCode::LessThanOrEqual => self.instruction_less_than_or_equal(),
+            OpCode::And => self.instruction_and(),
+            OpCode::Or => self.instruction_or(),
+            OpCode::Not => self.instruction_not(),
+            OpCode::Mod => self.instruction_mod(),
+            OpCode::Rot => self.instruction_rot(),
+            OpCode::Call => self.instruction_call(),
+            OpCode::LoadLocal => self.instruction_load_local(),
+            OpCode::GetLocal => self.instruction_get_local(),
+            OpCode::LoadGlobal => self.instruction_load_global(),
+            OpCode::GetGlobal => self.instruction_get_global(),
+            OpCode::LoadFree => self.instruction_load_free(),
+            OpCode::GetFree => self.instruction_get_free(),
+            OpCode::JumpIf => self.instruction_jump_if(),
+            OpCode::Jump => self.instruction_jump(),
         }
     }
 
-    pub fn run(&mut self) {
+    pub fn run(&mut self) -> Result<()> {
         while self.is_running {
-            self.run_once();
+            self.run_once()?;
         }
+        Ok(())
     }
 
-    pub fn call(&mut self, address: usize, arg_count: usize) {
+    pub fn call(&mut self, address: usize, arg_count: usize) -> Result<()> {
         self.new_local_stack();
         self.stack.push(Value::U32(self.ip as u32));
         self.ip = address;
@@ -353,16 +117,541 @@ impl Machine {
         loop {
             let mut ip = self.ip;
             let Some(Instruction::Return) = get_instruction(&self.program, &mut ip).ok() else {
-                self.run_once();
+                self.run_once()?;
                 continue;
             };
-            self.run_once();
+            self.run_once()?;
             break;
         }
+        Ok(())
     }
 }
 
 impl Machine {
+    fn instruction_start_at(&mut self) -> Result<()> {
+        let address = self.get_u32()? as usize;
+        self.ip = address;
+        Ok(())
+    }
+
+    fn instruction_halt(&mut self) -> Result<()> {
+        self.is_running = false;
+        Ok(())
+    }
+
+    fn instruction_return(&mut self) -> Result<()> {
+        let Some(Value::U32(address)) = self.stack.pop() else {
+            // TODO: REPORT ERROR
+            panic!("expected value on stack for return")
+        };
+        self.ip = address as usize;
+        self.leaving_local_stack();
+        Ok(())
+    }
+
+    fn instruction_push(&mut self) -> Result<()> {
+        let value = self.get_value()?;
+        self.stack.push(value);
+        Ok(())
+    }
+
+    fn instruction_add(&mut self) -> Result<()> {
+        let count = self.get_u8()?;
+        let args = self.stack.split_off(self.stack.len() - count as usize);
+        let mut left = args[0].clone();
+        for right in args.iter().skip(1) {
+            match (left, right) {
+                (Value::I32(l), Value::I32(r)) => {
+                    left = Value::I32(l + r);
+                }
+                (Value::F64(l), Value::F64(r)) => {
+                    left = Value::F64(l + r);
+                }
+                (Value::String(l), Value::String(r)) => {
+                    left = Value::String(format!("{l}{r}"));
+                }
+                _ => panic!("invalid types for Add"),
+            }
+        }
+        self.stack.push(left);
+        Ok(())
+    }
+
+    fn instruction_sub(&mut self) -> Result<()> {
+        let count = self.get_u8()?;
+        let args = self.stack.split_off(self.stack.len() - count as usize);
+        let mut left = args[0].clone();
+        for right in args.iter().skip(1) {
+            match (left, right) {
+                (Value::I32(l), Value::I32(r)) => {
+                    left = Value::I32(l - r);
+                }
+                (Value::F64(l), Value::F64(r)) => {
+                    left = Value::F64(l - r);
+                }
+                _ => panic!("invalid types for Sub"),
+            }
+        }
+        self.stack.push(left);
+        Ok(())
+    }
+
+    fn instruction_mul(&mut self) -> Result<()> {
+        let count = self.get_u8()?;
+        let args = self.stack.split_off(self.stack.len() - count as usize);
+        let mut left = args[0].clone();
+        for right in args.iter().skip(1) {
+            match (left, right) {
+                (Value::I32(l), Value::I32(r)) => {
+                    left = Value::I32(l * r);
+                }
+                (Value::F64(l), Value::F64(r)) => {
+                    left = Value::F64(l * r);
+                }
+                _ => panic!("invalid types for Mul"),
+            }
+        }
+        self.stack.push(left);
+        Ok(())
+    }
+
+    fn instruction_div(&mut self) -> Result<()> {
+        let count = self.get_u8()?;
+        let args = self.stack.split_off(self.stack.len() - count as usize);
+        let mut left = args[0].clone();
+        for right in args.iter().skip(1) {
+            match (left, right) {
+                (Value::I32(l), Value::I32(r)) => {
+                    left = Value::I32(l / r);
+                }
+                (Value::F64(l), Value::F64(r)) => {
+                    left = Value::F64(l / r);
+                }
+                _ => panic!("invalid types for Div"),
+            }
+        }
+        self.stack.push(left);
+        Ok(())
+    }
+
+    fn instruction_eq(&mut self) -> Result<()> {
+        let count = self.get_u8()?;
+        let args = self.stack.split_off(self.stack.len() - count as usize);
+        let left = &args[0];
+        let value = args.iter().skip(1).all(|right| match (left, right) {
+            (Value::I32(l), Value::I32(r)) => l == r,
+            (Value::F64(l), Value::F64(r)) => l == r,
+            _ => panic!("invalid types for Less Than"),
+        });
+        self.stack.push(Value::Bool(value));
+        Ok(())
+    }
+
+    fn instruction_greater_than(&mut self) -> Result<()> {
+        let count = self.get_u8()?;
+        let args = self.stack.split_off(self.stack.len() - count as usize);
+        let left = &args[0];
+        let value = args.iter().skip(1).all(|right| match (left, right) {
+            (Value::I32(l), Value::I32(r)) => l > r,
+            (Value::F64(l), Value::F64(r)) => l > r,
+            _ => panic!("invalid types for Less Than"),
+        });
+        self.stack.push(Value::Bool(value));
+        Ok(())
+    }
+
+    fn instruction_less_than(&mut self) -> Result<()> {
+        let count = self.get_u8()?;
+        let args = self.stack.split_off(self.stack.len() - count as usize);
+        let left = &args[0];
+        let value = args.iter().skip(1).all(|right| match (left, right) {
+            (Value::I32(l), Value::I32(r)) => l < r,
+            (Value::F64(l), Value::F64(r)) => l < r,
+            _ => panic!("invalid types for Less Than"),
+        });
+        self.stack.push(Value::Bool(value));
+        Ok(())
+    }
+
+    fn instruction_greater_than_or_equal(&mut self) -> Result<()> {
+        let count = self.get_u8()?;
+        let args = self.stack.split_off(self.stack.len() - count as usize);
+        let left = &args[0];
+        let value = args.iter().skip(1).all(|right| match (left, right) {
+            (Value::I32(l), Value::I32(r)) => l >= r,
+            (Value::F64(l), Value::F64(r)) => l >= r,
+            _ => panic!("invalid types for Greater Than Or Equal"),
+        });
+        self.stack.push(Value::Bool(value));
+        Ok(())
+    }
+
+    fn instruction_less_than_or_equal(&mut self) -> Result<()> {
+        let count = self.get_u8()?;
+        let args = self.stack.split_off(self.stack.len() - count as usize);
+        let left = &args[0];
+        let value = args.iter().skip(1).all(|right| match (left, right) {
+            (Value::I32(l), Value::I32(r)) => l <= r,
+            (Value::F64(l), Value::F64(r)) => l <= r,
+            _ => panic!("invalid types for Less Than Or Equal"),
+        });
+        self.stack.push(Value::Bool(value));
+        Ok(())
+    }
+
+    fn instruction_and(&mut self) -> Result<()> {
+        let count = self.get_u8()?;
+        let args = self.stack.split_off(self.stack.len() - count as usize);
+        let left = &args[0];
+        let value = args.iter().skip(1).all(|right| match (left, right) {
+            (Value::Bool(l), Value::Bool(r)) => *l && *r,
+            _ => panic!("invalid types for And"),
+        });
+        self.stack.push(Value::Bool(value));
+        Ok(())
+    }
+
+    fn instruction_or(&mut self) -> Result<()> {
+        let count = self.get_u8()?;
+        let args = self.stack.split_off(self.stack.len() - count as usize);
+        let left = &args[0];
+        let value = args
+            .iter()
+            .skip(1)
+            .fold(false, |acc, right| match (left, right) {
+                (Value::Bool(l), Value::Bool(r)) => acc || *l || *r,
+                _ => panic!("invalid types for Or"),
+            });
+        self.stack.push(Value::Bool(value));
+        Ok(())
+    }
+
+    fn instruction_not(&mut self) -> Result<()> {
+        let Some(value) = self.stack.pop() else {
+            panic!("expected value on stack for Not")
+        };
+        match value {
+            Value::Bool(b) => {
+                self.stack.push(Value::Bool(!b));
+            }
+            _ => panic!("invalid types for Not"),
+        }
+        Ok(())
+    }
+
+    fn instruction_mod(&mut self) -> Result<()> {
+        let Some(right) = self.stack.pop() else {
+            panic!("expected value on stack for Mod")
+        };
+        let Some(left) = self.stack.pop() else {
+            panic!("expected value on stack for Mod")
+        };
+        match (left, right) {
+            (Value::I32(left), Value::I32(right)) => {
+                self.stack.push(Value::I32(left % right));
+            }
+            (Value::F64(left), Value::F64(right)) => {
+                self.stack.push(Value::F64(left % right));
+            }
+            _ => panic!("invalid types for Mod"),
+        }
+        Ok(())
+    }
+
+    fn instruction_rot(&mut self) -> Result<()> {
+        let Some(right) = self.stack.pop() else {
+            panic!("expected value on stack for rot")
+        };
+        let Some(left) = self.stack.pop() else {
+            panic!("expected value on stack for rot")
+        };
+        self.stack.push(right);
+        self.stack.push(left);
+        Ok(())
+    }
+
+    fn instruction_call(&mut self) -> Result<()> {
+        let callee = self.get_callee()?;
+        let arg_count = self.get_u8()?;
+        match callee.clone() {
+            Callee::Function => {
+                let address = match self.stack.pop() {
+                    Some(Value::Callable(address)) => address,
+                    None => {
+                        panic!("expected value on stack for function call but stack is empty")
+                    }
+                    value => {
+                        panic!(
+                            "expected value on stack for function call but got {:?} {:#?}",
+                            value, self.stack
+                        )
+                    }
+                };
+
+                self.new_local_stack();
+                self.stack.push(Value::U32(self.ip as u32));
+                self.ip = address;
+                self.bring_to_top_of_stack(arg_count as usize);
+            }
+            Callee::Builtin(name) => self.builtins(name.clone(), arg_count),
+        }
+        Ok(())
+    }
+
+    fn instruction_load_local(&mut self) -> Result<()> {
+        let Some(value) = self.stack.pop() else {
+            panic!("expected value on stack for LoadLocal")
+        };
+
+        self.push_local(value);
+        Ok(())
+    }
+
+    fn instruction_get_local(&mut self) -> Result<()> {
+        let index = self.get_u8()? as usize;
+        let Some(value) = self.get_local(index) else {
+            panic!("expected value on stack for GetLocal")
+        };
+        self.stack.push(value.clone());
+        Ok(())
+    }
+
+    fn instruction_load_global(&mut self) -> Result<()> {
+        let Some(value) = self.stack.pop() else {
+            panic!("expected value on stack for LoadGlobal")
+        };
+
+        self.global_stack.push(value);
+        Ok(())
+    }
+
+    fn instruction_get_global(&mut self) -> Result<()> {
+        let index = self.get_u8()? as usize;
+        let Some(value) = self.global_stack.get(index) else {
+            panic!("expected value on stack for GetGlobal")
+        };
+        self.stack.push(value.clone());
+        Ok(())
+    }
+
+    fn instruction_load_free(&mut self) -> Result<()> {
+        let Some(value) = self.stack.pop() else {
+            panic!("expected value on stack for LoadFree")
+        };
+
+        self.free_stack.push(value);
+        Ok(())
+    }
+
+    fn instruction_get_free(&mut self) -> Result<()> {
+        let index = self.get_u8()? as usize;
+        let Some(value) = self.free_stack.get(index) else {
+            panic!("expected value on stack for GetFree")
+        };
+        self.stack.push(value.clone());
+        Ok(())
+    }
+
+    fn instruction_jump_if(&mut self) -> Result<()> {
+        let address = self.get_u32()? as usize;
+        let Some(value) = self.stack.pop() else {
+            panic!("expected value on stack for JumpIf")
+        };
+        if value == Value::Bool(false) {
+            self.ip += address;
+        }
+        Ok(())
+    }
+
+    fn instruction_jump(&mut self) -> Result<()> {
+        let direction = self.get_u8()?;
+        let address = self.get_u32()? as usize;
+        match direction {
+            Direction::OPCODE_FORWARD => {
+                self.ip += address;
+            }
+            Direction::OPCODE_BACKWARD => {
+                self.ip -= address;
+            }
+            _ => panic!("invalid direction for Jump"),
+        }
+        Ok(())
+    }
+
+    fn get_callee(&mut self) -> Result<Callee> {
+        let callee_opcode = self.program[self.ip];
+        self.ip += 1;
+        match callee_opcode {
+            // Function
+            // TODO: FUNCTION opcode
+            0x00 => Ok(Callee::Function),
+            // Builtin(String),
+            // TODO: BUILTIN opcode
+            0x01 => {
+                let length = self.get_u8()? as usize;
+                let start = self.ip;
+                let end = start + length;
+                let bytes = &self.program[start..end];
+                let name = String::from_utf8_lossy(bytes).to_string();
+                self.ip += length;
+                Ok(Callee::Builtin(name))
+            }
+            _ => Err(anyhow!("Unknown callee type: {}", self.program[self.ip])),
+        }
+    }
+
+    fn get_value(&mut self) -> Result<Value> {
+        let value_opcode = self.get_u8()?;
+        match value_opcode {
+            Value::CODE_U8 => {
+                let value = self.get_u8()?;
+                Ok(Value::U8(value))
+            }
+            Value::CODE_I32 => {
+                let value = self.get_i32()?;
+                Ok(Value::I32(value))
+            }
+            Value::CODE_U32 => {
+                let value = self.get_u32()?;
+                Ok(Value::U32(value))
+            }
+            Value::CODE_F32 => {
+                let value = self.get_f32()?;
+                Ok(Value::F32(value))
+            }
+            Value::CODE_F64 => {
+                let value = self.get_f64()?;
+                Ok(Value::F64(value))
+            }
+            Value::CODE_STRING => {
+                let value = self.get_string()?;
+                Ok(Value::String(value))
+            }
+            Value::CODE_BOOL => {
+                let value = self.get_u8()? != 0;
+                Ok(Value::Bool(value))
+            }
+            Value::CODE_LIST => {
+                let length = self.get_u32()?;
+                let mut values = Vec::new();
+                for _ in 0..length {
+                    values.push(self.get_value()?);
+                }
+                Ok(Value::List(values))
+            }
+            Value::CODE_CALLABLE => {
+                let address = self.get_u32()? as usize;
+                Ok(Value::Callable(address))
+            }
+            _ => Err(anyhow!("Unknown value `{}`", self.program[self.ip])),
+        }
+    }
+
+    fn get_op_code(&mut self) -> Result<OpCode> {
+        let ip = self.ip;
+        self.ip += 1;
+        OpCode::from_u8(self.program[ip]).ok_or_else(|| {
+            anyhow!(
+                "Unknown instruction `{} {:?}`",
+                self.program[ip],
+                &self.program[ip..]
+                    .iter()
+                    .map(|x| format!("{x:02x}"))
+                    .collect::<Vec<_>>()
+            )
+        })
+    }
+
+    fn get_u8(&mut self) -> Result<u8> {
+        let byte = self.program[self.ip];
+        self.ip += 1;
+        Ok(byte)
+    }
+
+    #[allow(dead_code)]
+    fn get_u16(&mut self) -> Result<u16> {
+        let byte2 = self.get_u8()? as u16;
+        let byte1 = self.get_u8()? as u16;
+        Ok(byte1 << 8 | byte2)
+    }
+
+    fn get_i32(&mut self) -> Result<i32> {
+        let byte4 = self.get_u8()? as i32;
+        let byte3 = self.get_u8()? as i32;
+        let byte2 = self.get_u8()? as i32;
+        let byte1 = self.get_u8()? as i32;
+        Ok(byte1 << 24 | byte2 << 16 | byte3 << 8 | byte4)
+    }
+
+    fn get_u32(&mut self) -> Result<u32> {
+        let byte4 = self.get_u8()? as u32;
+        let byte3 = self.get_u8()? as u32;
+        let byte2 = self.get_u8()? as u32;
+        let byte1 = self.get_u8()? as u32;
+        Ok(byte1 << 24 | byte2 << 16 | byte3 << 8 | byte4)
+    }
+
+    #[allow(dead_code)]
+    fn get_u64(&mut self) -> Result<u64> {
+        let byte8 = self.get_u8()? as u64;
+        let byte7 = self.get_u8()? as u64;
+        let byte6 = self.get_u8()? as u64;
+        let byte5 = self.get_u8()? as u64;
+        let byte4 = self.get_u8()? as u64;
+        let byte3 = self.get_u8()? as u64;
+        let byte2 = self.get_u8()? as u64;
+        let byte1 = self.get_u8()? as u64;
+        Ok(byte1 << 56
+            | byte2 << 48
+            | byte3 << 40
+            | byte4 << 32
+            | byte5 << 24
+            | byte6 << 16
+            | byte7 << 8
+            | byte8)
+    }
+
+    fn get_f32(&mut self) -> Result<f32> {
+        let byte1 = self.get_u8()? as u32;
+        let byte2 = self.get_u8()? as u32;
+        let byte3 = self.get_u8()? as u32;
+        let byte4 = self.get_u8()? as u32;
+        Ok(f32::from_le_bytes([
+            byte1 as u8,
+            byte2 as u8,
+            byte3 as u8,
+            byte4 as u8,
+        ]))
+    }
+
+    fn get_f64(&mut self) -> Result<f64> {
+        let byte1 = self.get_u8()? as u64;
+        let byte2 = self.get_u8()? as u64;
+        let byte3 = self.get_u8()? as u64;
+        let byte4 = self.get_u8()? as u64;
+        let byte5 = self.get_u8()? as u64;
+        let byte6 = self.get_u8()? as u64;
+        let byte7 = self.get_u8()? as u64;
+        let byte8 = self.get_u8()? as u64;
+        Ok(f64::from_le_bytes([
+            byte1 as u8,
+            byte2 as u8,
+            byte3 as u8,
+            byte4 as u8,
+            byte5 as u8,
+            byte6 as u8,
+            byte7 as u8,
+            byte8 as u8,
+        ]))
+    }
+
+    fn get_string(&mut self) -> Result<String> {
+        let len = self.get_u32()? as usize;
+        let bytes = self.program[self.ip..self.ip + len].to_vec();
+        self.ip += len;
+        Ok(String::from_utf8(bytes)?)
+    }
+
     fn new_local_stack(&mut self) {
         self.local_stack.push(Vec::new());
         self.call_stack += 1;
