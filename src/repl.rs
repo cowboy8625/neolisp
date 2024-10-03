@@ -1,6 +1,10 @@
 use crate::cli::Cli;
+use crate::compiler::CompilerOptions;
+use crate::compiler::{compile_to_instructions, simple_display_instructions};
 use crate::docs;
+use crate::parser::parser;
 use crate::vm::Machine;
+use chumsky::prelude::Parser;
 use rustyline::config::Configurer;
 use rustyline::highlight::MatchingBracketHighlighter;
 use rustyline::validate::MatchingBracketValidator;
@@ -8,10 +12,11 @@ use rustyline::{Cmd, Editor, EventHandler, KeyCode, KeyEvent, Modifiers, Result}
 use rustyline::{Completer, Helper, Highlighter, Hinter, Validator};
 const HELP: &str = r#"
 commands
-:q|e|exit|quit   - quit
-:help  - show this help message
-:clear -  clear the terminal screen
-:env   -  show environment variables
+:q|e|exit|quit             - quit
+:help                      - show this help message
+:clear                     - clear the terminal screen
+:help-doc <function name>  - with a give function name will return the help documentation
+:output-mode <ast|op|eval> - set the output mode
 "#;
 struct ShouldRunIfThereIsANewLine;
 
@@ -48,6 +53,14 @@ struct InputValidator {
     highlighter: MatchingBracketHighlighter,
 }
 
+#[derive(Debug, Default)]
+enum ReplOutputMode {
+    Ast,
+    Op,
+    #[default]
+    Eval,
+}
+
 pub fn run(args: Cli) -> Result<()> {
     let h = InputValidator {
         brackets: MatchingBracketValidator::new(),
@@ -65,6 +78,8 @@ pub fn run(args: Cli) -> Result<()> {
     }
 
     let help_docs = docs::load_doc();
+    let compiler_options = CompilerOptions { no_main: true };
+    let mut repl_output_mode = ReplOutputMode::default();
 
     loop {
         let input = rl.readline("> ")?;
@@ -81,6 +96,15 @@ pub fn run(args: Cli) -> Result<()> {
         }
         match command[0] {
             ":q" | ":e" | ":exit" | ":quit" => break,
+            ":output-mode" if command.len() == 2 => match command[1] {
+                "ast" => repl_output_mode = ReplOutputMode::Ast,
+                "op" => repl_output_mode = ReplOutputMode::Op,
+                "eval" => repl_output_mode = ReplOutputMode::Eval,
+                _ => {
+                    println!("unknown option {}", command[0]);
+                    continue;
+                }
+            },
             ":help" => println!("{HELP}"),
             ":clear" => rl.clear_screen()?,
             ":help-doc" if command.len() == 2 => {
@@ -97,21 +121,44 @@ pub fn run(args: Cli) -> Result<()> {
 
         // Ignore commands
         match command[0] {
-            ":help-doc" | ":help" | ":clear" | ":env" => continue,
+            ":help-doc" | ":help" | ":clear" | ":env" | ":output-mode" => continue,
             _ => (),
-        }
-
-        let program = match crate::compiler::compile(&input) {
-            Ok(v) => v,
-            Err(e) => {
-                println!("{e}");
-                continue;
-            }
         };
-        let mut machine = Machine::new(program);
-        machine.run();
-        if let Some(last) = machine.stack.last() {
-            eprintln!("{last:?}");
+
+        match repl_output_mode {
+            ReplOutputMode::Ast => {
+                let ast = parser().parse(input).map_err(|e| {
+                    anyhow::anyhow!(e.iter().map(|e| e.to_string() + "\n").collect::<String>())
+                });
+                match ast {
+                    Ok(v) => println!("{v:#?}"),
+                    Err(e) => println!("{e}"),
+                }
+            }
+            ReplOutputMode::Op => {
+                let instructions = match compile_to_instructions(&input, &compiler_options) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        println!("{e}");
+                        continue;
+                    }
+                };
+                simple_display_instructions(&instructions);
+            }
+            ReplOutputMode::Eval => {
+                let program = match crate::compiler::compile(&input, &compiler_options) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        println!("{e}");
+                        continue;
+                    }
+                };
+                let mut machine = Machine::new(program);
+                machine.run();
+                if let Some(last) = machine.stack.last() {
+                    eprintln!("{last}");
+                }
+            }
         }
     }
     if rl.append_history(&args.history_path).is_err() {

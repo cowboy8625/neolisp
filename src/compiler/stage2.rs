@@ -51,17 +51,17 @@ fn into_instructions(
         Stage1Instruction::Push(stage1_value) => {
             Instruction::Push(stage1_value_into_value(symbol_table, stage1_value))
         }
-        Stage1Instruction::Add => Instruction::Add,
-        Stage1Instruction::Sub => Instruction::Sub,
-        Stage1Instruction::Mul => Instruction::Mul,
-        Stage1Instruction::Div => Instruction::Div,
-        Stage1Instruction::Eq => Instruction::Eq,
-        Stage1Instruction::GreaterThan => Instruction::GreaterThan,
-        Stage1Instruction::LessThan => Instruction::LessThan,
-        Stage1Instruction::GreaterThanOrEqual => Instruction::GreaterThanOrEqual,
-        Stage1Instruction::LessThanOrEqual => Instruction::LessThanOrEqual,
-        Stage1Instruction::And => Instruction::And,
-        Stage1Instruction::Or => Instruction::Or,
+        Stage1Instruction::Add(c) => Instruction::Add(*c),
+        Stage1Instruction::Sub(c) => Instruction::Sub(*c),
+        Stage1Instruction::Mul(c) => Instruction::Mul(*c),
+        Stage1Instruction::Div(c) => Instruction::Div(*c),
+        Stage1Instruction::Eq(c) => Instruction::Eq(*c),
+        Stage1Instruction::GreaterThan(c) => Instruction::GreaterThan(*c),
+        Stage1Instruction::LessThan(c) => Instruction::LessThan(*c),
+        Stage1Instruction::GreaterThanOrEqual(c) => Instruction::GreaterThanOrEqual(*c),
+        Stage1Instruction::LessThanOrEqual(c) => Instruction::LessThanOrEqual(*c),
+        Stage1Instruction::And(c) => Instruction::And(*c),
+        Stage1Instruction::Or(c) => Instruction::Or(*c),
         Stage1Instruction::Not => Instruction::Not,
         Stage1Instruction::Mod => Instruction::Mod,
         Stage1Instruction::Rot => Instruction::Rot,
@@ -138,6 +138,7 @@ pub fn compile_to_instructions(
     };
 
     instructions.push(Instruction::StartAt(start_location as usize));
+    // TODO: MAYBE we need to insert a main function if no_main is true
     for function in &data.functions {
         symbol_table.enter_scope(&function.name);
         let params = convert_section_to_instructions(symbol_table, &function.params);

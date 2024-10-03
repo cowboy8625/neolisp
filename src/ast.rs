@@ -57,6 +57,54 @@ pub enum Expr {
     List(Vec<Spanned<Expr>>),
 }
 
+impl Expr {
+    // pub fn map<F>(&self, f: F) -> Self
+    // where
+    //     F: Fn(&Expr) -> Expr,
+    // {
+    //     match self {
+    //         Self::Bool(b) => Self::Bool(b.clone()),
+    //         Self::String(s) => Self::String(s.clone()),
+    //         Self::Symbol(s) => Self::Symbol(s.clone()),
+    //         Self::Number(n) => Self::Number(n.clone()),
+    //         Self::List(list) => Self::List(list.iter().map(|item| item.map(f)).collect()),
+    //     }
+    // }
+
+    pub fn is_bool(&self) -> bool {
+        matches!(self, Self::Bool(_))
+    }
+
+    pub fn is_number(&self) -> bool {
+        matches!(self, Self::Number(_))
+    }
+
+    pub fn is_string(&self) -> bool {
+        matches!(self, Self::String(_))
+    }
+
+    pub fn is_symbol(&self) -> bool {
+        matches!(self, Self::Symbol(_))
+    }
+
+    pub fn is_list(&self) -> bool {
+        matches!(self, Self::List(_))
+    }
+
+    pub fn first_list_item(&self) -> Option<&Spanned<Expr>> {
+        match self {
+            Self::List(list) => list.first(),
+            _ => None,
+        }
+    }
+
+    pub fn first_list_item_is<F>(&self, f: impl FnOnce(&Expr) -> bool) -> bool {
+        self.first_list_item()
+            .map(|spanned| f(&spanned.expr))
+            .unwrap_or(false)
+    }
+}
+
 impl std::fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

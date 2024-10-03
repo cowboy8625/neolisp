@@ -42,17 +42,17 @@ pub enum Instruction {
     Halt,
     Return,
     Push(Value),
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Eq,
-    GreaterThan,
-    LessThan,
-    GreaterThanOrEqual,
-    LessThanOrEqual,
-    And,
-    Or,
+    Add(u8),
+    Sub(u8),
+    Mul(u8),
+    Div(u8),
+    Eq(u8),
+    GreaterThan(u8),
+    LessThan(u8),
+    GreaterThanOrEqual(u8),
+    LessThanOrEqual(u8),
+    And(u8),
+    Or(u8),
     Not,
     Mod,
     Rot,
@@ -83,17 +83,19 @@ impl Instruction {
                 bytes.extend_from_slice(&value.to_bytecode());
                 bytes
             }
-            Instruction::Add => vec![OpCode::Add as u8],
-            Instruction::Sub => vec![OpCode::Sub as u8],
-            Instruction::Mul => vec![OpCode::Mul as u8],
-            Instruction::Div => vec![OpCode::Div as u8],
-            Instruction::Eq => vec![OpCode::Eq as u8],
-            Instruction::GreaterThan => vec![OpCode::GreaterThan as u8],
-            Instruction::LessThan => vec![OpCode::LessThan as u8],
-            Instruction::GreaterThanOrEqual => vec![OpCode::GreaterThanOrEqual as u8],
-            Instruction::LessThanOrEqual => vec![OpCode::LessThanOrEqual as u8],
-            Instruction::And => vec![OpCode::And as u8],
-            Instruction::Or => vec![OpCode::Or as u8],
+            Instruction::Add(count) => vec![OpCode::Add as u8, *count],
+            Instruction::Sub(count) => vec![OpCode::Sub as u8, *count],
+            Instruction::Mul(count) => vec![OpCode::Mul as u8, *count],
+            Instruction::Div(count) => vec![OpCode::Div as u8, *count],
+            Instruction::Eq(count) => vec![OpCode::Eq as u8, *count],
+            Instruction::GreaterThan(count) => vec![OpCode::GreaterThan as u8, *count],
+            Instruction::LessThan(count) => vec![OpCode::LessThan as u8, *count],
+            Instruction::GreaterThanOrEqual(count) => {
+                vec![OpCode::GreaterThanOrEqual as u8, *count]
+            }
+            Instruction::LessThanOrEqual(count) => vec![OpCode::LessThanOrEqual as u8, *count],
+            Instruction::And(count) => vec![OpCode::And as u8, *count],
+            Instruction::Or(count) => vec![OpCode::Or as u8, *count],
             Instruction::Not => vec![OpCode::Not as u8],
             Instruction::Mod => vec![OpCode::Mod as u8],
             Instruction::Rot => vec![OpCode::Rot as u8],
@@ -141,18 +143,18 @@ impl Instruction {
         // NOTE: if anything changes here update to Stage1Instruction.size as well
         match self {
             Self::StartAt(_) => 5,
-            Self::Add
-            | Self::Sub
-            | Self::Mul
-            | Self::Div
-            | Self::Eq
-            | Self::GreaterThan
-            | Self::LessThan
-            | Self::GreaterThanOrEqual
-            | Self::LessThanOrEqual
-            | Self::And
-            | Self::Or
-            | Self::Not
+            Self::Add(_)
+            | Self::Sub(_)
+            | Self::Mul(_)
+            | Self::Div(_)
+            | Self::Eq(_)
+            | Self::GreaterThan(_)
+            | Self::LessThan(_)
+            | Self::GreaterThanOrEqual(_)
+            | Self::LessThanOrEqual(_)
+            | Self::And(_)
+            | Self::Or(_) => 2,
+            Self::Not
             | Self::Mod
             | Self::Rot
             | Self::Noop

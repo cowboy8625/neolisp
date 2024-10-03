@@ -1,4 +1,6 @@
-use super::{Chunk, IState, Stage1Callee, Stage1Compiler, Stage1Instruction::*, Stage1Value};
+use super::{
+    Chunk, CompilerOptions, IState, Stage1Callee, Stage1Compiler, Stage1Instruction::*, Stage1Value,
+};
 use crate::parser::parser;
 use crate::symbol_table::SymbolTableBuilder;
 use crate::vm::Direction;
@@ -13,17 +15,18 @@ fn test_main_var() {
 ";
     let ast = parser().parse(src).unwrap();
     let mut symbol_table = SymbolTableBuilder::default().build(&ast);
-    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
+    let stage1_compiler =
+        Stage1Compiler::new(&mut symbol_table).compile(&ast, &CompilerOptions::default());
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
     assert_eq!(main.name, "main", "main function name");
-    assert_eq!(main.params, Chunk::new(), "main function params");
+    assert_eq!(main.params, Chunk::default(), "main function params");
     assert_eq!(
         main.prelude,
         Chunk::from(vec![
             Push(Stage1Value::F64(1.0)),
             Push(Stage1Value::F64(2.0)),
-            Add,
+            Add(2),
             LoadGlobal,
         ]),
         "main function prelude"
@@ -47,12 +50,13 @@ fn test_main_var_lambda() {
 ";
     let ast = parser().parse(src).unwrap();
     let mut symbol_table = SymbolTableBuilder::default().build(&ast);
-    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
+    let stage1_compiler =
+        Stage1Compiler::new(&mut symbol_table).compile(&ast, &CompilerOptions::default());
     // Checking function
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
     assert_eq!(main.name, "main", "main function name");
-    assert_eq!(main.params, Chunk::new(), "main function params");
+    assert_eq!(main.params, Chunk::default(), "main function params");
     assert_eq!(
         main.prelude,
         // This is the global variable being loaded
@@ -89,7 +93,7 @@ fn test_main_var_lambda() {
         Chunk::from(vec![
             GetLocal(IState::Set(0)),
             GetLocal(IState::Set(1)),
-            Add,
+            Add(2),
             Rot,
             Return
         ]),
@@ -105,12 +109,13 @@ fn test_main_var_lambda_curry() {
 ";
     let ast = parser().parse(src).unwrap();
     let mut symbol_table = SymbolTableBuilder::default().build(&ast);
-    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
+    let stage1_compiler =
+        Stage1Compiler::new(&mut symbol_table).compile(&ast, &CompilerOptions::default());
     // Checking function
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
     assert_eq!(main.name, "main", "main function name");
-    assert_eq!(main.params, Chunk::new(), "main function params");
+    assert_eq!(main.params, Chunk::default(), "main function params");
     assert_eq!(
         main.prelude,
         // This is the global variable being loaded
@@ -169,7 +174,7 @@ fn test_main_var_lambda_curry() {
         Chunk::from(vec![
             GetFree(IState::Set(0)),
             GetLocal(IState::Set(0)),
-            Add,
+            Add(2),
             Rot,
             Return
         ]),
@@ -184,16 +189,17 @@ fn test_main_call_lambda() {
 "#;
     let ast = parser().parse(src).unwrap();
     let mut symbol_table = SymbolTableBuilder::default().build(&ast);
-    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
+    let stage1_compiler =
+        Stage1Compiler::new(&mut symbol_table).compile(&ast, &CompilerOptions::default());
     // Checking function
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
     assert_eq!(main.name, "main", "main function name");
-    assert_eq!(main.params, Chunk::new(), "main function params");
+    assert_eq!(main.params, Chunk::default(), "main function params");
     assert_eq!(
         main.prelude,
         // This is the global variable being loaded
-        Chunk::new(),
+        Chunk::default(),
         "main function prelude"
     );
     assert_eq!(
@@ -225,7 +231,7 @@ fn test_main_call_lambda() {
         Chunk::from(vec![
             GetLocal(IState::Set(0)),
             GetLocal(IState::Set(1)),
-            Add,
+            Add(2),
             Rot,
             Return
         ]),
@@ -241,7 +247,8 @@ fn test_main_applying_lambda() {
 "#;
     let ast = parser().parse(src).unwrap();
     let mut symbol_table = SymbolTableBuilder::default().build(&ast);
-    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
+    let stage1_compiler =
+        Stage1Compiler::new(&mut symbol_table).compile(&ast, &CompilerOptions::default());
 
     // Checking function apply
     assert_eq!(stage1_compiler.functions.len(), 2, "two functions");
@@ -255,7 +262,7 @@ fn test_main_applying_lambda() {
     assert_eq!(
         apply.prelude,
         // This is the global variable being loaded
-        Chunk::new(),
+        Chunk::default(),
         "apply function prelude"
     );
     assert_eq!(
@@ -274,11 +281,11 @@ fn test_main_applying_lambda() {
     // Checking function main
     let main = &stage1_compiler.functions[1];
     assert_eq!(main.name, "main", "main function name");
-    assert_eq!(main.params, Chunk::new(), "main function params");
+    assert_eq!(main.params, Chunk::default(), "main function params");
     assert_eq!(
         main.prelude,
         // This is the global variable being loaded
-        Chunk::new(),
+        Chunk::default(),
         "main function prelude"
     );
     assert_eq!(
@@ -310,7 +317,7 @@ fn test_main_applying_lambda() {
         Chunk::from(vec![
             GetLocal(IState::Set(0)),
             Push(Stage1Value::F64(321.0)),
-            Add,
+            Add(2),
             Rot,
             Return
         ]),
@@ -325,18 +332,19 @@ fn test_main_if_else() {
 "#;
     let ast = parser().parse(src).unwrap();
     let mut symbol_table = SymbolTableBuilder::default().build(&ast);
-    let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
+    let stage1_compiler =
+        Stage1Compiler::new(&mut symbol_table).compile(&ast, &CompilerOptions::default());
 
     // Checking function apply
     assert_eq!(stage1_compiler.functions.len(), 1, "one functions");
     // Checking function main
     let main = &stage1_compiler.functions[0];
     assert_eq!(main.name, "main", "main function name");
-    assert_eq!(main.params, Chunk::new(), "main function params");
+    assert_eq!(main.params, Chunk::default(), "main function params");
     assert_eq!(
         main.prelude,
         // This is the global variable being loaded
-        Chunk::new(),
+        Chunk::default(),
         "main function prelude"
     );
     assert_eq!(

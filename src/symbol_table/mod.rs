@@ -3,11 +3,11 @@ mod test;
 
 use crate::ast::{Expr, Spanned};
 use crate::expr_walker::{
-    AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LoopExpr, VarExpr,
+    AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LoopExpr, OperatorExpr, VarExpr,
 };
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct SymbolTable {
     global_scope: HashMap<String, Symbol>, // Permanent global scope
     function_scopes: HashMap<String, HashMap<String, Symbol>>, // Persistent function scopes
@@ -15,15 +15,6 @@ pub struct SymbolTable {
 }
 
 impl SymbolTable {
-    /// Create a new symbol table with an empty global scope
-    pub fn new() -> Self {
-        SymbolTable {
-            global_scope: HashMap::new(),
-            function_scopes: HashMap::new(),
-            scope_stack: Vec::new(),
-        }
-    }
-
     /// Enter a new scope (pushes a new scope onto the stack)
     pub fn enter_new_scope(&mut self) {
         self.scope_stack.push(HashMap::new());
@@ -180,7 +171,7 @@ pub struct SymbolTableBuilder {
 
 impl SymbolTableBuilder {
     pub fn build(&mut self, ast: &[Spanned<Expr>]) -> SymbolTable {
-        let mut table = SymbolTable::new();
+        let mut table = SymbolTable::default();
         self.walk(&mut table, ast);
         table
     }
@@ -199,8 +190,8 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         name
     }
 
-    fn handle_operator(&mut self, table: &mut SymbolTable, _: &str, expr: &[Spanned<Expr>]) {
-        for spanned in expr.iter().skip(1) {
+    fn handle_operator(&mut self, table: &mut SymbolTable, _: &str, operator_expr: &OperatorExpr) {
+        for spanned in operator_expr.args.iter() {
             self.walk_expr(table, spanned);
         }
     }

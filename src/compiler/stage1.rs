@@ -1,8 +1,9 @@
+use super::CompilerOptions;
 use crate::ast::{Expr, Spanned};
 use crate::expr_walker::{
-    AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LoopExpr, VarExpr,
+    AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LoopExpr, OperatorExpr, VarExpr,
 };
-use crate::symbol_table::{SymbolKind, SymbolScope, SymbolTable};
+use crate::symbol_table::{Symbol, SymbolKind, SymbolScope, SymbolTable, SymbolType};
 use crate::vm::Direction;
 
 #[derive(Debug)]
@@ -31,17 +32,17 @@ pub enum Stage1Instruction {
     Halt,
     Return,
     Push(Stage1Value),
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Eq,
-    GreaterThan,
-    LessThan,
-    GreaterThanOrEqual,
-    LessThanOrEqual,
-    And,
-    Or,
+    Add(u8),
+    Sub(u8),
+    Mul(u8),
+    Div(u8),
+    Eq(u8),
+    GreaterThan(u8),
+    LessThan(u8),
+    GreaterThanOrEqual(u8),
+    LessThanOrEqual(u8),
+    And(u8),
+    Or(u8),
     Not,
     Mod,
     Rot,
@@ -59,18 +60,18 @@ pub enum Stage1Instruction {
 impl Stage1Instruction {
     pub fn size(&self) -> usize {
         match self {
-            Self::Add
-            | Self::Sub
-            | Self::Mul
-            | Self::Div
-            | Self::Eq
-            | Self::GreaterThan
-            | Self::LessThan
-            | Self::GreaterThanOrEqual
-            | Self::LessThanOrEqual
-            | Self::And
-            | Self::Or
-            | Self::Not
+            Self::Add(_)
+            | Self::Sub(_)
+            | Self::Mul(_)
+            | Self::Div(_)
+            | Self::Eq(_)
+            | Self::GreaterThan(_)
+            | Self::LessThan(_)
+            | Self::GreaterThanOrEqual(_)
+            | Self::LessThanOrEqual(_)
+            | Self::And(_)
+            | Self::Or(_) => 2,
+            Self::Not
             | Self::Mod
             | Self::Rot
             | Self::Halt
@@ -140,16 +141,12 @@ impl Stage1Value {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Chunk {
     pub items: Vec<Stage1Instruction>,
 }
 
 impl Chunk {
-    pub fn new() -> Self {
-        Self { items: Vec::new() }
-    }
-
     pub fn push(&mut self, instruction: Stage1Instruction) {
         self.items.push(instruction);
     }
@@ -189,17 +186,42 @@ impl<'a> Stage1Compiler<'a> {
 
     #[allow(dead_code)]
     pub fn compile_to_chunk(&mut self, ast: &[Spanned<Expr>]) -> Chunk {
-        let mut chunk = Chunk::new();
+        let mut chunk = Chunk::default();
         self.walk(&mut chunk, ast);
         chunk
     }
 
-    pub fn compile(mut self, ast: &[Spanned<Expr>]) -> Stage1Data {
-        let mut chunk = Chunk::new();
+    pub fn compile(mut self, ast: &[Spanned<Expr>], options: &CompilerOptions) -> Stage1Data {
+        let mut chunk = Chunk::default();
         self.walk(&mut chunk, ast);
+
+        if options.no_main {
+            let mut body = Chunk::default();
+            body.push(Stage1Instruction::Halt);
+            self.functions.push(Stage1Function {
+                name: "main".to_string(),
+                params: Chunk::default(),
+                prelude: Chunk::default(),
+                body,
+            });
+
+            self.symbol_table.enter_new_scope();
+            let symbol = Symbol {
+                id: self.symbol_table.get_id(),
+                name: "main".to_string(),
+                symbol_type: SymbolType::Function(Vec::new(), Box::new(SymbolType::Dynamic)),
+                kind: SymbolKind::Function,
+                scope: SymbolScope::Global,
+                scope_level: self.symbol_table.get_scope_level() as u32,
+                location: None,
+            };
+
+            self.symbol_table.insert("main".to_string(), symbol);
+            self.symbol_table.exit_new_scope(Some("main"));
+        }
         for function in self.functions.iter_mut() {
             if function.name == "main" {
-                function.prelude.extend(chunk);
+                function.prelude.extend(chunk.clone());
                 break;
             }
         }
@@ -218,20 +240,28 @@ impl<'a> AstWalker<Chunk> for Stage1Compiler<'a> {
         name
     }
 
-    fn handle_operator(&mut self, chunk: &mut Chunk, operator: &str, list: &[Spanned<Expr>]) {
-        const ARGS: usize = 1;
-        let Some(op) = get_operator_opcode(operator) else {
+    fn handle_operator(&mut self, chunk: &mut Chunk, symbol: &str, operator: &OperatorExpr) {
+        let Some(op) = get_operator_opcode(symbol, operator.args.len() as u8) else {
             // TODO: REPORT ERROR
-            panic!("unknown operator: {}", operator);
+            panic!("unknown operator: {}", symbol);
         };
 
-        let count = list.len() - 1;
-        for spanned in list.iter().skip(ARGS) {
+        match op {
+            Stage1Instruction::Not if operator.args.len() != 1 => {
+                // TODO: REPORT ERROR
+                panic!("not function requires 1 argument only");
+            }
+            Stage1Instruction::Mod if operator.args.len() != 2 => {
+                // TODO: REPORT ERROR
+                panic!("mod function requires 2 argument only");
+            }
+            _ => {}
+        }
+
+        for spanned in operator.args.iter() {
             self.walk_expr(chunk, spanned);
         }
-        for _ in 0..count - 1 {
-            chunk.push(op.clone());
-        }
+        chunk.push(op);
     }
 
     fn handle_builtin(&mut self, chunk: &mut Chunk, name: &str, spanned: &[Spanned<Expr>]) {
@@ -264,7 +294,7 @@ impl<'a> AstWalker<Chunk> for Stage1Compiler<'a> {
             );
         };
 
-        let mut params = Chunk::new();
+        let mut params = Chunk::default();
         for param in expr_params.iter() {
             let Expr::Symbol(_) = &param.expr else {
                 panic!("expected symbol for param");
@@ -273,7 +303,7 @@ impl<'a> AstWalker<Chunk> for Stage1Compiler<'a> {
             params.push(Stage1Instruction::LoadLocal);
         }
 
-        let mut body = Chunk::new();
+        let mut body = Chunk::default();
         self.walk_expr(&mut body, function.body);
 
         if name == "main" {
@@ -287,7 +317,7 @@ impl<'a> AstWalker<Chunk> for Stage1Compiler<'a> {
 
         self.functions.push(Stage1Function {
             name: name.to_string(),
-            prelude: Chunk::new(),
+            prelude: Chunk::default(),
             params,
             body,
         });
@@ -313,7 +343,7 @@ impl<'a> AstWalker<Chunk> for Stage1Compiler<'a> {
             params.push(Stage1Instruction::LoadLocal);
         }
 
-        let mut body = Chunk::new();
+        let mut body = Chunk::default();
         self.symbol_table.enter_scope(&name);
         self.walk_expr(&mut body, lambda.body);
         self.symbol_table.exit_scope();
@@ -364,11 +394,11 @@ impl<'a> AstWalker<Chunk> for Stage1Compiler<'a> {
     fn handle_if_else(&mut self, chunk: &mut Chunk, if_else: &IfElseExpr) {
         self.walk_expr(chunk, if_else.condition);
 
-        let mut then_chunk = Chunk::new();
+        let mut then_chunk = Chunk::default();
         self.walk_expr(&mut then_chunk, if_else.then);
         let then_offset = then_chunk.size() + Stage1Instruction::Jump(Direction::Forward(0)).size();
 
-        let mut else_chunk = Chunk::new();
+        let mut else_chunk = Chunk::default();
         if let Some(else_spanned) = if_else.otherwise.as_ref() {
             self.walk_expr(&mut else_chunk, else_spanned);
         };
@@ -402,10 +432,10 @@ impl<'a> AstWalker<Chunk> for Stage1Compiler<'a> {
     }
 
     fn handle_loop(&mut self, chunk: &mut Chunk, r#loop: &LoopExpr) {
-        let mut chunk_condition = Chunk::new();
+        let mut chunk_condition = Chunk::default();
         self.walk_expr(&mut chunk_condition, r#loop.condition);
 
-        let mut chunk_body = Chunk::new();
+        let mut chunk_body = Chunk::default();
         self.walk_expr(&mut chunk_body, r#loop.body);
 
         let body_offset = chunk_body.size();
@@ -464,22 +494,22 @@ impl<'a> AstWalker<Chunk> for Stage1Compiler<'a> {
     }
 }
 
-fn get_operator_opcode(op: &str) -> Option<Stage1Instruction> {
+fn get_operator_opcode(op: &str, count: u8) -> Option<Stage1Instruction> {
     // NOTE: When implementing a new operator if this step is skipped the compiler will crash
     // here reminding you to add the new operator to this list. ONLY if you added the operator
     // to the OPERATORS list in main.rs
     match op {
-        "+" => Some(Stage1Instruction::Add),
-        "-" => Some(Stage1Instruction::Sub),
-        "*" => Some(Stage1Instruction::Mul),
-        "/" => Some(Stage1Instruction::Div),
-        "=" => Some(Stage1Instruction::Eq),
-        ">" => Some(Stage1Instruction::GreaterThan),
-        "<" => Some(Stage1Instruction::LessThan),
-        ">=" => Some(Stage1Instruction::GreaterThanOrEqual),
-        "<=" => Some(Stage1Instruction::LessThanOrEqual),
-        "and" => Some(Stage1Instruction::And),
-        "or" => Some(Stage1Instruction::Or),
+        "+" => Some(Stage1Instruction::Add(count)),
+        "-" => Some(Stage1Instruction::Sub(count)),
+        "*" => Some(Stage1Instruction::Mul(count)),
+        "/" => Some(Stage1Instruction::Div(count)),
+        "=" => Some(Stage1Instruction::Eq(count)),
+        ">" => Some(Stage1Instruction::GreaterThan(count)),
+        "<" => Some(Stage1Instruction::LessThan(count)),
+        ">=" => Some(Stage1Instruction::GreaterThanOrEqual(count)),
+        "<=" => Some(Stage1Instruction::LessThanOrEqual(count)),
+        "and" => Some(Stage1Instruction::And(count)),
+        "or" => Some(Stage1Instruction::Or(count)),
         "not" => Some(Stage1Instruction::Not),
         "mod" => Some(Stage1Instruction::Mod),
         _ => None,
@@ -511,7 +541,7 @@ fn get_operator_opcode(op: &str) -> Option<Stage1Instruction> {
 //     }
 //
 //     pub fn compiler(mut self, ast: &[Spanned<Expr>]) -> Stage1Data {
-//         let mut chunk = Chunk::new();
+//         let mut chunk = Chunk::default();
 //         for expr in ast {
 //             self.compile_expr(&mut chunk, expr);
 //         }
@@ -704,7 +734,7 @@ fn get_operator_opcode(op: &str) -> Option<Stage1Instruction> {
 //             panic!("loop requires condition");
 //         };
 //
-//         let mut chunk_condition = Chunk::new();
+//         let mut chunk_condition = Chunk::default();
 //         self.compile_expr(&mut chunk_condition, condition_spanned);
 //         eprintln!("{:?}\n{:#?}", chunk_condition, condition_spanned);
 //
@@ -712,7 +742,7 @@ fn get_operator_opcode(op: &str) -> Option<Stage1Instruction> {
 //             panic!("loop without body");
 //         };
 //
-//         let mut body_chunk = Chunk::new();
+//         let mut body_chunk = Chunk::default();
 //         self.compile_expr(&mut body_chunk, body_spanned);
 //
 //         let body_offset = body_chunk.size();
@@ -746,7 +776,7 @@ fn get_operator_opcode(op: &str) -> Option<Stage1Instruction> {
 //             panic!("if without then");
 //         };
 //
-//         let mut then_chunk = Chunk::new();
+//         let mut then_chunk = Chunk::default();
 //         self.compile_expr(&mut then_chunk, then_spanned);
 //         let then_offset = then_chunk.size() + Stage1Instruction::Jump(Direction::Forward(0)).size();
 //         // 1. jump to else if false 4
@@ -755,7 +785,7 @@ fn get_operator_opcode(op: &str) -> Option<Stage1Instruction> {
 //         // 4. else
 //         // 5. end
 //
-//         let mut else_chunk = Chunk::new();
+//         let mut else_chunk = Chunk::default();
 //         if let Some(else_spanned) = list.get(ELSE) {
 //             self.compile_expr(&mut else_chunk, else_spanned);
 //         };
@@ -824,7 +854,7 @@ fn get_operator_opcode(op: &str) -> Option<Stage1Instruction> {
 //             );
 //         };
 //
-//         let mut params = Chunk::new();
+//         let mut params = Chunk::default();
 //         for param in expr_params.iter() {
 //             let Expr::Symbol(_) = &param.expr else {
 //                 panic!("expected symbol for param");
@@ -833,7 +863,7 @@ fn get_operator_opcode(op: &str) -> Option<Stage1Instruction> {
 //             params.push(Stage1Instruction::LoadLocal);
 //         }
 //
-//         let mut body = Chunk::new();
+//         let mut body = Chunk::default();
 //         for expr in list.iter().skip(BODY) {
 //             self.compile_expr(&mut body, expr);
 //         }
@@ -849,7 +879,7 @@ fn get_operator_opcode(op: &str) -> Option<Stage1Instruction> {
 //
 //         self.functions.push(Stage1Function {
 //             name: name.to_string(),
-//             prelude: Chunk::new(),
+//             prelude: Chunk::default(),
 //             params,
 //             body,
 //         });
@@ -887,7 +917,7 @@ fn get_operator_opcode(op: &str) -> Option<Stage1Instruction> {
 //             params.push(Stage1Instruction::LoadLocal);
 //         }
 //
-//         let mut body = Chunk::new();
+//         let mut body = Chunk::default();
 //         for expr in list.iter().skip(BODY) {
 //             self.compile_expr(&mut body, expr);
 //         }
@@ -961,12 +991,13 @@ mod tests {
 "#;
         let ast = parser().parse(src).unwrap();
         let mut symbol_table = SymbolTableBuilder::default().build(&ast);
-        let stage1_compiler = Stage1Compiler::new(&mut symbol_table).compile(&ast);
+        let stage1_compiler =
+            Stage1Compiler::new(&mut symbol_table).compile(&ast, &CompilerOptions::default());
         assert_eq!(stage1_compiler.functions.len(), 1, "one function");
         let main = &stage1_compiler.functions[0];
         assert_eq!(main.name, "main", "main function name");
-        assert_eq!(main.params, Chunk::new(), "main function params");
-        assert_eq!(main.prelude, Chunk::new(), "main function prelude");
+        assert_eq!(main.params, Chunk::default(), "main function params");
+        assert_eq!(main.prelude, Chunk::default(), "main function prelude");
         assert_eq!(
             main.body,
             Chunk::from(vec![

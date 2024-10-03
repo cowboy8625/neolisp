@@ -14,3 +14,18 @@ num-derive = "0.4.2"
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"
+criterion = "0.5.1"
+
+
+[[bin]]
+name = "neolisp"
+path = "src/main.rs"
+
+[lib]
+name = "neolisp"
+path = "src/lib.rs"
+
+
+[[bench]]
+name = "fibonacci"
+harness = false

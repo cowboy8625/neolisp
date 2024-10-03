@@ -40,17 +40,61 @@ pub fn get_instruction(bytes: &[u8], ip: &mut usize) -> Result<Instruction, Stri
             let value = get_value(bytes, ip)?;
             Ok(Instruction::Push(value))
         }
-        OpCode::Add => Ok(Instruction::Add),
-        OpCode::Sub => Ok(Instruction::Sub),
-        OpCode::Mul => Ok(Instruction::Mul),
-        OpCode::Div => Ok(Instruction::Div),
-        OpCode::Eq => Ok(Instruction::Eq),
-        OpCode::GreaterThan => Ok(Instruction::GreaterThan),
-        OpCode::LessThan => Ok(Instruction::LessThan),
-        OpCode::GreaterThanOrEqual => Ok(Instruction::GreaterThanOrEqual),
-        OpCode::LessThanOrEqual => Ok(Instruction::LessThanOrEqual),
-        OpCode::And => Ok(Instruction::And),
-        OpCode::Or => Ok(Instruction::Or),
+        OpCode::Add => {
+            let count = bytes[*ip];
+            *ip += 1;
+            Ok(Instruction::Add(count))
+        }
+        OpCode::Sub => {
+            let count = bytes[*ip];
+            *ip += 1;
+            Ok(Instruction::Sub(count))
+        }
+        OpCode::Mul => {
+            let count = bytes[*ip];
+            *ip += 1;
+            Ok(Instruction::Mul(count))
+        }
+        OpCode::Div => {
+            let count = bytes[*ip];
+            *ip += 1;
+            Ok(Instruction::Div(count))
+        }
+        OpCode::Eq => {
+            let count = bytes[*ip];
+            *ip += 1;
+            Ok(Instruction::Eq(count))
+        }
+        OpCode::GreaterThan => {
+            let count = bytes[*ip];
+            *ip += 1;
+            Ok(Instruction::GreaterThan(count))
+        }
+        OpCode::LessThan => {
+            let count = bytes[*ip];
+            *ip += 1;
+            Ok(Instruction::LessThan(count))
+        }
+        OpCode::GreaterThanOrEqual => {
+            let count = bytes[*ip];
+            *ip += 1;
+            Ok(Instruction::GreaterThanOrEqual(count))
+        }
+        OpCode::LessThanOrEqual => {
+            let count = bytes[*ip];
+            *ip += 1;
+            Ok(Instruction::LessThanOrEqual(count))
+        }
+        OpCode::And => {
+            let count = bytes[*ip];
+            *ip += 1;
+            Ok(Instruction::And(count))
+        }
+        OpCode::Or => {
+            let count = bytes[*ip];
+            *ip += 1;
+            Ok(Instruction::Or(count))
+        }
         OpCode::Not => Ok(Instruction::Not),
         OpCode::Mod => Ok(Instruction::Mod),
         OpCode::Rot => Ok(Instruction::Rot),
@@ -71,7 +115,6 @@ pub fn get_instruction(bytes: &[u8], ip: &mut usize) -> Result<Instruction, Stri
             // FIXME: GetGlobaL probably sould have a u32
             let index = bytes[*ip];
             *ip += 1;
-            eprintln!("GetGlobal: {}", index);
             Ok(Instruction::GetGlobal(index as usize))
         }
         OpCode::LoadFree => Ok(Instruction::LoadFree),
@@ -101,193 +144,6 @@ pub fn get_instruction(bytes: &[u8], ip: &mut usize) -> Result<Instruction, Stri
             _ => unreachable!(),
         },
     }
-}
-
-#[test]
-fn test_decompile_start_at() {
-    let bytes = vec![OpCode::StartAt as u8, 0x01, 0x00, 0x00, 0x00];
-
-    let instructions = decompile(&bytes);
-    assert_eq!(instructions, vec![Instruction::StartAt(1)]);
-}
-
-#[test]
-fn test_decompile_noop() {
-    let bytes = vec![OpCode::Noop as u8];
-
-    let instructions = decompile(&bytes);
-    assert_eq!(instructions, vec![Instruction::Noop]);
-}
-
-#[test]
-fn test_decompile_halt() {
-    let bytes = vec![OpCode::Halt as u8];
-
-    let instructions = decompile(&bytes);
-    assert_eq!(instructions, vec![Instruction::Halt]);
-}
-
-#[test]
-fn test_decompile_return() {
-    let bytes = vec![OpCode::Return as u8];
-
-    let instructions = decompile(&bytes);
-    assert_eq!(instructions, vec![Instruction::Return]);
-}
-
-#[test]
-fn test_decompile_push() {
-    let bytes = vec![OpCode::Push as u8, 0x00, 0x04];
-
-    let instructions = decompile(&bytes);
-    assert_eq!(instructions, vec![Instruction::Push(Value::U8(4))]);
-}
-
-#[test]
-fn test_decompile_add() {
-    let bytes = vec![OpCode::Add as u8];
-
-    let instructions = decompile(&bytes);
-    assert_eq!(instructions, vec![Instruction::Add]);
-}
-
-#[test]
-fn test_decompile_sub() {
-    let bytes = vec![OpCode::Sub as u8];
-
-    let instructions = decompile(&bytes);
-    assert_eq!(instructions, vec![Instruction::Sub]);
-}
-
-#[test]
-fn test_decompile_eq() {
-    let bytes = vec![OpCode::Eq as u8];
-
-    let instructions = decompile(&bytes);
-    assert_eq!(instructions, vec![Instruction::Eq]);
-}
-
-#[test]
-fn test_decompile_or() {
-    let bytes = vec![OpCode::Or as u8];
-
-    let instructions = decompile(&bytes);
-    assert_eq!(instructions, vec![Instruction::Or]);
-}
-
-#[test]
-fn test_decompile_rot() {
-    let bytes = vec![OpCode::Rot as u8];
-
-    let instructions = decompile(&bytes);
-    assert_eq!(instructions, vec![Instruction::Rot]);
-}
-
-#[test]
-fn test_decompile_callable_builtin_print() {
-    #[rustfmt::skip]
-    let bytes = vec![
-        OpCode::Call as u8, // Callable type
-        0x01, // Builtin type
-        0x05, // Builtin name length
-        0x70, 0x72, 0x69, 0x6E, 0x74, // "print"
-        0x01, // count
-    ];
-
-    let instructions = decompile(&bytes);
-    assert_eq!(
-        instructions,
-        vec![Instruction::Call(Callee::Builtin("print".to_string()), 1)]
-    );
-}
-
-#[test]
-fn test_decompile_load_local() {
-    let bytes = vec![OpCode::LoadLocal as u8];
-
-    let instructions = decompile(&bytes);
-    assert_eq!(instructions, vec![Instruction::LoadLocal]);
-}
-
-#[test]
-fn test_decompile_get_local() {
-    let bytes = vec![OpCode::GetLocal as u8, 0x10];
-
-    let instructions = decompile(&bytes);
-    assert_eq!(instructions, vec![Instruction::GetLocal(16)]);
-}
-
-#[test]
-fn test_decompile_load_global() {
-    let bytes = vec![OpCode::LoadGlobal as u8];
-
-    let instructions = decompile(&bytes);
-    assert_eq!(instructions, vec![Instruction::LoadGlobal]);
-}
-
-#[test]
-fn test_decompile_get_global() {
-    let bytes = vec![OpCode::GetGlobal as u8, 0x10];
-
-    let instructions = decompile(&bytes);
-    assert_eq!(instructions, vec![Instruction::GetGlobal(16)]);
-}
-
-#[test]
-fn test_decompile_load_free() {
-    let bytes = vec![OpCode::LoadFree as u8];
-
-    let instructions = decompile(&bytes);
-    assert_eq!(instructions, vec![Instruction::LoadFree]);
-}
-
-#[test]
-fn test_decompile_get_free() {
-    let bytes = vec![OpCode::GetFree as u8, 0x10];
-
-    let instructions = decompile(&bytes);
-    assert_eq!(instructions, vec![Instruction::GetFree(16)]);
-}
-
-#[test]
-fn test_decompile_jump_if() {
-    let bytes = vec![OpCode::JumpIf as u8, 0x10, 0x00, 0x00, 0x00];
-
-    let instructions = decompile(&bytes);
-    assert_eq!(instructions, vec![Instruction::JumpIf(16)]);
-}
-
-#[test]
-fn test_decompile_jump() {
-    let bytes = vec![
-        OpCode::Jump as u8,
-        Direction::OPCODE_FORWARD,
-        0x10,
-        0x00,
-        0x00,
-        0x00,
-    ];
-
-    let instructions = decompile(&bytes);
-    assert_eq!(
-        instructions,
-        vec![Instruction::Jump(Direction::Forward(16))]
-    );
-
-    let bytes = vec![
-        OpCode::Jump as u8,
-        Direction::OPCODE_BACKWARD,
-        0x10,
-        0x00,
-        0x00,
-        0x00,
-    ];
-
-    let instructions = decompile(&bytes);
-    assert_eq!(
-        instructions,
-        vec![Instruction::Jump(Direction::Backward(16))]
-    );
 }
 
 fn get_value(bytes: &[u8], ip: &mut usize) -> Result<Value, String> {
@@ -356,114 +212,6 @@ fn get_value(bytes: &[u8], ip: &mut usize) -> Result<Value, String> {
     }
 }
 
-#[test]
-fn test_decompile_value_u8() {
-    let bytes = vec![0x00, 0x01];
-
-    let mut ip = 0;
-    let value = get_value(&bytes, &mut ip).unwrap();
-    assert_eq!(value, Value::U8(1));
-    assert_eq!(ip, 2);
-}
-
-#[test]
-fn test_decompile_value_i32() {
-    let bytes = vec![0x01, 0x01, 0x00, 0x00, 0x00];
-
-    let mut ip = 0;
-    let value = get_value(&bytes, &mut ip).unwrap();
-    assert_eq!(value, Value::I32(1));
-    assert_eq!(ip, 5);
-}
-
-#[test]
-fn test_decompile_value_u32() {
-    let bytes = vec![0x02, 0x01, 0x00, 0x00, 0x00];
-
-    let mut ip = 0;
-    let value = get_value(&bytes, &mut ip).unwrap();
-    assert_eq!(value, Value::U32(1));
-    assert_eq!(ip, 5);
-}
-
-#[test]
-fn test_decompile_value_f32() {
-    let bytes = vec![0x03, 0x00, 0x00, 0x80, 0x3F];
-
-    let mut ip = 0;
-    let value = get_value(&bytes, &mut ip).unwrap();
-    assert_eq!(value, Value::F32(1.));
-    assert_eq!(ip, 5);
-}
-
-#[test]
-fn test_decompile_value_f64() {
-    let bytes = vec![0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF0, 0x3F];
-
-    let mut ip = 0;
-    let value = get_value(&bytes, &mut ip).unwrap();
-    assert_eq!(value, Value::F64(1.));
-    assert_eq!(ip, 9);
-}
-
-#[test]
-fn test_decompile_value_string() {
-    let bytes = vec![0x05, 0x05, 0x00, 0x00, 0x00, 0x61, 0x62, 0x63, 0x64, 0x65];
-
-    let mut ip = 0;
-    let value = get_value(&bytes, &mut ip).unwrap();
-    assert_eq!(value, Value::String("abcde".to_string()));
-    assert_eq!(ip, 10);
-}
-
-#[test]
-fn test_decompile_value_boolean() {
-    let bytes = vec![0x06, 0x01];
-
-    let mut ip = 0;
-    let value = get_value(&bytes, &mut ip).unwrap();
-    assert_eq!(value, Value::Bool(true));
-    assert_eq!(ip, 2);
-}
-
-#[test]
-fn test_decompile_value_list() {
-    let bytes = vec![
-        0x07, // List type
-        0x04, 0x00, 0x00, 0x00, // List length
-        0x00, 0x05, // u8 type with a value of 5
-        0x01, 0x02, 0x00, 0x00, 0x00, // i32 type with a value of 2
-        0x00, 0x01, // u8 type with a value of 1
-        0x02, 0x03, 0x00, 0x00, 0x00, // u32 type with a value of 3
-    ];
-
-    let mut ip = 0;
-    let value = get_value(&bytes, &mut ip).unwrap();
-    assert_eq!(
-        value,
-        Value::List(vec![
-            Value::U8(5),
-            Value::I32(2),
-            Value::U8(1),
-            Value::U32(3)
-        ])
-    );
-    assert_eq!(ip, 19);
-}
-
-#[test]
-fn test_decompile_value_callable() {
-    let bytes = vec![
-        0x08, // Callable type
-        0x10, 0x00, 0x00, 0x00, // Callable index
-    ];
-
-    let mut ip = 0;
-    let value = get_value(&bytes, &mut ip).unwrap();
-    assert_eq!(value, Value::Callable(16));
-    assert_eq!(ip, 5);
-}
-
 fn get_callee(bytes: &[u8], ip: &mut usize) -> Result<Callee, String> {
     match bytes[*ip] {
         // Function
@@ -484,20 +232,265 @@ fn get_callee(bytes: &[u8], ip: &mut usize) -> Result<Callee, String> {
     }
 }
 
-#[test]
-fn test_decompile_callee_function() {
-    let bytes = vec![0x00];
-    let mut ip = 0;
-    let callee = get_callee(&bytes, &mut ip).unwrap();
-    assert_eq!(callee, Callee::Function);
-    assert_eq!(ip, 1);
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-fn test_decompile_callee_builtin_print() {
-    let bytes = vec![0x01, 0x05, 0x70, 0x72, 0x69, 0x6E, 0x74];
-    let mut ip = 0;
-    let callee = get_callee(&bytes, &mut ip).unwrap();
-    assert_eq!(callee, Callee::Builtin("print".to_string()));
-    assert_eq!(ip, 7);
+    macro_rules! test_decompile {
+        ($name:ident, $input:expr, $expected:expr) => {
+            #[test]
+            fn $name() {
+                let instructions = decompile(&$input);
+                assert_eq!(instructions, $expected);
+            }
+        };
+    }
+
+    test_decompile!(
+        test_decompile_start_at,
+        vec![OpCode::StartAt as u8, 0x01, 0x00, 0x00, 0x00],
+        vec![Instruction::StartAt(1)]
+    );
+    test_decompile!(
+        test_decompile_noop,
+        vec![OpCode::Noop as u8],
+        vec![Instruction::Noop]
+    );
+    test_decompile!(
+        test_decompile_halt,
+        vec![OpCode::Halt as u8],
+        vec![Instruction::Halt]
+    );
+    test_decompile!(
+        test_decompile_return,
+        vec![OpCode::Return as u8],
+        vec![Instruction::Return]
+    );
+    test_decompile!(
+        test_decompile_push,
+        vec![OpCode::Push as u8, 0x00, 0x04],
+        vec![Instruction::Push(Value::U8(4))]
+    );
+    test_decompile!(
+        test_decompile_add,
+        vec![OpCode::Add as u8, 0x02],
+        vec![Instruction::Add(2)]
+    );
+    test_decompile!(
+        test_decompile_sub,
+        vec![OpCode::Sub as u8, 0x02],
+        vec![Instruction::Sub(2)]
+    );
+    test_decompile!(
+        test_decompile_eq,
+        vec![OpCode::Eq as u8, 0x02],
+        vec![Instruction::Eq(2)]
+    );
+    test_decompile!(
+        test_decompile_or,
+        vec![OpCode::Or as u8, 0x02],
+        vec![Instruction::Or(2)]
+    );
+    test_decompile!(
+        test_decompile_rot,
+        vec![OpCode::Rot as u8],
+        vec![Instruction::Rot]
+    );
+    #[rustfmt::skip]
+    test_decompile!(
+        test_decompile_callable_builtin_print,
+        vec![
+            OpCode::Call as u8, // Callable type
+            0x01, // Builtin type
+            0x05, // Builtin name length
+            0x70, 0x72, 0x69, 0x6E, 0x74, // "print"
+            0x01, // count
+        ],
+        vec![Instruction::Call(Callee::Builtin("print".to_string()), 1)]
+    );
+    test_decompile!(
+        test_decompile_load_local,
+        vec![OpCode::LoadLocal as u8],
+        vec![Instruction::LoadLocal]
+    );
+    test_decompile!(
+        test_decompile_get_local,
+        vec![OpCode::GetLocal as u8, 0x10],
+        vec![Instruction::GetLocal(16)]
+    );
+    test_decompile!(
+        test_decompile_load_global,
+        vec![OpCode::LoadGlobal as u8],
+        vec![Instruction::LoadGlobal]
+    );
+    test_decompile!(
+        test_decompile_get_global,
+        vec![OpCode::GetGlobal as u8, 0x10],
+        vec![Instruction::GetGlobal(16)]
+    );
+    test_decompile!(
+        test_decompile_load_free,
+        vec![OpCode::LoadFree as u8],
+        vec![Instruction::LoadFree]
+    );
+    test_decompile!(
+        test_decompile_get_free,
+        vec![OpCode::GetFree as u8, 0x10],
+        vec![Instruction::GetFree(16)]
+    );
+    test_decompile!(
+        test_decompile_jump_if,
+        vec![OpCode::JumpIf as u8, 0x10, 0x00, 0x00, 0x00],
+        vec![Instruction::JumpIf(16)]
+    );
+    test_decompile!(
+        test_decompile_jump_forward,
+        vec![
+            OpCode::Jump as u8,
+            Direction::OPCODE_FORWARD,
+            0x10,
+            0x00,
+            0x00,
+            0x00,
+        ],
+        vec![Instruction::Jump(Direction::Forward(16))]
+    );
+    test_decompile!(
+        test_decompile_jump_backward,
+        vec![
+            OpCode::Jump as u8,
+            Direction::OPCODE_BACKWARD,
+            0x10,
+            0x00,
+            0x00,
+            0x00,
+        ],
+        vec![Instruction::Jump(Direction::Backward(16))]
+    );
+
+    #[test]
+    fn test_decompile_value_u8() {
+        let bytes = vec![0x00, 0x01];
+
+        let mut ip = 0;
+        let value = get_value(&bytes, &mut ip).unwrap();
+        assert_eq!(value, Value::U8(1));
+        assert_eq!(ip, 2);
+    }
+
+    #[test]
+    fn test_decompile_value_i32() {
+        let bytes = vec![0x01, 0x01, 0x00, 0x00, 0x00];
+
+        let mut ip = 0;
+        let value = get_value(&bytes, &mut ip).unwrap();
+        assert_eq!(value, Value::I32(1));
+        assert_eq!(ip, 5);
+    }
+
+    #[test]
+    fn test_decompile_value_u32() {
+        let bytes = vec![0x02, 0x01, 0x00, 0x00, 0x00];
+
+        let mut ip = 0;
+        let value = get_value(&bytes, &mut ip).unwrap();
+        assert_eq!(value, Value::U32(1));
+        assert_eq!(ip, 5);
+    }
+
+    #[test]
+    fn test_decompile_value_f32() {
+        let bytes = vec![0x03, 0x00, 0x00, 0x80, 0x3F];
+
+        let mut ip = 0;
+        let value = get_value(&bytes, &mut ip).unwrap();
+        assert_eq!(value, Value::F32(1.));
+        assert_eq!(ip, 5);
+    }
+
+    #[test]
+    fn test_decompile_value_f64() {
+        let bytes = vec![0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0xF0, 0x3F];
+
+        let mut ip = 0;
+        let value = get_value(&bytes, &mut ip).unwrap();
+        assert_eq!(value, Value::F64(1.));
+        assert_eq!(ip, 9);
+    }
+
+    #[test]
+    fn test_decompile_value_string() {
+        let bytes = vec![0x05, 0x05, 0x00, 0x00, 0x00, 0x61, 0x62, 0x63, 0x64, 0x65];
+
+        let mut ip = 0;
+        let value = get_value(&bytes, &mut ip).unwrap();
+        assert_eq!(value, Value::String("abcde".to_string()));
+        assert_eq!(ip, 10);
+    }
+
+    #[test]
+    fn test_decompile_value_boolean() {
+        let bytes = vec![0x06, 0x01];
+
+        let mut ip = 0;
+        let value = get_value(&bytes, &mut ip).unwrap();
+        assert_eq!(value, Value::Bool(true));
+        assert_eq!(ip, 2);
+    }
+
+    #[test]
+    fn test_decompile_value_list() {
+        let bytes = vec![
+            0x07, // List type
+            0x04, 0x00, 0x00, 0x00, // List length
+            0x00, 0x05, // u8 type with a value of 5
+            0x01, 0x02, 0x00, 0x00, 0x00, // i32 type with a value of 2
+            0x00, 0x01, // u8 type with a value of 1
+            0x02, 0x03, 0x00, 0x00, 0x00, // u32 type with a value of 3
+        ];
+
+        let mut ip = 0;
+        let value = get_value(&bytes, &mut ip).unwrap();
+        assert_eq!(
+            value,
+            Value::List(vec![
+                Value::U8(5),
+                Value::I32(2),
+                Value::U8(1),
+                Value::U32(3)
+            ])
+        );
+        assert_eq!(ip, 19);
+    }
+
+    #[test]
+    fn test_decompile_value_callable() {
+        let bytes = vec![
+            0x08, // Callable type
+            0x10, 0x00, 0x00, 0x00, // Callable index
+        ];
+
+        let mut ip = 0;
+        let value = get_value(&bytes, &mut ip).unwrap();
+        assert_eq!(value, Value::Callable(16));
+        assert_eq!(ip, 5);
+    }
+
+    #[test]
+    fn test_decompile_callee_function() {
+        let bytes = vec![0x00];
+        let mut ip = 0;
+        let callee = get_callee(&bytes, &mut ip).unwrap();
+        assert_eq!(callee, Callee::Function);
+        assert_eq!(ip, 1);
+    }
+
+    #[test]
+    fn test_decompile_callee_builtin_print() {
+        let bytes = vec![0x01, 0x05, 0x70, 0x72, 0x69, 0x6E, 0x74];
+        let mut ip = 0;
+        let callee = get_callee(&bytes, &mut ip).unwrap();
+        assert_eq!(callee, Callee::Builtin("print".to_string()));
+        assert_eq!(ip, 7);
+    }
 }

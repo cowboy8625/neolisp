@@ -1,81 +1,53 @@
-mod ast;
-mod cli;
-mod compiler;
-mod docs;
-mod error;
-mod expr_walker;
-mod parser;
-mod repl;
-mod symbol_table;
-#[cfg(test)]
-mod tests;
-mod vm;
-
-const OPERATORS: &[&str] = &[
-    "+", "-", "*", "/", "=", ">", "<", ">=", "<=", "and", "or", "not", "mod",
-];
-const BUILTINS: &[&str] = &[
-    "sleep",
-    "atom?",
-    "number?",
-    "slice",
-    "join",
-    "split",
-    "to-string",
-    "filter",
-    "fold-right",
-    "fold",
-    "map",
-    "nth",
-    "reverse",
-    "append",
-    "last",
-    "cdr",
-    "typeof",
-    "print",
-    "nth",
-    "length",
-    "assert-eq",
-    "assert",
-    "list",
-    "cons",
-    "car",
-];
-const KEYWORDS: &[&str] = &["var", "let", "fn", "if", "lambda", "loop"];
+use neolisp::{
+    cli::{Cli, Command},
+    compiler::{compile, simple_display_instructions, CompilerOptions},
+    repl,
+    vm::{self, Machine},
+};
 
 use clap::Parser as ClapParser;
 fn main() -> anyhow::Result<()> {
-    let args = cli::Cli::parse();
+    let args = Cli::parse();
 
-    match args.command {
-        cli::Commands::Build { decompile, file } => build(file, decompile),
-        cli::Commands::Run { repl, .. } if repl => {
+    let Some(command) = args.command.clone() else {
+        repl::run(args)?;
+        return Ok(());
+    };
+
+    match command {
+        Command::Build { decompile, file } => build(file, decompile, &CompilerOptions::default()),
+        Command::Run { repl, .. } if repl => {
             repl::run(args)?;
             Ok(())
         }
-        cli::Commands::Run {
+        Command::Run {
             breakpoints,
             decompile,
             file,
+            no_main,
             ..
-        } => run(file, breakpoints, decompile),
-        cli::Commands::Test { file: _ } => todo!(),
+        } => {
+            let options = CompilerOptions { no_main };
+            run(file, breakpoints, decompile, &options)
+        }
+        Command::Test { file: _ } => todo!(),
     }
 }
 
-fn build(file: Option<String>, decompile: bool) -> anyhow::Result<()> {
+fn build(file: Option<String>, decompile: bool, options: &CompilerOptions) -> anyhow::Result<()> {
     let filename = file.clone().unwrap_or("main.nl".to_string());
     eprintln!("Compiling [{filename}]");
     let Ok(src) = std::fs::read_to_string(filename) else {
         panic!("failed to read file")
     };
     let now = std::time::Instant::now();
-    let program = compiler::compile(&src)?;
+    let program = compile(&src, options)?;
     eprintln!("Compiled in {}ms", now.elapsed().as_millis());
     eprintln!("Compiled to {} bytes", program.len());
 
     if decompile {
-        display_instructions(&program);
+        let instructions = vm::decompile(&program);
+        simple_display_instructions(&instructions);
         return Ok(());
     }
     // Save to file
@@ -91,8 +63,13 @@ fn get_compiled_filename(file: Option<String>) -> anyhow::Result<String> {
     Ok(filename.split('.').next().unwrap().to_string())
 }
 
-fn run(file: Option<String>, breakpoints: Vec<usize>, decompile: bool) -> anyhow::Result<()> {
-    build(file.clone(), decompile)?;
+fn run(
+    file: Option<String>,
+    breakpoints: Vec<usize>,
+    decompile: bool,
+    options: &CompilerOptions,
+) -> anyhow::Result<()> {
+    build(file.clone(), decompile, options)?;
     if decompile {
         return Ok(());
     }
@@ -100,20 +77,11 @@ fn run(file: Option<String>, breakpoints: Vec<usize>, decompile: bool) -> anyhow
     let compiled_filename = get_compiled_filename(file)?;
 
     let program = std::fs::read(compiled_filename)?;
-    let mut machine = vm::Machine::new(program);
+    let mut machine = Machine::new(program);
     for i in breakpoints {
         machine.add_breakpoint(i);
     }
     eprintln!("Running...");
     machine.run();
     Ok(())
-}
-
-fn display_instructions(program: &[u8]) {
-    let instructions = vm::decompile(program);
-    let mut offset = 0;
-    for int in instructions.iter() {
-        eprintln!("{offset:02X} {offset:>2}  {:?}", int);
-        offset += int.size();
-    }
 }
