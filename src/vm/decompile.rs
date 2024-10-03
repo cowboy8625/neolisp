@@ -90,7 +90,11 @@ pub fn get_instruction(bytes: &[u8], ip: &mut usize) -> Result<Instruction, Stri
             *ip += 1;
             Ok(Instruction::And(count))
         }
-        OpCode::Or => Ok(Instruction::Or),
+        OpCode::Or => {
+            let count = bytes[*ip];
+            *ip += 1;
+            Ok(Instruction::Or(count))
+        }
         OpCode::Not => Ok(Instruction::Not),
         OpCode::Mod => Ok(Instruction::Mod),
         OpCode::Rot => Ok(Instruction::Rot),
@@ -231,192 +235,138 @@ fn get_callee(bytes: &[u8], ip: &mut usize) -> Result<Callee, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    #[test]
-    fn test_decompile_start_at() {
-        let bytes = vec![OpCode::StartAt as u8, 0x01, 0x00, 0x00, 0x00];
 
-        let instructions = decompile(&bytes);
-        assert_eq!(instructions, vec![Instruction::StartAt(1)]);
+    macro_rules! test_decompile {
+        ($name:ident, $input:expr, $expected:expr) => {
+            #[test]
+            fn $name() {
+                let instructions = decompile(&$input);
+                assert_eq!(instructions, $expected);
+            }
+        };
     }
 
-    #[test]
-    fn test_decompile_noop() {
-        let bytes = vec![OpCode::Noop as u8];
-
-        let instructions = decompile(&bytes);
-        assert_eq!(instructions, vec![Instruction::Noop]);
-    }
-
-    #[test]
-    fn test_decompile_halt() {
-        let bytes = vec![OpCode::Halt as u8];
-
-        let instructions = decompile(&bytes);
-        assert_eq!(instructions, vec![Instruction::Halt]);
-    }
-
-    #[test]
-    fn test_decompile_return() {
-        let bytes = vec![OpCode::Return as u8];
-
-        let instructions = decompile(&bytes);
-        assert_eq!(instructions, vec![Instruction::Return]);
-    }
-
-    #[test]
-    fn test_decompile_push() {
-        let bytes = vec![OpCode::Push as u8, 0x00, 0x04];
-
-        let instructions = decompile(&bytes);
-        assert_eq!(instructions, vec![Instruction::Push(Value::U8(4))]);
-    }
-
-    #[test]
-    fn test_decompile_add() {
-        let bytes = vec![OpCode::Add as u8, 0x02];
-
-        let instructions = decompile(&bytes);
-        assert_eq!(instructions, vec![Instruction::Add(2)]);
-    }
-
-    #[test]
-    fn test_decompile_sub() {
-        let bytes = vec![OpCode::Sub as u8, 0x03];
-
-        let instructions = decompile(&bytes);
-        assert_eq!(instructions, vec![Instruction::Sub(3)]);
-    }
-
-    #[test]
-    fn test_decompile_eq() {
-        let bytes = vec![OpCode::Eq as u8, 0x03];
-
-        let instructions = decompile(&bytes);
-        assert_eq!(instructions, vec![Instruction::Eq(3)]);
-    }
-
-    #[test]
-    fn test_decompile_or() {
-        let bytes = vec![OpCode::Or as u8];
-
-        let instructions = decompile(&bytes);
-        assert_eq!(instructions, vec![Instruction::Or]);
-    }
-
-    #[test]
-    fn test_decompile_rot() {
-        let bytes = vec![OpCode::Rot as u8];
-
-        let instructions = decompile(&bytes);
-        assert_eq!(instructions, vec![Instruction::Rot]);
-    }
-
-    #[test]
-    fn test_decompile_callable_builtin_print() {
-        #[rustfmt::skip]
-    let bytes = vec![
-        OpCode::Call as u8, // Callable type
-        0x01, // Builtin type
-        0x05, // Builtin name length
-        0x70, 0x72, 0x69, 0x6E, 0x74, // "print"
-        0x01, // count
-    ];
-
-        let instructions = decompile(&bytes);
-        assert_eq!(
-            instructions,
-            vec![Instruction::Call(Callee::Builtin("print".to_string()), 1)]
-        );
-    }
-
-    #[test]
-    fn test_decompile_load_local() {
-        let bytes = vec![OpCode::LoadLocal as u8];
-
-        let instructions = decompile(&bytes);
-        assert_eq!(instructions, vec![Instruction::LoadLocal]);
-    }
-
-    #[test]
-    fn test_decompile_get_local() {
-        let bytes = vec![OpCode::GetLocal as u8, 0x10];
-
-        let instructions = decompile(&bytes);
-        assert_eq!(instructions, vec![Instruction::GetLocal(16)]);
-    }
-
-    #[test]
-    fn test_decompile_load_global() {
-        let bytes = vec![OpCode::LoadGlobal as u8];
-
-        let instructions = decompile(&bytes);
-        assert_eq!(instructions, vec![Instruction::LoadGlobal]);
-    }
-
-    #[test]
-    fn test_decompile_get_global() {
-        let bytes = vec![OpCode::GetGlobal as u8, 0x10];
-
-        let instructions = decompile(&bytes);
-        assert_eq!(instructions, vec![Instruction::GetGlobal(16)]);
-    }
-
-    #[test]
-    fn test_decompile_load_free() {
-        let bytes = vec![OpCode::LoadFree as u8];
-
-        let instructions = decompile(&bytes);
-        assert_eq!(instructions, vec![Instruction::LoadFree]);
-    }
-
-    #[test]
-    fn test_decompile_get_free() {
-        let bytes = vec![OpCode::GetFree as u8, 0x10];
-
-        let instructions = decompile(&bytes);
-        assert_eq!(instructions, vec![Instruction::GetFree(16)]);
-    }
-
-    #[test]
-    fn test_decompile_jump_if() {
-        let bytes = vec![OpCode::JumpIf as u8, 0x10, 0x00, 0x00, 0x00];
-
-        let instructions = decompile(&bytes);
-        assert_eq!(instructions, vec![Instruction::JumpIf(16)]);
-    }
-
-    #[test]
-    fn test_decompile_jump() {
-        let bytes = vec![
+    test_decompile!(
+        test_decompile_start_at,
+        vec![OpCode::StartAt as u8, 0x01, 0x00, 0x00, 0x00],
+        vec![Instruction::StartAt(1)]
+    );
+    test_decompile!(
+        test_decompile_noop,
+        vec![OpCode::Noop as u8],
+        vec![Instruction::Noop]
+    );
+    test_decompile!(
+        test_decompile_halt,
+        vec![OpCode::Halt as u8],
+        vec![Instruction::Halt]
+    );
+    test_decompile!(
+        test_decompile_return,
+        vec![OpCode::Return as u8],
+        vec![Instruction::Return]
+    );
+    test_decompile!(
+        test_decompile_push,
+        vec![OpCode::Push as u8, 0x00, 0x04],
+        vec![Instruction::Push(Value::U8(4))]
+    );
+    test_decompile!(
+        test_decompile_add,
+        vec![OpCode::Add as u8, 0x02],
+        vec![Instruction::Add(2)]
+    );
+    test_decompile!(
+        test_decompile_sub,
+        vec![OpCode::Sub as u8, 0x02],
+        vec![Instruction::Sub(2)]
+    );
+    test_decompile!(
+        test_decompile_eq,
+        vec![OpCode::Eq as u8, 0x02],
+        vec![Instruction::Eq(2)]
+    );
+    test_decompile!(
+        test_decompile_or,
+        vec![OpCode::Or as u8, 0x02],
+        vec![Instruction::Or(2)]
+    );
+    test_decompile!(
+        test_decompile_rot,
+        vec![OpCode::Rot as u8],
+        vec![Instruction::Rot]
+    );
+    #[rustfmt::skip]
+    test_decompile!(
+        test_decompile_callable_builtin_print,
+        vec![
+            OpCode::Call as u8, // Callable type
+            0x01, // Builtin type
+            0x05, // Builtin name length
+            0x70, 0x72, 0x69, 0x6E, 0x74, // "print"
+            0x01, // count
+        ],
+        vec![Instruction::Call(Callee::Builtin("print".to_string()), 1)]
+    );
+    test_decompile!(
+        test_decompile_load_local,
+        vec![OpCode::LoadLocal as u8],
+        vec![Instruction::LoadLocal]
+    );
+    test_decompile!(
+        test_decompile_get_local,
+        vec![OpCode::GetLocal as u8, 0x10],
+        vec![Instruction::GetLocal(16)]
+    );
+    test_decompile!(
+        test_decompile_load_global,
+        vec![OpCode::LoadGlobal as u8],
+        vec![Instruction::LoadGlobal]
+    );
+    test_decompile!(
+        test_decompile_get_global,
+        vec![OpCode::GetGlobal as u8, 0x10],
+        vec![Instruction::GetGlobal(16)]
+    );
+    test_decompile!(
+        test_decompile_load_free,
+        vec![OpCode::LoadFree as u8],
+        vec![Instruction::LoadFree]
+    );
+    test_decompile!(
+        test_decompile_get_free,
+        vec![OpCode::GetFree as u8, 0x10],
+        vec![Instruction::GetFree(16)]
+    );
+    test_decompile!(
+        test_decompile_jump_if,
+        vec![OpCode::JumpIf as u8, 0x10, 0x00, 0x00, 0x00],
+        vec![Instruction::JumpIf(16)]
+    );
+    test_decompile!(
+        test_decompile_jump_forward,
+        vec![
             OpCode::Jump as u8,
             Direction::OPCODE_FORWARD,
             0x10,
             0x00,
             0x00,
             0x00,
-        ];
-
-        let instructions = decompile(&bytes);
-        assert_eq!(
-            instructions,
-            vec![Instruction::Jump(Direction::Forward(16))]
-        );
-
-        let bytes = vec![
+        ],
+        vec![Instruction::Jump(Direction::Forward(16))]
+    );
+    test_decompile!(
+        test_decompile_jump_backward,
+        vec![
             OpCode::Jump as u8,
             Direction::OPCODE_BACKWARD,
             0x10,
             0x00,
             0x00,
             0x00,
-        ];
-
-        let instructions = decompile(&bytes);
-        assert_eq!(
-            instructions,
-            vec![Instruction::Jump(Direction::Backward(16))]
-        );
-    }
+        ],
+        vec![Instruction::Jump(Direction::Backward(16))]
+    );
 
     #[test]
     fn test_decompile_value_u8() {
