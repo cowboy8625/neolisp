@@ -17,7 +17,6 @@ pub fn parse_expr() -> impl Parser<char, Spanned<Expr>, Error = Error> {
             });
 
         let float = int
-            .clone()
             .then_ignore(just('.'))
             .then(text::digits(10))
             .then(just('_').ignore_then(text::digits(10)).repeated())
