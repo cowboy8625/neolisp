@@ -157,7 +157,7 @@ pub fn nlvm_filter(machine: &mut Machine, count: u8) -> Result<()> {
     let mut result = Vec::new();
     for value in list.drain(..) {
         machine.stack.push(value.clone());
-        machine.call(address, 1);
+        machine.call(address, 1)?;
         let Some(Value::Bool(true)) = machine.stack.pop() else {
             continue;
         };
@@ -184,7 +184,7 @@ pub fn nlvm_fold_right(machine: &mut Machine, count: u8) -> Result<()> {
     for value in list.drain(..).rev() {
         machine.stack.push(result);
         machine.stack.push(value);
-        machine.call(address, 2);
+        machine.call(address, 2)?;
         result = machine.stack.pop().unwrap();
     }
     machine.stack.push(result);
@@ -209,7 +209,7 @@ pub fn nlvm_fold(machine: &mut Machine, count: u8) -> Result<()> {
     for value in list.drain(..) {
         machine.stack.push(result);
         machine.stack.push(value);
-        machine.call(address, 2);
+        machine.call(address, 2)?;
         result = machine.stack.pop().unwrap();
     }
     machine.stack.push(result);
@@ -232,7 +232,7 @@ pub fn nlvm_map(machine: &mut Machine, count: u8) -> Result<()> {
     let mut result = Vec::new();
     for value in list.drain(..) {
         machine.stack.push(value);
-        machine.call(address, 1);
+        machine.call(address, 1)?;
         result.push(machine.stack.pop().unwrap());
     }
 

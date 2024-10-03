@@ -82,6 +82,6 @@ fn run(
         machine.add_breakpoint(i);
     }
     eprintln!("Running...");
-    machine.run();
+    machine.run()?;
     Ok(())
 }

@@ -12,13 +12,14 @@ fn test_compile(src: &str) -> Vec<u8> {
 macro_rules! check_return_when {
     ($name:ident, $src:expr, $expected:expr) => {
         #[test]
-        fn $name() {
+        fn $name() -> anyhow::Result<()> {
             let program = test_compile($src);
             let mut machine = Machine::new(program);
 
-            machine.run();
+            machine.run()?;
             assert_eq!(machine.stack.len(), 1);
             assert_eq!(machine.stack[0], $expected);
+            Ok(())
         }
     };
 }
@@ -65,7 +66,7 @@ check_return_when!(
 
 check_return_when!(not_instruction_true, "(not false)", Value::Bool(true));
 check_return_when!(not_instruction_false, "(not true)", Value::Bool(false));
-check_return_when!(mod_instruction, "(mod 3 2 3)", Value::Bool(false));
+check_return_when!(mod_instruction, "(mod 4 2)", Value::F64(0.));
 
 check_return_when!(
     lambda_is_called,
