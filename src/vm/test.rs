@@ -30,6 +30,26 @@ check_return_when!(divide_instrction, "(/ 444 2 2)", Value::F64(111.));
 check_return_when!(equals_instrction, "(= 2 2 2)", Value::Bool(true));
 check_return_when!(greater_than_instrction, "(> 5 3 2)", Value::Bool(true));
 check_return_when!(less_than_instrction, "(< 2 3 5)", Value::Bool(true));
+check_return_when!(
+    and_instruction_true,
+    "(and true true true)",
+    Value::Bool(true)
+);
+check_return_when!(
+    and_instruction_false,
+    "(and false true true)",
+    Value::Bool(false)
+);
+check_return_when!(
+    or_instruction_true,
+    "(or false false true)",
+    Value::Bool(true)
+);
+check_return_when!(
+    or_instruction_false,
+    "(or false false false)",
+    Value::Bool(false)
+);
 
 check_return_when!(
     greater_than_or_equal_instrction,

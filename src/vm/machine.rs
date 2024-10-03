@@ -213,10 +213,13 @@ impl Machine {
             Instruction::Or(count) => {
                 let args = self.stack.split_off(self.stack.len() - count as usize);
                 let left = &args[0];
-                let value = args.iter().skip(1).all(|right| match (left, right) {
-                    (Value::Bool(l), Value::Bool(r)) => *l || *r,
-                    _ => panic!("invalid types for Or"),
-                });
+                let value = args
+                    .iter()
+                    .skip(1)
+                    .fold(false, |acc, right| match (left, right) {
+                        (Value::Bool(l), Value::Bool(r)) => acc || *l || *r,
+                        _ => panic!("invalid types for Or"),
+                    });
                 self.stack.push(Value::Bool(value));
             }
             Instruction::Not => {
