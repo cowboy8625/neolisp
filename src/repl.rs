@@ -128,7 +128,7 @@ pub fn run(args: Cli) -> Result<()> {
         match repl_output_mode {
             ReplOutputMode::Ast => {
                 let ast = parser().parse(input).map_err(|e| {
-                    anyhow::anyhow!(e.iter().map(|e| format!("{e}\n")).collect::<String>())
+                    anyhow::anyhow!(e.iter().map(|e| e.to_string() + "\n").collect::<String>())
                 });
                 match ast {
                     Ok(v) => println!("{v:#?}"),

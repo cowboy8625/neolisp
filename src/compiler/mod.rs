@@ -14,7 +14,7 @@ pub use stage1::{
 pub fn compile(src: &str, options: &CompilerOptions) -> anyhow::Result<Vec<u8>> {
     let ast = parser()
         .parse(src)
-        .map_err(|e| anyhow::anyhow!(e.iter().map(|e| format!("{e}\n")).collect::<String>()))?;
+        .map_err(|e| anyhow::anyhow!(e.iter().map(|e| e.to_string() + "\n").collect::<String>()))?;
     let mut symbol_table = SymbolTableBuilder::default().build(&ast);
     let stage1_data = Stage1Compiler::new(&mut symbol_table).compile(&ast, options);
     let instructions = stage2::compile_to_instructions(&mut symbol_table, &stage1_data);

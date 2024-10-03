@@ -20,7 +20,7 @@ fn test_main_var() {
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
     assert_eq!(main.name, "main", "main function name");
-    assert_eq!(main.params, Chunk::new(), "main function params");
+    assert_eq!(main.params, Chunk::default(), "main function params");
     assert_eq!(
         main.prelude,
         Chunk::from(vec![
@@ -56,7 +56,7 @@ fn test_main_var_lambda() {
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
     assert_eq!(main.name, "main", "main function name");
-    assert_eq!(main.params, Chunk::new(), "main function params");
+    assert_eq!(main.params, Chunk::default(), "main function params");
     assert_eq!(
         main.prelude,
         // This is the global variable being loaded
@@ -115,7 +115,7 @@ fn test_main_var_lambda_curry() {
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
     assert_eq!(main.name, "main", "main function name");
-    assert_eq!(main.params, Chunk::new(), "main function params");
+    assert_eq!(main.params, Chunk::default(), "main function params");
     assert_eq!(
         main.prelude,
         // This is the global variable being loaded
@@ -195,11 +195,11 @@ fn test_main_call_lambda() {
     assert_eq!(stage1_compiler.functions.len(), 1, "one function");
     let main = &stage1_compiler.functions[0];
     assert_eq!(main.name, "main", "main function name");
-    assert_eq!(main.params, Chunk::new(), "main function params");
+    assert_eq!(main.params, Chunk::default(), "main function params");
     assert_eq!(
         main.prelude,
         // This is the global variable being loaded
-        Chunk::new(),
+        Chunk::default(),
         "main function prelude"
     );
     assert_eq!(
@@ -262,7 +262,7 @@ fn test_main_applying_lambda() {
     assert_eq!(
         apply.prelude,
         // This is the global variable being loaded
-        Chunk::new(),
+        Chunk::default(),
         "apply function prelude"
     );
     assert_eq!(
@@ -281,11 +281,11 @@ fn test_main_applying_lambda() {
     // Checking function main
     let main = &stage1_compiler.functions[1];
     assert_eq!(main.name, "main", "main function name");
-    assert_eq!(main.params, Chunk::new(), "main function params");
+    assert_eq!(main.params, Chunk::default(), "main function params");
     assert_eq!(
         main.prelude,
         // This is the global variable being loaded
-        Chunk::new(),
+        Chunk::default(),
         "main function prelude"
     );
     assert_eq!(
@@ -340,11 +340,11 @@ fn test_main_if_else() {
     // Checking function main
     let main = &stage1_compiler.functions[0];
     assert_eq!(main.name, "main", "main function name");
-    assert_eq!(main.params, Chunk::new(), "main function params");
+    assert_eq!(main.params, Chunk::default(), "main function params");
     assert_eq!(
         main.prelude,
         // This is the global variable being loaded
-        Chunk::new(),
+        Chunk::default(),
         "main function prelude"
     );
     assert_eq!(

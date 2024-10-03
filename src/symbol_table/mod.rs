@@ -7,7 +7,7 @@ use crate::expr_walker::{
 };
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct SymbolTable {
     global_scope: HashMap<String, Symbol>, // Permanent global scope
     function_scopes: HashMap<String, HashMap<String, Symbol>>, // Persistent function scopes
@@ -15,15 +15,6 @@ pub struct SymbolTable {
 }
 
 impl SymbolTable {
-    /// Create a new symbol table with an empty global scope
-    pub fn new() -> Self {
-        SymbolTable {
-            global_scope: HashMap::new(),
-            function_scopes: HashMap::new(),
-            scope_stack: Vec::new(),
-        }
-    }
-
     /// Enter a new scope (pushes a new scope onto the stack)
     pub fn enter_new_scope(&mut self) {
         self.scope_stack.push(HashMap::new());
@@ -180,7 +171,7 @@ pub struct SymbolTableBuilder {
 
 impl SymbolTableBuilder {
     pub fn build(&mut self, ast: &[Spanned<Expr>]) -> SymbolTable {
-        let mut table = SymbolTable::new();
+        let mut table = SymbolTable::default();
         self.walk(&mut table, ast);
         table
     }
