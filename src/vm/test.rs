@@ -135,3 +135,39 @@ fn test_to_bytecode() {
         instructions[4]
     );
 }
+
+#[test]
+fn testing_function_call_instructions() {
+    // NOTE: This is just to make sure a bench mark runs correctly
+    // Just delete later if I forget
+    use super::instruction::{Callee, Instruction};
+    let program = vec![
+        // 0x00
+        Instruction::Push(Value::F64(1.)), // 0x0A
+        // 0x0A
+        Instruction::Push(Value::F64(1.)), // 0x0A
+        // 0x14
+        Instruction::Push(Value::Callable(0x1E)), // 0x06
+        // 0x1A
+        Instruction::Call(Callee::Function, 2), // 0x03
+        // 0x1D
+        Instruction::Halt, // 0x01
+        // 0x1E
+        Instruction::Rot,         // 0x01
+        Instruction::LoadLocal,   // 0x01
+        Instruction::Rot,         // 0x01
+        Instruction::LoadLocal,   // 0x01
+        Instruction::GetLocal(0), // 0x05?
+        Instruction::GetLocal(1), // 0x05?
+        Instruction::Add(2),      // 0x02
+        Instruction::Rot,         // 0x01
+        Instruction::Return,      // 0x01
+    ]
+    .iter()
+    .flat_map(|i| i.to_bytecode())
+    .collect::<Vec<u8>>();
+
+    let mut machine = Machine::new(program);
+
+    machine.run().unwrap();
+}

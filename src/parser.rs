@@ -6,15 +6,36 @@ pub fn parse_expr() -> impl Parser<char, Spanned<Expr>, Error = Error> {
     recursive(|expr| {
         let comment = just(';').then(take_until(just('\n'))).padded();
 
-        let int = text::int(10);
+        let int = text::digits(10)
+            .then(just('_').ignore_then(text::digits(10)).repeated())
+            .map(|(first, rest)| {
+                let mut number = first;
+                for part in rest {
+                    number.push_str(&part);
+                }
+                number
+            });
 
-        let number = int
-            .or(just('-').repeated().then(int).map(|(sign, num)| {
+        let float = int
+            .then_ignore(just('.'))
+            .then(text::digits(10))
+            .then(just('_').ignore_then(text::digits(10)).repeated())
+            .map(|((integer_part, fractional_part), fractional_rest)| {
+                let mut number = format!("{}.{}", integer_part, fractional_part);
+                for part in fractional_rest {
+                    number.push_str(&part);
+                }
+                number
+            });
+
+        let number = float
+            .or(int)
+            .or(just('-').repeated().then(float.or(int)).map(|(sign, num)| {
                 let sign = if sign.len() % 2 == 0 { "" } else { "-" };
                 format!("{sign}{num}")
             }))
             .map_with_span(|s: String, span: Span| {
-                Spanned::from((Expr::Number(s.parse().unwrap()), span))
+                Spanned::from((Expr::Number(s.replace("_", "").parse().unwrap()), span))
             })
             .padded();
 
