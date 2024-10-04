@@ -10,68 +10,115 @@ fn test_compile(src: &str) -> Vec<u8> {
 }
 
 macro_rules! check_return_when {
-    ($name:ident, $src:expr, $expected:expr) => {
+    ($name:ident, $src:expr, $expected:expr $(, cycles = $expected_cycles:expr )?) => {
         #[test]
         fn $name() -> anyhow::Result<()> {
             let program = test_compile($src);
             let mut machine = Machine::new(program);
 
+            machine.debug();
+
             machine.run()?;
             assert_eq!(machine.stack.len(), 1);
             assert_eq!(machine.stack[0], $expected);
+            $(
+                assert_eq!(machine.cycle_count, $expected_cycles);
+            )?
             Ok(())
         }
     };
 }
 
-check_return_when!(add_instrction, "(+ 123 321)", Value::F64(444.));
-check_return_when!(sub_instrction, "(- 123 321)", Value::F64(-198.));
-check_return_when!(multiply_instrction, "(* 123 321)", Value::F64(39483.));
-check_return_when!(divide_instrction, "(/ 444 2 2)", Value::F64(111.));
-check_return_when!(equals_instrction, "(= 2 2 2)", Value::Bool(true));
-check_return_when!(greater_than_instrction, "(> 5 3 2)", Value::Bool(true));
-check_return_when!(less_than_instrction, "(< 2 3 5)", Value::Bool(true));
+check_return_when!(add_instrction, "(+ 123 321)", Value::F64(444.), cycles = 5);
+check_return_when!(sub_instrction, "(- 123 321)", Value::F64(-198.), cycles = 5);
+check_return_when!(
+    multiply_instrction,
+    "(* 123 321)",
+    Value::F64(39483.),
+    cycles = 5
+);
+check_return_when!(
+    divide_instrction,
+    "(/ 444 2 2)",
+    Value::F64(111.),
+    cycles = 6
+);
+check_return_when!(
+    equals_instrction,
+    "(= 2 2 2)",
+    Value::Bool(true),
+    cycles = 6
+);
+check_return_when!(
+    greater_than_instrction,
+    "(> 5 3 2)",
+    Value::Bool(true),
+    cycles = 6
+);
+check_return_when!(
+    less_than_instrction,
+    "(< 2 3 5)",
+    Value::Bool(true),
+    cycles = 6
+);
 check_return_when!(
     and_instruction_true,
     "(and true true true)",
-    Value::Bool(true)
+    Value::Bool(true),
+    cycles = 6
 );
 check_return_when!(
     and_instruction_false,
     "(and false true true)",
-    Value::Bool(false)
+    Value::Bool(false),
+    cycles = 6
 );
 check_return_when!(
     or_instruction_true,
     "(or false false true)",
-    Value::Bool(true)
+    Value::Bool(true),
+    cycles = 6
 );
 check_return_when!(
     or_instruction_false,
     "(or false false false)",
-    Value::Bool(false)
+    Value::Bool(false),
+    cycles = 6
 );
 
 check_return_when!(
     greater_than_or_equal_instrction,
     "(>= 9 9 6 7 8)",
-    Value::Bool(true)
+    Value::Bool(true),
+    cycles = 8
 );
 
 check_return_when!(
     less_than_or_eqal_instrction,
     "(<= 2 2 3 5)",
-    Value::Bool(true)
+    Value::Bool(true),
+    cycles = 7
 );
 
-check_return_when!(not_instruction_true, "(not false)", Value::Bool(true));
-check_return_when!(not_instruction_false, "(not true)", Value::Bool(false));
-check_return_when!(mod_instruction, "(mod 4 2)", Value::F64(0.));
+check_return_when!(
+    not_instruction_true,
+    "(not false)",
+    Value::Bool(true),
+    cycles = 4
+);
+check_return_when!(
+    not_instruction_false,
+    "(not true)",
+    Value::Bool(false),
+    cycles = 4
+);
+check_return_when!(mod_instruction, "(mod 4 2)", Value::F64(0.), cycles = 5);
 
 check_return_when!(
     lambda_is_called,
     "(((lambda (x) (lambda (y) (+ x y))) 1) 3)",
-    Value::F64(4.)
+    Value::F64(4.),
+    cycles = 21
 );
 
 // #[test]
@@ -134,6 +181,27 @@ fn test_to_bytecode() {
         "{:?}",
         instructions[4]
     );
+}
+
+#[test]
+fn test_cycles_for_fib() {
+    let src = r#"
+(fn fib (n)
+  (if (or (= n 0) (= n 1))
+      n
+      (+ (fib (- n 1)) (fib (- n 2)))))
+
+(fib 30)
+"#;
+
+    let program = compile(src, &CompilerOptions { no_main: true }).unwrap();
+    let mut machine = Machine::new(program);
+    machine.run().unwrap();
+    // eprintln!("{:#?}", machine.stack);
+    assert_eq!(machine.stack.len(), 1);
+    assert_eq!(machine.stack[0], Value::F64(832040.));
+    // FIXME: This seems really really really high!
+    assert_eq!(machine.cycle_count, 49811935);
 }
 
 #[test]

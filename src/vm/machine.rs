@@ -1,9 +1,8 @@
-use core::panic;
-
 use super::builtin;
 use super::decompile::{decompile, get_instruction};
 use super::instruction::{Callee, Direction, Instruction, OpCode};
 use super::value::Value;
+use core::panic;
 use num_traits::FromPrimitive;
 
 use anyhow::{anyhow, Result};
@@ -18,21 +17,26 @@ pub enum DebugMode {
     #[default]
     Off,
     Pause,
+    PauseAndDisplay,
     Step,
+    StepAndDisplay,
     Continue,
+    ContinueStart,
 }
 
 pub struct Machine {
     pub program: Vec<u8>,
     pub ip: usize,
     pub is_running: bool,
-    pub call_stack: usize,
+    pub call_stack: Vec<usize>,
     pub stack: Vec<Value>,
-    pub local_stack: Vec<Vec<Value>>,
+    pub local_stack: Vec<Value>,
     pub global_stack: Vec<Value>,
     pub free_stack: Vec<Value>,
     pub breakpoints: Vec<usize>,
     pub debug_mode: DebugMode,
+    #[cfg(test)]
+    pub cycle_count: usize,
 }
 
 impl Machine {
@@ -41,13 +45,15 @@ impl Machine {
             program,
             ip: 0,
             is_running: true,
-            call_stack: 0,
-            stack: Vec::new(),
-            local_stack: vec![Vec::new()],
-            global_stack: Vec::new(),
-            free_stack: Vec::new(),
-            breakpoints: Vec::new(),
+            call_stack: Vec::with_capacity(100),
+            stack: Vec::with_capacity(100),
+            local_stack: Vec::with_capacity(100),
+            global_stack: Vec::with_capacity(100),
+            free_stack: Vec::with_capacity(100),
+            breakpoints: Vec::with_capacity(100),
             debug_mode: DebugMode::Off,
+            #[cfg(test)]
+            cycle_count: 0,
         }
     }
 
@@ -56,17 +62,35 @@ impl Machine {
     }
 
     pub fn run_once(&mut self) -> Result<()> {
+        #[cfg(test)]
+        {
+            self.cycle_count += 1;
+        }
+
         match self.debug_mode {
             DebugMode::Off if self.breakpoints.contains(&self.ip) => {
-                self.debug_mode = DebugMode::Pause;
+                self.debug_mode = DebugMode::PauseAndDisplay;
                 return Ok(());
             }
+            DebugMode::Off => {}
             DebugMode::Pause => {
                 self.debugger();
                 return Ok(());
             }
+            DebugMode::PauseAndDisplay => {
+                self.debug_mode = DebugMode::Pause;
+                self.debug();
+                self.debugger();
+                return Ok(());
+            }
             DebugMode::Step => self.debug_mode = DebugMode::Pause,
-            _ => (),
+            DebugMode::StepAndDisplay => self.debug_mode = DebugMode::PauseAndDisplay,
+            DebugMode::Continue if self.breakpoints.contains(&self.ip) => {
+                self.debug_mode = DebugMode::PauseAndDisplay;
+                return Ok(());
+            }
+            DebugMode::Continue => {}
+            DebugMode::ContinueStart => self.debug_mode = DebugMode::Continue,
         }
 
         let opcode = self.get_op_code()?;
@@ -110,7 +134,7 @@ impl Machine {
     }
 
     pub fn call(&mut self, address: usize, arg_count: usize) -> Result<()> {
-        self.new_local_stack();
+        self.new_local_stack(arg_count);
         self.stack.push(Value::U32(self.ip as u32));
         self.ip = address;
         self.bring_to_top_of_stack(arg_count);
@@ -391,7 +415,7 @@ impl Machine {
                     }
                 };
 
-                self.new_local_stack();
+                self.new_local_stack(arg_count as usize);
                 self.stack.push(Value::U32(self.ip as u32));
                 self.ip = address;
                 self.bring_to_top_of_stack(arg_count as usize);
@@ -655,20 +679,25 @@ impl Machine {
         Ok(String::from_utf8(bytes)?)
     }
 
-    fn new_local_stack(&mut self) {
-        self.local_stack.push(Vec::new());
-        self.call_stack += 1;
+    fn new_local_stack(&mut self, count: usize) {
+        self.call_stack.push(count);
     }
+
     fn leaving_local_stack(&mut self) {
-        self.local_stack.pop();
-        self.call_stack -= 1;
+        let count = self.call_stack.pop().unwrap();
+        let len = self.local_stack.len();
+        self.local_stack.truncate(len - count);
     }
+
     fn push_local(&mut self, value: Value) {
-        self.local_stack[self.call_stack].push(value);
+        self.local_stack.push(value);
     }
 
     fn get_local(&self, index: usize) -> Option<&Value> {
-        self.local_stack[self.call_stack].get(index)
+        let count = self.call_stack.last().unwrap();
+        let start = self.local_stack.len() - count;
+        let local_stack = &self.local_stack[start..];
+        local_stack.get(index)
     }
 
     fn bring_to_top_of_stack(&mut self, count: usize) {
@@ -730,6 +759,7 @@ impl Machine {
                 println!("n    next");
                 println!("rot  rotate <count>");
                 println!("ip   shows ip address");
+                println!("nd   run <next> and <display>");
                 println!("q    quit");
             }
             "pfs" | "print-free-stack" => {
@@ -740,7 +770,17 @@ impl Machine {
             }
             // HACK: the local stack should be shared with the main stack.
             "pls" | "print-local-stack" => {
-                println!("LOCAL STACK:");
+                let Some(count) = self.call_stack.last() else {
+                    println!("LOCAL STACK EMPTY");
+                    return;
+                };
+                println!("LOCAL STACK {count}:");
+                let start = self.local_stack.len().saturating_sub(*count);
+                for (i, item) in self.local_stack[start..].iter().rev().enumerate() {
+                    println!("0x{i:02X}: {item:?}");
+                }
+            }
+            "pals" | "print-all-local-stack" => {
                 for (i, item) in self.local_stack.iter().rev().enumerate() {
                     println!("0x{i:02X}: {item:?}");
                 }
@@ -783,7 +823,7 @@ impl Machine {
                 self.add_breakpoint(ip);
             }
             "p" | "print" => eprintln!("print <index>"),
-            "c" | "continue" => self.debug_mode = DebugMode::Continue,
+            "c" | "continue" => self.debug_mode = DebugMode::ContinueStart,
             "n" | "next" => self.debug_mode = DebugMode::Step,
             "rot" if result.len() == 2 => {
                 let Ok(count) = result[1].parse::<usize>() else {
@@ -802,12 +842,13 @@ impl Machine {
                 println!("{:?}", self.stack);
             }
             "ip" => println!("ip: 0x{:02X}, {0}", self.ip),
+            "nd" => self.debug_mode = DebugMode::StepAndDisplay,
             "q" | "quit" => self.shutdown(),
             _ => println!("{RED}unknown command{RESET} {input}"),
         }
     }
 
-    fn debug(&self) {
+    pub fn debug(&self) {
         let instructions = decompile(&self.program);
         let mut offset = 0;
         for int in instructions.iter() {
