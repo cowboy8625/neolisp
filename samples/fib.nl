@@ -7,3 +7,9 @@
       (+ (fib (- n 1)) (fib (- n 2)))))
 
 (fn main () (print (fib 30) "\n"))
+; (fn tail_recursive_factorial (n acc)
+;   (if (= n 0)
+;       acc
+;       (tail_recursive_factorial (- n 1) (* n acc))))
+; 
+; (fn main () (print (tail_recursive_factorial 30) "\n"))

@@ -1,17 +1,23 @@
 use super::builtin;
-use super::decompile::{decompile, get_instruction};
-use super::instruction::{Callee, Direction, Instruction, OpCode};
+#[cfg(any(debug_assertions, test))]
+use super::decompile::decompile;
+use super::decompile::get_instruction;
+use super::instruction::{Callee, Direction, Instruction};
 use super::value::Value;
 use core::panic;
-use num_traits::FromPrimitive;
 
 use anyhow::{anyhow, Result};
 
+#[cfg(any(debug_assertions))]
 const RED: &str = "\x1b[31m";
+#[cfg(any(debug_assertions, test))]
 const GREEN: &str = "\x1b[32m";
+#[cfg(any(debug_assertions, test))]
 const UNDERLINE: &str = "\x1b[4m";
+#[cfg(any(debug_assertions, test))]
 const RESET: &str = "\x1b[0m";
 
+#[cfg(debug_assertions)]
 #[derive(Debug, Default)]
 pub enum DebugMode {
     #[default]
@@ -24,6 +30,36 @@ pub enum DebugMode {
     ContinueStart,
 }
 
+const INSTRUCTION_CALL: [fn(&mut Machine) -> Result<()>; 27] = [
+    instruction_start_at,
+    instruction_halt,
+    instruction_return,
+    instruction_push,
+    instruction_add,
+    instruction_sub,
+    instruction_mul,
+    instruction_div,
+    instruction_eq,
+    instruction_greater_than,
+    instruction_less_than,
+    instruction_greater_than_or_equal,
+    instruction_less_than_or_equal,
+    instruction_and,
+    instruction_or,
+    instruction_not,
+    instruction_mod,
+    instruction_rot,
+    instruction_call,
+    instruction_load_local,
+    instruction_get_local,
+    instruction_load_global,
+    instruction_get_global,
+    instruction_load_free,
+    instruction_get_free,
+    instruction_jump_if,
+    instruction_jump,
+];
+
 pub struct Machine {
     pub program: Vec<u8>,
     pub ip: usize,
@@ -34,6 +70,7 @@ pub struct Machine {
     pub global_stack: Vec<Value>,
     pub free_stack: Vec<Value>,
     pub breakpoints: Vec<usize>,
+    #[cfg(debug_assertions)]
     pub debug_mode: DebugMode,
     #[cfg(test)]
     pub cycle_count: usize,
@@ -45,18 +82,20 @@ impl Machine {
             program,
             ip: 0,
             is_running: true,
-            call_stack: Vec::with_capacity(100),
-            stack: Vec::with_capacity(100),
-            local_stack: Vec::with_capacity(100),
-            global_stack: Vec::with_capacity(100),
-            free_stack: Vec::with_capacity(100),
-            breakpoints: Vec::with_capacity(100),
+            call_stack: Vec::with_capacity(2024),
+            stack: Vec::with_capacity(2024),
+            local_stack: Vec::with_capacity(2024),
+            global_stack: Vec::with_capacity(2024),
+            free_stack: Vec::with_capacity(2024),
+            breakpoints: Vec::with_capacity(2024),
+            #[cfg(debug_assertions)]
             debug_mode: DebugMode::Off,
             #[cfg(test)]
             cycle_count: 0,
         }
     }
 
+    #[cfg(debug_assertions)]
     pub fn add_breakpoint(&mut self, ip: usize) {
         self.breakpoints.push(ip);
     }
@@ -67,6 +106,7 @@ impl Machine {
             self.cycle_count += 1;
         }
 
+        #[cfg(debug_assertions)]
         match self.debug_mode {
             DebugMode::Off if self.breakpoints.contains(&self.ip) => {
                 self.debug_mode = DebugMode::PauseAndDisplay;
@@ -93,37 +133,10 @@ impl Machine {
             DebugMode::ContinueStart => self.debug_mode = DebugMode::Continue,
         }
 
-        let opcode = self.get_op_code()?;
+        let opcode = self.get_u8()? as usize;
 
-        match opcode {
-            OpCode::StartAt => self.instruction_start_at(),
-            OpCode::Halt => self.instruction_halt(),
-            OpCode::Return => self.instruction_return(),
-            OpCode::Push => self.instruction_push(),
-            OpCode::Add => self.instruction_add(),
-            OpCode::Sub => self.instruction_sub(),
-            OpCode::Mul => self.instruction_mul(),
-            OpCode::Div => self.instruction_div(),
-            OpCode::Eq => self.instruction_eq(),
-            OpCode::GreaterThan => self.instruction_greater_than(),
-            OpCode::LessThan => self.instruction_less_than(),
-            OpCode::GreaterThanOrEqual => self.instruction_greater_than_or_equal(),
-            OpCode::LessThanOrEqual => self.instruction_less_than_or_equal(),
-            OpCode::And => self.instruction_and(),
-            OpCode::Or => self.instruction_or(),
-            OpCode::Not => self.instruction_not(),
-            OpCode::Mod => self.instruction_mod(),
-            OpCode::Rot => self.instruction_rot(),
-            OpCode::Call => self.instruction_call(),
-            OpCode::LoadLocal => self.instruction_load_local(),
-            OpCode::GetLocal => self.instruction_get_local(),
-            OpCode::LoadGlobal => self.instruction_load_global(),
-            OpCode::GetGlobal => self.instruction_get_global(),
-            OpCode::LoadFree => self.instruction_load_free(),
-            OpCode::GetFree => self.instruction_get_free(),
-            OpCode::JumpIf => self.instruction_jump_if(),
-            OpCode::Jump => self.instruction_jump(),
-        }
+        INSTRUCTION_CALL[opcode](self)?;
+        Ok(())
     }
 
     pub fn run(&mut self) -> Result<()> {
@@ -152,359 +165,6 @@ impl Machine {
 }
 
 impl Machine {
-    fn instruction_start_at(&mut self) -> Result<()> {
-        let address = self.get_u32()? as usize;
-        self.ip = address;
-        Ok(())
-    }
-
-    fn instruction_halt(&mut self) -> Result<()> {
-        self.is_running = false;
-        Ok(())
-    }
-
-    fn instruction_return(&mut self) -> Result<()> {
-        let Some(Value::U32(address)) = self.stack.pop() else {
-            // TODO: REPORT ERROR
-            panic!("expected value on stack for return")
-        };
-        self.ip = address as usize;
-        self.leaving_local_stack();
-        Ok(())
-    }
-
-    fn instruction_push(&mut self) -> Result<()> {
-        let value = self.get_value()?;
-        self.stack.push(value);
-        Ok(())
-    }
-
-    fn instruction_add(&mut self) -> Result<()> {
-        let count = self.get_u8()?;
-        let args = self.stack.split_off(self.stack.len() - count as usize);
-        let mut left = args[0].clone();
-        for right in args.iter().skip(1) {
-            match (left, right) {
-                (Value::I32(l), Value::I32(r)) => {
-                    left = Value::I32(l + r);
-                }
-                (Value::F64(l), Value::F64(r)) => {
-                    left = Value::F64(l + r);
-                }
-                (Value::String(l), Value::String(r)) => {
-                    left = Value::String(format!("{l}{r}"));
-                }
-                (lhs, rhs) => panic!(
-                    "invalid types for Add: {lhs:?} and {rhs:?}, {:#?}",
-                    self.stack
-                ),
-            }
-        }
-        self.stack.push(left);
-        Ok(())
-    }
-
-    fn instruction_sub(&mut self) -> Result<()> {
-        let count = self.get_u8()?;
-        let args = self.stack.split_off(self.stack.len() - count as usize);
-        let mut left = args[0].clone();
-        for right in args.iter().skip(1) {
-            match (left, right) {
-                (Value::I32(l), Value::I32(r)) => {
-                    left = Value::I32(l - r);
-                }
-                (Value::F64(l), Value::F64(r)) => {
-                    left = Value::F64(l - r);
-                }
-                _ => panic!("invalid types for Sub"),
-            }
-        }
-        self.stack.push(left);
-        Ok(())
-    }
-
-    fn instruction_mul(&mut self) -> Result<()> {
-        let count = self.get_u8()?;
-        let args = self.stack.split_off(self.stack.len() - count as usize);
-        let mut left = args[0].clone();
-        for right in args.iter().skip(1) {
-            match (left, right) {
-                (Value::I32(l), Value::I32(r)) => {
-                    left = Value::I32(l * r);
-                }
-                (Value::F64(l), Value::F64(r)) => {
-                    left = Value::F64(l * r);
-                }
-                _ => panic!("invalid types for Mul"),
-            }
-        }
-        self.stack.push(left);
-        Ok(())
-    }
-
-    fn instruction_div(&mut self) -> Result<()> {
-        let count = self.get_u8()?;
-        let args = self.stack.split_off(self.stack.len() - count as usize);
-        let mut left = args[0].clone();
-        for right in args.iter().skip(1) {
-            match (left, right) {
-                (Value::I32(l), Value::I32(r)) => {
-                    left = Value::I32(l / r);
-                }
-                (Value::F64(l), Value::F64(r)) => {
-                    left = Value::F64(l / r);
-                }
-                _ => panic!("invalid types for Div"),
-            }
-        }
-        self.stack.push(left);
-        Ok(())
-    }
-
-    fn instruction_eq(&mut self) -> Result<()> {
-        let count = self.get_u8()?;
-        let args = self.stack.split_off(self.stack.len() - count as usize);
-        let left = &args[0];
-        let value = args.iter().skip(1).all(|right| match (left, right) {
-            (Value::I32(l), Value::I32(r)) => l == r,
-            (Value::F64(l), Value::F64(r)) => l == r,
-            _ => panic!("invalid types for Less Than"),
-        });
-        self.stack.push(Value::Bool(value));
-        Ok(())
-    }
-
-    fn instruction_greater_than(&mut self) -> Result<()> {
-        let count = self.get_u8()?;
-        let args = self.stack.split_off(self.stack.len() - count as usize);
-        let left = &args[0];
-        let value = args.iter().skip(1).all(|right| match (left, right) {
-            (Value::I32(l), Value::I32(r)) => l > r,
-            (Value::F64(l), Value::F64(r)) => l > r,
-            _ => panic!("invalid types for Less Than"),
-        });
-        self.stack.push(Value::Bool(value));
-        Ok(())
-    }
-
-    fn instruction_less_than(&mut self) -> Result<()> {
-        let count = self.get_u8()?;
-        let args = self.stack.split_off(self.stack.len() - count as usize);
-        let left = &args[0];
-        let value = args.iter().skip(1).all(|right| match (left, right) {
-            (Value::I32(l), Value::I32(r)) => l < r,
-            (Value::F64(l), Value::F64(r)) => l < r,
-            _ => panic!("invalid types for Less Than"),
-        });
-        self.stack.push(Value::Bool(value));
-        Ok(())
-    }
-
-    fn instruction_greater_than_or_equal(&mut self) -> Result<()> {
-        let count = self.get_u8()?;
-        let args = self.stack.split_off(self.stack.len() - count as usize);
-        let left = &args[0];
-        let value = args.iter().skip(1).all(|right| match (left, right) {
-            (Value::I32(l), Value::I32(r)) => l >= r,
-            (Value::F64(l), Value::F64(r)) => l >= r,
-            _ => panic!("invalid types for Greater Than Or Equal"),
-        });
-        self.stack.push(Value::Bool(value));
-        Ok(())
-    }
-
-    fn instruction_less_than_or_equal(&mut self) -> Result<()> {
-        let count = self.get_u8()?;
-        let args = self.stack.split_off(self.stack.len() - count as usize);
-        let left = &args[0];
-        let value = args.iter().skip(1).all(|right| match (left, right) {
-            (Value::I32(l), Value::I32(r)) => l <= r,
-            (Value::F64(l), Value::F64(r)) => l <= r,
-            _ => panic!("invalid types for Less Than Or Equal"),
-        });
-        self.stack.push(Value::Bool(value));
-        Ok(())
-    }
-
-    fn instruction_and(&mut self) -> Result<()> {
-        let count = self.get_u8()?;
-        let args = self.stack.split_off(self.stack.len() - count as usize);
-        let left = &args[0];
-        let value = args.iter().skip(1).all(|right| match (left, right) {
-            (Value::Bool(l), Value::Bool(r)) => *l && *r,
-            _ => panic!("invalid types for And"),
-        });
-        self.stack.push(Value::Bool(value));
-        Ok(())
-    }
-
-    fn instruction_or(&mut self) -> Result<()> {
-        let count = self.get_u8()?;
-        let args = self.stack.split_off(self.stack.len() - count as usize);
-        let left = &args[0];
-        let value = args
-            .iter()
-            .skip(1)
-            .fold(false, |acc, right| match (left, right) {
-                (Value::Bool(l), Value::Bool(r)) => acc || *l || *r,
-                _ => panic!("invalid types for Or"),
-            });
-        self.stack.push(Value::Bool(value));
-        Ok(())
-    }
-
-    fn instruction_not(&mut self) -> Result<()> {
-        let Some(value) = self.stack.pop() else {
-            panic!("expected value on stack for Not")
-        };
-        match value {
-            Value::Bool(b) => {
-                self.stack.push(Value::Bool(!b));
-            }
-            _ => panic!("invalid types for Not"),
-        }
-        Ok(())
-    }
-
-    fn instruction_mod(&mut self) -> Result<()> {
-        let Some(right) = self.stack.pop() else {
-            panic!("expected value on stack for Mod")
-        };
-        let Some(left) = self.stack.pop() else {
-            panic!("expected value on stack for Mod")
-        };
-        match (left, right) {
-            (Value::I32(left), Value::I32(right)) => {
-                self.stack.push(Value::I32(left % right));
-            }
-            (Value::F64(left), Value::F64(right)) => {
-                self.stack.push(Value::F64(left % right));
-            }
-            _ => panic!("invalid types for Mod"),
-        }
-        Ok(())
-    }
-
-    fn instruction_rot(&mut self) -> Result<()> {
-        let Some(right) = self.stack.pop() else {
-            panic!("expected value on stack for rot")
-        };
-        let Some(left) = self.stack.pop() else {
-            panic!("expected value on stack for rot")
-        };
-        self.stack.push(right);
-        self.stack.push(left);
-        Ok(())
-    }
-
-    fn instruction_call(&mut self) -> Result<()> {
-        let callee = self.get_callee()?;
-        let arg_count = self.get_u8()?;
-        match callee.clone() {
-            Callee::Function => {
-                let address = match self.stack.pop() {
-                    Some(Value::Callable(address)) => address,
-                    None => {
-                        panic!("expected value on stack for function call but stack is empty")
-                    }
-                    value => {
-                        panic!(
-                            "expected value on stack for function call but got {:?} {:#?}",
-                            value, self.stack
-                        )
-                    }
-                };
-
-                self.new_local_stack(arg_count as usize);
-                self.stack.push(Value::U32(self.ip as u32));
-                self.ip = address;
-                self.bring_to_top_of_stack(arg_count as usize);
-            }
-            Callee::Builtin(name) => self.builtins(name.clone(), arg_count),
-        }
-        Ok(())
-    }
-
-    fn instruction_load_local(&mut self) -> Result<()> {
-        let Some(value) = self.stack.pop() else {
-            panic!("expected value on stack for LoadLocal")
-        };
-
-        self.push_local(value);
-        Ok(())
-    }
-
-    fn instruction_get_local(&mut self) -> Result<()> {
-        let index = self.get_u8()? as usize;
-        let Some(value) = self.get_local(index) else {
-            panic!("expected value on stack for GetLocal")
-        };
-        self.stack.push(value.clone());
-        Ok(())
-    }
-
-    fn instruction_load_global(&mut self) -> Result<()> {
-        let Some(value) = self.stack.pop() else {
-            panic!("expected value on stack for LoadGlobal")
-        };
-
-        self.global_stack.push(value);
-        Ok(())
-    }
-
-    fn instruction_get_global(&mut self) -> Result<()> {
-        let index = self.get_u8()? as usize;
-        let Some(value) = self.global_stack.get(index) else {
-            panic!("expected value on stack for GetGlobal")
-        };
-        self.stack.push(value.clone());
-        Ok(())
-    }
-
-    fn instruction_load_free(&mut self) -> Result<()> {
-        let Some(value) = self.stack.pop() else {
-            panic!("expected value on stack for LoadFree")
-        };
-
-        self.free_stack.push(value);
-        Ok(())
-    }
-
-    fn instruction_get_free(&mut self) -> Result<()> {
-        let index = self.get_u8()? as usize;
-        let Some(value) = self.free_stack.get(index) else {
-            panic!("expected value on stack for GetFree")
-        };
-        self.stack.push(value.clone());
-        Ok(())
-    }
-
-    fn instruction_jump_if(&mut self) -> Result<()> {
-        let address = self.get_u32()? as usize;
-        let Some(value) = self.stack.pop() else {
-            panic!("expected value on stack for JumpIf")
-        };
-        if value == Value::Bool(false) {
-            self.ip += address;
-        }
-        Ok(())
-    }
-
-    fn instruction_jump(&mut self) -> Result<()> {
-        let direction = self.get_u8()?;
-        let address = self.get_u32()? as usize;
-        match direction {
-            Direction::OPCODE_FORWARD => {
-                self.ip += address;
-            }
-            Direction::OPCODE_BACKWARD => {
-                self.ip -= address;
-            }
-            _ => panic!("invalid direction for Jump"),
-        }
-        Ok(())
-    }
-
     fn get_callee(&mut self) -> Result<Callee> {
         let callee_opcode = self.program[self.ip];
         self.ip += 1;
@@ -572,21 +232,6 @@ impl Machine {
             }
             _ => Err(anyhow!("Unknown value `{}`", self.program[self.ip])),
         }
-    }
-
-    fn get_op_code(&mut self) -> Result<OpCode> {
-        let ip = self.ip;
-        self.ip += 1;
-        OpCode::from_u8(self.program[ip]).ok_or_else(|| {
-            anyhow!(
-                "Unknown instruction `{} {:?}`",
-                self.program[ip],
-                &self.program[ip..]
-                    .iter()
-                    .map(|x| format!("{x:02x}"))
-                    .collect::<Vec<_>>()
-            )
-        })
     }
 
     fn get_u8(&mut self) -> Result<u8> {
@@ -735,6 +380,7 @@ impl Machine {
         }
     }
 
+    #[cfg(debug_assertions)]
     fn debugger(&mut self) {
         use std::io::Write;
         let mut input = String::new();
@@ -848,6 +494,7 @@ impl Machine {
         }
     }
 
+    #[cfg(any(debug_assertions, test))]
     pub fn debug(&self) {
         let instructions = decompile(&self.program);
         let mut offset = 0;
@@ -867,7 +514,382 @@ impl Machine {
         }
     }
 
+    #[cfg(debug_assertions)]
     fn shutdown(&mut self) {
         self.is_running = false;
     }
+}
+
+fn instruction_start_at(machine: &mut Machine) -> Result<()> {
+    let address = machine.get_u32()? as usize;
+    machine.ip = address;
+    Ok(())
+}
+
+fn instruction_halt(machine: &mut Machine) -> Result<()> {
+    machine.is_running = false;
+    Ok(())
+}
+
+fn instruction_return(machine: &mut Machine) -> Result<()> {
+    let Some(Value::U32(address)) = machine.stack.pop() else {
+        // TODO: REPORT ERROR
+        panic!("expected value on stack for return")
+    };
+    machine.ip = address as usize;
+    machine.leaving_local_stack();
+    Ok(())
+}
+fn instruction_push(machine: &mut Machine) -> Result<()> {
+    let value = machine.get_value()?;
+    machine.stack.push(value);
+    Ok(())
+}
+
+fn instruction_add(machine: &mut Machine) -> Result<()> {
+    let count = machine.get_u8()?;
+    let args = machine
+        .stack
+        .split_off(machine.stack.len() - count as usize);
+    let mut left = args[0].clone();
+    for right in args.iter().skip(1) {
+        match (left, right) {
+            (Value::I32(l), Value::I32(r)) => {
+                left = Value::I32(l + r);
+            }
+            (Value::F64(l), Value::F64(r)) => {
+                left = Value::F64(l + r);
+            }
+            (Value::String(l), Value::String(r)) => {
+                left = Value::String(format!("{l}{r}"));
+            }
+            (lhs, rhs) => panic!(
+                "invalid types for Add: {lhs:?} and {rhs:?}, {:#?}",
+                machine.stack
+            ),
+        }
+    }
+    machine.stack.push(left);
+    Ok(())
+}
+
+fn instruction_sub(machine: &mut Machine) -> Result<()> {
+    let count = machine.get_u8()?;
+    let args = machine
+        .stack
+        .split_off(machine.stack.len() - count as usize);
+    let mut left = args[0].clone();
+    for right in args.iter().skip(1) {
+        match (left, right) {
+            (Value::I32(l), Value::I32(r)) => {
+                left = Value::I32(l - r);
+            }
+            (Value::F64(l), Value::F64(r)) => {
+                left = Value::F64(l - r);
+            }
+            _ => panic!("invalid types for Sub"),
+        }
+    }
+    machine.stack.push(left);
+    Ok(())
+}
+
+fn instruction_mul(machine: &mut Machine) -> Result<()> {
+    let count = machine.get_u8()?;
+    let args = machine
+        .stack
+        .split_off(machine.stack.len() - count as usize);
+    let mut left = args[0].clone();
+    for right in args.iter().skip(1) {
+        match (left, right) {
+            (Value::I32(l), Value::I32(r)) => {
+                left = Value::I32(l * r);
+            }
+            (Value::F64(l), Value::F64(r)) => {
+                left = Value::F64(l * r);
+            }
+            _ => panic!("invalid types for Mul"),
+        }
+    }
+    machine.stack.push(left);
+    Ok(())
+}
+
+fn instruction_div(machine: &mut Machine) -> Result<()> {
+    let count = machine.get_u8()?;
+    let args = machine
+        .stack
+        .split_off(machine.stack.len() - count as usize);
+    let mut left = args[0].clone();
+    for right in args.iter().skip(1) {
+        match (left, right) {
+            (Value::I32(l), Value::I32(r)) => {
+                left = Value::I32(l / r);
+            }
+            (Value::F64(l), Value::F64(r)) => {
+                left = Value::F64(l / r);
+            }
+            _ => panic!("invalid types for Div"),
+        }
+    }
+    machine.stack.push(left);
+    Ok(())
+}
+
+fn instruction_eq(machine: &mut Machine) -> Result<()> {
+    let count = machine.get_u8()?;
+    let args = machine
+        .stack
+        .split_off(machine.stack.len() - count as usize);
+    let left = &args[0];
+    let value = args.iter().skip(1).all(|right| match (left, right) {
+        (Value::I32(l), Value::I32(r)) => l == r,
+        (Value::F64(l), Value::F64(r)) => l == r,
+        _ => panic!("invalid types for Less Than"),
+    });
+    machine.stack.push(Value::Bool(value));
+    Ok(())
+}
+
+fn instruction_greater_than(machine: &mut Machine) -> Result<()> {
+    let count = machine.get_u8()?;
+    let args = machine
+        .stack
+        .split_off(machine.stack.len() - count as usize);
+    let left = &args[0];
+    let value = args.iter().skip(1).all(|right| match (left, right) {
+        (Value::I32(l), Value::I32(r)) => l > r,
+        (Value::F64(l), Value::F64(r)) => l > r,
+        _ => panic!("invalid types for Less Than"),
+    });
+    machine.stack.push(Value::Bool(value));
+    Ok(())
+}
+
+fn instruction_less_than(machine: &mut Machine) -> Result<()> {
+    let count = machine.get_u8()?;
+    let args = machine
+        .stack
+        .split_off(machine.stack.len() - count as usize);
+    let left = &args[0];
+    let value = args.iter().skip(1).all(|right| match (left, right) {
+        (Value::I32(l), Value::I32(r)) => l < r,
+        (Value::F64(l), Value::F64(r)) => l < r,
+        _ => panic!("invalid types for Less Than"),
+    });
+    machine.stack.push(Value::Bool(value));
+    Ok(())
+}
+
+fn instruction_greater_than_or_equal(machine: &mut Machine) -> Result<()> {
+    let count = machine.get_u8()?;
+    let args = machine
+        .stack
+        .split_off(machine.stack.len() - count as usize);
+    let left = &args[0];
+    let value = args.iter().skip(1).all(|right| match (left, right) {
+        (Value::I32(l), Value::I32(r)) => l >= r,
+        (Value::F64(l), Value::F64(r)) => l >= r,
+        _ => panic!("invalid types for Greater Than Or Equal"),
+    });
+    machine.stack.push(Value::Bool(value));
+    Ok(())
+}
+
+fn instruction_less_than_or_equal(machine: &mut Machine) -> Result<()> {
+    let count = machine.get_u8()?;
+    let args = machine
+        .stack
+        .split_off(machine.stack.len() - count as usize);
+    let left = &args[0];
+    let value = args.iter().skip(1).all(|right| match (left, right) {
+        (Value::I32(l), Value::I32(r)) => l <= r,
+        (Value::F64(l), Value::F64(r)) => l <= r,
+        _ => panic!("invalid types for Less Than Or Equal"),
+    });
+    machine.stack.push(Value::Bool(value));
+    Ok(())
+}
+
+fn instruction_and(machine: &mut Machine) -> Result<()> {
+    let count = machine.get_u8()?;
+    let args = machine
+        .stack
+        .split_off(machine.stack.len() - count as usize);
+    let left = &args[0];
+    let value = args.iter().skip(1).all(|right| match (left, right) {
+        (Value::Bool(l), Value::Bool(r)) => *l && *r,
+        _ => panic!("invalid types for And"),
+    });
+    machine.stack.push(Value::Bool(value));
+    Ok(())
+}
+
+fn instruction_or(machine: &mut Machine) -> Result<()> {
+    let count = machine.get_u8()?;
+    let args = machine
+        .stack
+        .split_off(machine.stack.len() - count as usize);
+    let left = &args[0];
+    let value = args
+        .iter()
+        .skip(1)
+        .fold(false, |acc, right| match (left, right) {
+            (Value::Bool(l), Value::Bool(r)) => acc || *l || *r,
+            _ => panic!("invalid types for Or"),
+        });
+    machine.stack.push(Value::Bool(value));
+    Ok(())
+}
+
+fn instruction_not(machine: &mut Machine) -> Result<()> {
+    let Some(value) = machine.stack.pop() else {
+        panic!("expected value on stack for Not")
+    };
+    match value {
+        Value::Bool(b) => {
+            machine.stack.push(Value::Bool(!b));
+        }
+        _ => panic!("invalid types for Not"),
+    }
+    Ok(())
+}
+
+fn instruction_mod(machine: &mut Machine) -> Result<()> {
+    let Some(right) = machine.stack.pop() else {
+        panic!("expected value on stack for Mod")
+    };
+    let Some(left) = machine.stack.pop() else {
+        panic!("expected value on stack for Mod")
+    };
+    match (left, right) {
+        (Value::I32(left), Value::I32(right)) => {
+            machine.stack.push(Value::I32(left % right));
+        }
+        (Value::F64(left), Value::F64(right)) => {
+            machine.stack.push(Value::F64(left % right));
+        }
+        _ => panic!("invalid types for Mod"),
+    }
+    Ok(())
+}
+
+fn instruction_rot(machine: &mut Machine) -> Result<()> {
+    let Some(right) = machine.stack.pop() else {
+        panic!("expected value on stack for rot {:?}", machine.stack)
+    };
+    let Some(left) = machine.stack.pop() else {
+        panic!("expected value on stack for rot {:?}", machine.stack)
+    };
+    machine.stack.push(right);
+    machine.stack.push(left);
+    Ok(())
+}
+
+fn instruction_call(machine: &mut Machine) -> Result<()> {
+    let callee = machine.get_callee()?;
+    let arg_count = machine.get_u8()?;
+    match callee.clone() {
+        Callee::Function => {
+            let address = match machine.stack.pop() {
+                Some(Value::Callable(address)) => address,
+                None => {
+                    panic!("expected value on stack for function call but stack is empty")
+                }
+                value => {
+                    panic!(
+                        "expected value on stack for function call but got {:?} {:#?}",
+                        value, machine.stack
+                    )
+                }
+            };
+
+            machine.new_local_stack(arg_count as usize);
+            machine.stack.push(Value::U32(machine.ip as u32));
+            machine.ip = address;
+            machine.bring_to_top_of_stack(arg_count as usize);
+        }
+        Callee::Builtin(name) => machine.builtins(name.clone(), arg_count),
+    }
+    Ok(())
+}
+
+fn instruction_load_local(machine: &mut Machine) -> Result<()> {
+    let Some(value) = machine.stack.pop() else {
+        panic!("expected value on stack for LoadLocal")
+    };
+
+    machine.push_local(value);
+    Ok(())
+}
+
+fn instruction_get_local(machine: &mut Machine) -> Result<()> {
+    let index = machine.get_u8()? as usize;
+    let Some(value) = machine.get_local(index) else {
+        panic!("expected value on stack for GetLocal")
+    };
+    machine.stack.push(value.clone());
+    Ok(())
+}
+
+fn instruction_load_global(machine: &mut Machine) -> Result<()> {
+    let Some(value) = machine.stack.pop() else {
+        panic!("expected value on stack for LoadGlobal")
+    };
+
+    machine.global_stack.push(value);
+    Ok(())
+}
+
+fn instruction_get_global(machine: &mut Machine) -> Result<()> {
+    let index = machine.get_u8()? as usize;
+    let Some(value) = machine.global_stack.get(index) else {
+        panic!("expected value on stack for GetGlobal")
+    };
+    machine.stack.push(value.clone());
+    Ok(())
+}
+
+fn instruction_load_free(machine: &mut Machine) -> Result<()> {
+    let Some(value) = machine.stack.pop() else {
+        panic!("expected value on stack for LoadFree")
+    };
+
+    machine.free_stack.push(value);
+    Ok(())
+}
+
+fn instruction_get_free(machine: &mut Machine) -> Result<()> {
+    let index = machine.get_u8()? as usize;
+    let Some(value) = machine.free_stack.get(index) else {
+        panic!("expected value on stack for GetFree")
+    };
+    machine.stack.push(value.clone());
+    Ok(())
+}
+
+fn instruction_jump_if(machine: &mut Machine) -> Result<()> {
+    let address = machine.get_u32()? as usize;
+    let Some(value) = machine.stack.pop() else {
+        panic!("expected value on stack for JumpIf")
+    };
+    if value == Value::Bool(false) {
+        machine.ip += address;
+    }
+    Ok(())
+}
+
+fn instruction_jump(machine: &mut Machine) -> Result<()> {
+    let direction = machine.get_u8()?;
+    let address = machine.get_u32()? as usize;
+    match direction {
+        Direction::OPCODE_FORWARD => {
+            machine.ip += address;
+        }
+        Direction::OPCODE_BACKWARD => {
+            machine.ip -= address;
+        }
+        _ => panic!("invalid direction for Jump"),
+    }
+    Ok(())
 }

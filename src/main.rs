@@ -21,6 +21,7 @@ fn main() -> anyhow::Result<()> {
             Ok(())
         }
         Command::Run {
+            #[cfg(debug_assertions)]
             breakpoints,
             decompile,
             file,
@@ -28,7 +29,15 @@ fn main() -> anyhow::Result<()> {
             ..
         } => {
             let options = CompilerOptions { no_main };
-            run(file, breakpoints, decompile, &options)
+            run(
+                file,
+                #[cfg(debug_assertions)]
+                {
+                    breakpoints
+                },
+                decompile,
+                &options,
+            )
         }
         Command::Test { file: _ } => todo!(),
     }
@@ -65,7 +74,7 @@ fn get_compiled_filename(file: Option<String>) -> anyhow::Result<String> {
 
 fn run(
     file: Option<String>,
-    breakpoints: Vec<usize>,
+    #[cfg(debug_assertions)] breakpoints: Vec<usize>,
     decompile: bool,
     options: &CompilerOptions,
 ) -> anyhow::Result<()> {
@@ -78,8 +87,11 @@ fn run(
 
     let program = std::fs::read(compiled_filename)?;
     let mut machine = Machine::new(program);
-    for i in breakpoints {
-        machine.add_breakpoint(i);
+    #[cfg(debug_assertions)]
+    {
+        for i in breakpoints {
+            machine.add_breakpoint(i);
+        }
     }
     eprintln!("Running...");
     machine.run()?;
