@@ -6,7 +6,7 @@
       n
       (+ (fib (- n 1)) (fib (- n 2)))))
 
-(fn main () (print (fib 35) "\n"))
+(fn main () (print (fib 30) "\n"))
 ;; 21 58 95 169 280 465 761 1241 2019 3277 5312 8605
 ; (fn tail_recursive_factorial (n acc)
 ;   (if (= n 0)

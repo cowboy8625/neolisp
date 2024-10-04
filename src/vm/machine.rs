@@ -8,7 +8,7 @@ use core::panic;
 
 use anyhow::{anyhow, Result};
 
-#[cfg(any(debug_assertions))]
+#[cfg(debug_assertions)]
 const RED: &str = "\x1b[31m";
 #[cfg(any(debug_assertions, test))]
 const GREEN: &str = "\x1b[32m";
@@ -150,7 +150,7 @@ impl Machine {
         self.new_local_stack(arg_count);
         self.stack.push(Value::U32(self.ip as u32));
         self.ip = address;
-        self.bring_to_top_of_stack(arg_count);
+        // self.bring_to_top_of_stack(arg_count);
         loop {
             let mut ip = self.ip;
             let Some(Instruction::Return) = get_instruction(&self.program, &mut ip).ok() else {
@@ -347,7 +347,7 @@ impl Machine {
 
     fn bring_to_top_of_stack(&mut self, count: usize) {
         let length = self.stack.len();
-        self.stack[length - count..].rotate_left(count);
+        self.stack[length - count..].rotate_left(count.saturating_sub(1));
     }
 
     fn builtins(&mut self, name: String, arg_count: u8) {
@@ -759,15 +759,16 @@ fn instruction_mod(machine: &mut Machine) -> Result<()> {
     let Some(right) = machine.stack.pop() else {
         panic!("expected value on stack for Mod")
     };
-    let Some(left) = machine.stack.pop() else {
+    let Some(left) = machine.stack.last() else {
         panic!("expected value on stack for Mod")
     };
+    let last_index = machine.stack.len() - 1;
     match (left, right) {
         (Value::I32(left), Value::I32(right)) => {
-            machine.stack.push(Value::I32(left % right));
+            machine.stack[last_index] = Value::I32(left % right);
         }
         (Value::F64(left), Value::F64(right)) => {
-            machine.stack.push(Value::F64(left % right));
+            machine.stack[last_index] = Value::F64(left % right);
         }
         _ => panic!("invalid types for Mod"),
     }
@@ -775,14 +776,7 @@ fn instruction_mod(machine: &mut Machine) -> Result<()> {
 }
 
 fn instruction_rot(machine: &mut Machine) -> Result<()> {
-    let Some(right) = machine.stack.pop() else {
-        panic!("expected value on stack for rot {:?}", machine.stack)
-    };
-    let Some(left) = machine.stack.pop() else {
-        panic!("expected value on stack for rot {:?}", machine.stack)
-    };
-    machine.stack.push(right);
-    machine.stack.push(left);
+    machine.bring_to_top_of_stack(2);
     Ok(())
 }
 
@@ -805,9 +799,11 @@ fn instruction_call(machine: &mut Machine) -> Result<()> {
             };
 
             machine.new_local_stack(arg_count as usize);
-            machine.stack.push(Value::U32(machine.ip as u32));
+            let location = machine.stack.len() - arg_count as usize;
+            machine
+                .stack
+                .insert(location, Value::U32(machine.ip as u32));
             machine.ip = address;
-            machine.bring_to_top_of_stack(arg_count as usize);
         }
         Callee::Builtin(name) => machine.builtins(name.clone(), arg_count),
     }

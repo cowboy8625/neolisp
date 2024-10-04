@@ -299,7 +299,6 @@ impl<'a> AstWalker<Chunk> for Stage1Compiler<'a> {
             let Expr::Symbol(_) = &param.expr else {
                 panic!("expected symbol for param");
             };
-            params.push(Stage1Instruction::Rot);
             params.push(Stage1Instruction::LoadLocal);
         }
 
@@ -339,7 +338,6 @@ impl<'a> AstWalker<Chunk> for Stage1Compiler<'a> {
             let Expr::Symbol(_) = &param.expr else {
                 panic!("expected symbol for param");
             };
-            params.push(Stage1Instruction::Rot);
             params.push(Stage1Instruction::LoadLocal);
         }
 

@@ -85,7 +85,7 @@ fn test_main_var_lambda() {
     assert_eq!(lambda.name, "lambda_0", "lambda name");
     assert_eq!(
         lambda.params,
-        Chunk::from(vec![Rot, LoadLocal, Rot, LoadLocal]),
+        Chunk::from(vec![LoadLocal, LoadLocal]),
         "lambda params"
     );
     assert_eq!(
@@ -146,7 +146,7 @@ fn test_main_var_lambda_curry() {
     assert_eq!(lambda.name, "lambda_0", "lambda_0 name");
     assert_eq!(
         lambda.params,
-        Chunk::from(vec![Rot, LoadLocal]),
+        Chunk::from(vec![LoadLocal]),
         "lambda_0 params"
     );
     assert_eq!(
@@ -164,11 +164,7 @@ fn test_main_var_lambda_curry() {
     // Check that we have a lambda 2
     let lambda = &stage1_compiler.lambdas[0];
     assert_eq!(lambda.name, "lambda_1", "lambda name");
-    assert_eq!(
-        lambda.params,
-        Chunk::from(vec![Rot, LoadLocal]),
-        "lambda params"
-    );
+    assert_eq!(lambda.params, Chunk::from(vec![LoadLocal]), "lambda params");
     assert_eq!(
         lambda.body,
         Chunk::from(vec![
@@ -223,7 +219,7 @@ fn test_main_call_lambda() {
     assert_eq!(lambda.name, "lambda_0", "lambda_0 name");
     assert_eq!(
         lambda.params,
-        Chunk::from(vec![Rot, LoadLocal, Rot, LoadLocal]),
+        Chunk::from(vec![LoadLocal, LoadLocal]),
         "lambda_0 params"
     );
     assert_eq!(
@@ -256,7 +252,7 @@ fn test_main_applying_lambda() {
     assert_eq!(apply.name, "apply", "apply function name");
     assert_eq!(
         apply.params,
-        Chunk::from(vec![Rot, LoadLocal, Rot, LoadLocal]),
+        Chunk::from(vec![LoadLocal, LoadLocal]),
         "apply function params"
     );
     assert_eq!(
@@ -309,7 +305,7 @@ fn test_main_applying_lambda() {
     assert_eq!(lambda.name, "lambda_0", "lambda_0 name");
     assert_eq!(
         lambda.params,
-        Chunk::from(vec![Rot, LoadLocal]),
+        Chunk::from(vec![LoadLocal]),
         "lambda_0 params"
     );
     assert_eq!(

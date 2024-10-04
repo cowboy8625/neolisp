@@ -118,7 +118,7 @@ check_return_when!(
     lambda_is_called,
     "(((lambda (x) (lambda (y) (+ x y))) 1) 3)",
     Value::F64(4.),
-    cycles = 21
+    cycles = 19
 );
 
 // #[test]
@@ -201,7 +201,7 @@ fn test_cycles_for_fib() {
     assert_eq!(machine.stack.len(), 1);
     assert_eq!(machine.stack[0], Value::F64(832040.));
     // FIXME: This seems really really really high!
-    assert_eq!(machine.cycle_count, 49811935);
+    assert_eq!(machine.cycle_count, 47119398);
 }
 
 #[test]
@@ -221,9 +221,7 @@ fn testing_function_call_instructions() {
         // 0x1D
         Instruction::Halt, // 0x01
         // 0x1E
-        Instruction::Rot,         // 0x01
         Instruction::LoadLocal,   // 0x01
-        Instruction::Rot,         // 0x01
         Instruction::LoadLocal,   // 0x01
         Instruction::GetLocal(0), // 0x05?
         Instruction::GetLocal(1), // 0x05?
