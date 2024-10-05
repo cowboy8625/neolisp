@@ -3,7 +3,7 @@ use crate::ast::{Expr, Spanned};
 use crate::expr_walker::{
     AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LoopExpr, OperatorExpr, VarExpr,
 };
-use crate::symbol_table::{Symbol, SymbolKind, SymbolScope, SymbolTable, SymbolType};
+use crate::symbol_table::{SymbolKind, SymbolScope, SymbolTable};
 use crate::vm::Direction;
 
 #[derive(Debug)]
@@ -196,28 +196,19 @@ impl<'a> Stage1Compiler<'a> {
         self.walk(&mut chunk, ast);
 
         if options.no_main {
+            let name = "main".to_string();
             let mut body = Chunk::default();
             body.push(Stage1Instruction::Halt);
             self.functions.push(Stage1Function {
-                name: "main".to_string(),
+                name: name.clone(),
                 params: Chunk::default(),
                 prelude: Chunk::default(),
                 body,
             });
 
-            self.symbol_table.enter_new_scope();
-            let symbol = Symbol {
-                id: self.symbol_table.get_id(),
-                name: "main".to_string(),
-                symbol_type: SymbolType::Function(Vec::new(), Box::new(SymbolType::Dynamic)),
-                kind: SymbolKind::Function,
-                scope: SymbolScope::Global,
-                scope_level: self.symbol_table.get_scope_level() as u32,
-                location: None,
-            };
-
-            self.symbol_table.insert("main".to_string(), symbol);
-            self.symbol_table.exit_new_scope(Some("main"));
+            self.symbol_table
+                .enter_new_scope(&name, SymbolKind::Function);
+            self.symbol_table.exit_new_scope(Some(&name));
         }
         for function in self.functions.iter_mut() {
             if function.name == "main" {

@@ -72,7 +72,7 @@ pub struct Machine {
     pub breakpoints: Vec<usize>,
     #[cfg(debug_assertions)]
     pub debug_mode: DebugMode,
-    #[cfg(test)]
+    #[cfg(any(debug_assertions, test))]
     pub cycle_count: usize,
 }
 
@@ -90,7 +90,7 @@ impl Machine {
             breakpoints: Vec::with_capacity(2024),
             #[cfg(debug_assertions)]
             debug_mode: DebugMode::Off,
-            #[cfg(test)]
+            #[cfg(any(debug_assertions, test))]
             cycle_count: 0,
         }
     }
@@ -101,7 +101,7 @@ impl Machine {
     }
 
     pub fn run_once(&mut self) -> Result<()> {
-        #[cfg(test)]
+        #[cfg(any(debug_assertions, test))]
         {
             self.cycle_count += 1;
         }
@@ -143,6 +143,12 @@ impl Machine {
         while self.is_running {
             self.run_once()?;
         }
+        #[cfg(any(debug_assertions, test))]
+        eprintln!("cycles: {}", self.cycle_count);
+        #[cfg(any(debug_assertions, test))]
+        eprintln!("stack {:#?}", self.stack);
+        #[cfg(any(debug_assertions, test))]
+        eprintln!("stack_local {:#?}", self.local_stack);
         Ok(())
     }
 

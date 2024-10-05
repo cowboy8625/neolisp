@@ -32,10 +32,14 @@ fn test_table_creation() {
         Some(&Symbol {
             id: 0,
             name: "main".to_string(),
-            symbol_type: SymbolType::Function(vec![], Box::new(SymbolType::Dynamic)),
+            symbol_type: SymbolType::Function {
+                self_reference: false,
+                params: vec![],
+                return_type: Box::new(SymbolType::Dynamic)
+            },
             kind: SymbolKind::Function,
             scope: SymbolScope::Global,
-            scope_level: 1,
+            scope_level: 0,
             location: None,
         })
     );
@@ -44,28 +48,61 @@ fn test_table_creation() {
         Some(&Symbol {
             id: 0,
             name: "lambda_0".to_string(),
-            symbol_type: SymbolType::Function(
-                vec![SymbolType::Dynamic],
-                Box::new(SymbolType::Dynamic)
-            ),
+            symbol_type: SymbolType::Function {
+                self_reference: false,
+                params: vec![SymbolType::Dynamic],
+                return_type: Box::new(SymbolType::Dynamic)
+            },
             kind: SymbolKind::Lambda,
             scope: SymbolScope::Global,
-            scope_level: 1,
+            scope_level: 0,
             location: None,
         })
     );
     assert_eq!(
         symbol_table.lookup("lambda_1"),
         Some(&Symbol {
-            id: 1,
+            id: 0,
             name: "lambda_1".to_string(),
-            symbol_type: SymbolType::Function(
-                vec![SymbolType::Dynamic],
-                Box::new(SymbolType::Dynamic)
-            ),
+            symbol_type: SymbolType::Function {
+                self_reference: false,
+                params: vec![SymbolType::Dynamic],
+                return_type: Box::new(SymbolType::Dynamic)
+            },
             kind: SymbolKind::Lambda,
-            scope: SymbolScope::Function,
-            scope_level: 2,
+            scope: SymbolScope::Global,
+            scope_level: 1,
+            location: None,
+        })
+    );
+}
+
+#[test]
+fn detecting_recursion() {
+    let src = r#"
+(fn fib (n)
+  (if (or (= n 0) (= n 1))
+      n
+      (+ (fib (- n 1)) (fib (- n 2)))))
+
+(fn main () (print (fib 42) "\n"))
+"#;
+    let ast = parser().parse(src).unwrap();
+    let symbol_table = SymbolTableBuilder::default().build(&ast);
+    eprintln!("{:#?}", symbol_table);
+    assert_eq!(
+        symbol_table.lookup("fib"),
+        Some(&Symbol {
+            id: 0,
+            name: "fib".to_string(),
+            symbol_type: SymbolType::Function {
+                self_reference: true,
+                params: vec![SymbolType::Dynamic],
+                return_type: Box::new(SymbolType::Dynamic)
+            },
+            kind: SymbolKind::Function,
+            scope: SymbolScope::Global,
+            scope_level: 0,
             location: None,
         })
     );

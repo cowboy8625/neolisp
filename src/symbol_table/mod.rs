@@ -16,8 +16,24 @@ pub struct SymbolTable {
 
 impl SymbolTable {
     /// Enter a new scope (pushes a new scope onto the stack)
-    pub fn enter_new_scope(&mut self) {
-        self.scope_stack.push(HashMap::new());
+    pub fn enter_new_scope(&mut self, name: &str, kind: SymbolKind) {
+        let scope = HashMap::from([(
+            name.to_string(),
+            Symbol {
+                id: self.get_id(),
+                name: name.to_string(),
+                symbol_type: SymbolType::Function {
+                    self_reference: false,
+                    params: vec![],
+                    return_type: Box::new(SymbolType::Dynamic),
+                },
+                kind,
+                scope: SymbolScope::Global,
+                scope_level: self.get_scope_level() as u32,
+                location: None,
+            },
+        )]);
+        self.scope_stack.push(scope);
     }
 
     /// Exit the current scope (pops the top scope off the stack)
@@ -42,6 +58,7 @@ impl SymbolTable {
         self.scope_stack.pop();
     }
 
+    /// Set the location of a symbol
     pub fn set_location(&mut self, scope_name: Option<&str>, name: &str, location: u32) {
         if let Some(scope_name) = scope_name {
             if let Some(scope) = self.function_scopes.get_mut(scope_name) {
@@ -73,8 +90,9 @@ impl SymbolTable {
 
     pub fn get_id(&self) -> usize {
         self.scope_stack
-            .iter()
-            .fold(0, |acc, scope| acc + scope.len())
+            .last()
+            .map(|scope| scope.len().saturating_sub(1))
+            .unwrap_or(0)
     }
 
     /// Insert a symbol into the current scope
@@ -112,6 +130,26 @@ impl SymbolTable {
         self.global_scope.get(name)
     }
 
+    pub fn get_mut_current_scope(&mut self, name: &str) -> Option<&mut Symbol> {
+        if self.scope_stack.is_empty() {
+            return None;
+        }
+        let length = self.scope_stack.len() - 1;
+        self.scope_stack
+            .get_mut(length)
+            .and_then(|scope| scope.get_mut(name))
+    }
+
+    pub fn is_recursive(&self, name: &str) -> bool {
+        self.scope_stack.iter().any(|scope| {
+            scope.contains_key(name)
+                && scope
+                    .get(name)
+                    .map(|s| matches!(s.kind, SymbolKind::Function | SymbolKind::Lambda))
+                    .unwrap_or(false)
+        })
+    }
+
     /// Get the symbol table for a function scope after analysis
     pub fn get_function_scope(&self, function_name: &str) -> Option<&HashMap<String, Symbol>> {
         self.function_scopes.get(function_name)
@@ -126,7 +164,11 @@ pub enum SymbolType {
     // Int,
     // Float,
     // String,
-    Function(Vec<SymbolType>, Box<SymbolType>), // (params, return type)
+    Function {
+        self_reference: bool,
+        params: Vec<SymbolType>,
+        return_type: Box<SymbolType>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -158,6 +200,41 @@ pub struct Symbol {
     pub scope: SymbolScope,
     pub scope_level: u32,
     pub location: Option<u32>,
+}
+
+impl Symbol {
+    pub fn make_recursive(&mut self) {
+        match self.symbol_type {
+            SymbolType::Function {
+                ref mut self_reference,
+                ..
+            } => {
+                *self_reference = true;
+            }
+            _ => panic!("Cannot make recursive symbol {:#?}", self),
+        }
+    }
+
+    pub fn params(&mut self, new_params: Vec<SymbolType>) {
+        match &mut self.symbol_type {
+            SymbolType::Function { ref mut params, .. } => {
+                *params = new_params;
+            }
+            _ => panic!("Cannot make recursive symbol {:#?}", self),
+        }
+    }
+
+    pub fn return_type(&mut self, new_return_type: SymbolType) {
+        match &mut self.symbol_type {
+            SymbolType::Function {
+                ref mut return_type,
+                ..
+            } => {
+                *return_type = Box::new(new_return_type);
+            }
+            _ => panic!("Cannot make recursive symbol {:#?}", self),
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -213,8 +290,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
 
         let old_local_counter = self.local_counter;
         self.local_counter = 0;
-        let id = table.get_id();
-        table.enter_new_scope();
+        table.enter_new_scope(name, SymbolKind::Function);
 
         // Parameters of the function
         let Expr::List(params) = &function.params.expr else {
@@ -246,17 +322,14 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         // Body of the function
         self.walk_expr(table, function.body);
 
-        let symbol = Symbol {
-            id,
-            name: name.to_string(),
-            symbol_type: SymbolType::Function(params_symbol_types, Box::new(SymbolType::Dynamic)),
-            kind: SymbolKind::Function,
-            scope,
-            scope_level: table.get_scope_level() as u32,
-            location: None,
-        };
+        {
+            let function_symbol = table
+                .get_mut_current_scope(name)
+                .expect("This should never fail as we just inserted it at the top of this method");
 
-        table.insert(function.name.to_string(), symbol);
+            function_symbol.params(params_symbol_types);
+        }
+
         table.exit_new_scope(Some(name));
 
         self.current_scope = scope;
@@ -272,8 +345,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
 
         let old_local_counter = self.local_counter;
         self.local_counter = 0;
-        let id = table.get_id();
-        table.enter_new_scope();
+        table.enter_new_scope(&name, SymbolKind::Lambda);
 
         // Parameters of the function
         let Expr::List(params) = &lambda.params.expr else {
@@ -305,17 +377,13 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         // Body of the function
         self.walk_expr(table, lambda.body);
 
-        let symbol = Symbol {
-            id,
-            name: name.clone(),
-            symbol_type: SymbolType::Function(params_symbol_types, Box::new(SymbolType::Dynamic)),
-            kind: SymbolKind::Lambda,
-            scope,
-            scope_level: table.get_scope_level() as u32,
-            location: None,
-        };
+        {
+            let lambda_symbol = table
+                .get_mut_current_scope(&name)
+                .expect("This should never fail as we just inserted it at the top of this method");
 
-        table.insert(name.clone(), symbol);
+            lambda_symbol.params(params_symbol_types);
+        }
         table.exit_new_scope(Some(&name));
         self.current_scope = scope;
         self.local_counter = old_local_counter;
@@ -390,6 +458,10 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
                 );
             }
             _ => {}
+        }
+        if table.is_recursive(name) {
+            let symbol = table.get_mut_current_scope(name).unwrap();
+            symbol.make_recursive();
         }
     }
 
