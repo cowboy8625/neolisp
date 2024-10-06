@@ -36,6 +36,7 @@ pub mod compiler;
 pub mod docs;
 pub mod error;
 pub mod expr_walker;
+pub mod machine;
 pub mod parser;
 pub mod repl;
 pub mod symbol_table;

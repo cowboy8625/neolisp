@@ -37,6 +37,12 @@ pub enum Command {
             default_value_t = false
         )]
         no_main: bool,
+        #[arg(
+            long,
+            help = "try out the new vm implementation, which is faster? (implies -d)",
+            default_value_t = false
+        )]
+        new_vm: bool,
         file: Option<String>,
     },
     Test {
