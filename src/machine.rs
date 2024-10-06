@@ -1,6 +1,8 @@
 use super::{
     ast::{Expr, Spanned},
-    expr_walker::{AstWalker, CallExpr, FunctionExpr, IfElseExpr, LoopExpr, OperatorExpr, VarExpr},
+    expr_walker::{
+        AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LoopExpr, OperatorExpr, VarExpr,
+    },
     parser::parser,
     symbol_table::{Symbol, SymbolKind, SymbolScope, SymbolTable, SymbolTableBuilder},
     BUILTINS,
@@ -579,8 +581,34 @@ impl AstWalker<Program> for Compiler<'_> {
         program.push(Instruction::SetGlobal);
     }
 
-    fn handle_lambda(&mut self, _: &mut Program, _: &crate::expr_walker::LambdaExpr) {
-        todo!()
+    fn handle_lambda(&mut self, program: &mut Program, lambda: &LambdaExpr) {
+        let jump_forward_instruciion_size = Instruction::Jump(0).size();
+        let name = self.get_lambda_name();
+        let start = self.get_program_size(program) + jump_forward_instruciion_size;
+        self.symbol_table
+            .set_location(Some(&name), &name, start as u32);
+
+        self.symbol_table.enter_scope(&name);
+
+        if !lambda.params.expr.is_list() {
+            // TODO: REPORT ERROR
+            panic!(
+                "expected list for params but found {:?}",
+                &lambda.params.expr
+            );
+        };
+
+        let mut body = Vec::new();
+        self.walk_expr(&mut body, lambda.body);
+        body.push(Instruction::Return);
+
+        self.symbol_table.exit_scope();
+
+        let body_size = self.get_program_size(&body);
+        program.push(Instruction::Jump(start + body_size));
+        program.extend(body);
+
+        program.push(Instruction::Push(Box::new(Value::Callable(start))));
     }
 
     fn handle_call(&mut self, program: &mut Program, call: &CallExpr) {
