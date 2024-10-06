@@ -1,9 +1,6 @@
 use crate::cli::Cli;
-use crate::compiler::CompilerOptions;
-use crate::compiler::{compile_to_instructions, simple_display_instructions};
 use crate::docs;
 use crate::parser::parser;
-use crate::vm::Machine;
 use anyhow::Result;
 use chumsky::prelude::Parser;
 use rustyline::config::Configurer;
@@ -71,6 +68,10 @@ pub fn run(args: Cli) -> Result<()> {
     rl.set_edit_mode(args.editor_mode.into());
     rl.set_helper(Some(h));
     rl.bind_sequence(
+        KeyEvent(KeyCode::Char('c'), Modifiers::CTRL),
+        EventHandler::Simple(Cmd::Interrupt),
+    );
+    rl.bind_sequence(
         KeyEvent(KeyCode::Enter, Modifiers::NONE),
         EventHandler::Conditional(Box::new(ShouldRunIfThereIsANewLine)),
     );
@@ -79,16 +80,25 @@ pub fn run(args: Cli) -> Result<()> {
     }
 
     let help_docs = docs::load_doc();
-    let compiler_options = CompilerOptions { no_main: true };
     let mut repl_output_mode = ReplOutputMode::default();
+    let mut machine = crate::machine::Machine::default();
 
     loop {
-        let input = rl.readline("> ")?;
+        let input = match rl.readline("> ") {
+            Ok(input) => input,
+            Err(rustyline::error::ReadlineError::Interrupted) => {
+                break;
+            }
+            Err(rustyline::error::ReadlineError::Eof) => break,
+            Err(err) => {
+                println!("Error: {:?}", err);
+                break;
+            }
+        };
 
         if input.is_empty() {
             continue;
         }
-        rl.add_history_entry(input.as_str())?;
 
         // Run command
         let command = input.split(' ').collect::<Vec<&str>>();
@@ -126,6 +136,7 @@ pub fn run(args: Cli) -> Result<()> {
             _ => (),
         };
 
+        rl.add_history_entry(input.as_str())?;
         match repl_output_mode {
             ReplOutputMode::Ast => {
                 let ast = parser().parse(input).map_err(|e| {
@@ -137,27 +148,15 @@ pub fn run(args: Cli) -> Result<()> {
                 }
             }
             ReplOutputMode::Op => {
-                let instructions = match compile_to_instructions(&input, &compiler_options) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        println!("{e}");
-                        continue;
-                    }
-                };
-                simple_display_instructions(&instructions);
+                machine.debug()?;
             }
             ReplOutputMode::Eval => {
-                let program = match crate::compiler::compile(&input, &compiler_options) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        println!("{e}");
-                        continue;
-                    }
-                };
-                let mut machine = Machine::new(program);
-                machine.run()?;
-                if let Some(last) = machine.stack.last() {
-                    eprintln!("{last}");
+                match machine.run_from_string(&input) {
+                    Ok(()) => (),
+                    Err(e) => println!("{e}"),
+                }
+                if let Some(last) = machine.pop() {
+                    eprintln!(":{last}");
                 }
             }
         }

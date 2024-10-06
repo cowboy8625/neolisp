@@ -119,13 +119,13 @@ fn run_new_vm(
     file: Option<String>,
     #[cfg(any(debug_assertions, test))] breakpoints: Vec<usize>,
     decompile: bool,
-    _no_main: bool,
+    no_main: bool,
 ) -> anyhow::Result<()> {
     let filename = file.unwrap_or("main.nl".to_string());
 
     let src = std::fs::read_to_string(filename)?;
 
-    let options = neolisp::machine::CompilerOptions::default();
+    let options = neolisp::machine::CompilerOptions { no_main };
     let instructions = neolisp::machine::compile(&src, options)?;
 
     if decompile {

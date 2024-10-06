@@ -13,11 +13,8 @@ use num_traits::FromPrimitive;
 
 #[cfg(debug_assertions)]
 const RED: &str = "\x1b[31m";
-#[cfg(any(debug_assertions, test))]
 const GREEN: &str = "\x1b[32m";
-#[cfg(any(debug_assertions, test))]
 const UNDERLINE: &str = "\x1b[4m";
-#[cfg(any(debug_assertions, test))]
 const RESET: &str = "\x1b[0m";
 
 #[cfg(debug_assertions)]
@@ -401,6 +398,7 @@ pub struct Compiler<'a> {
     symbol_table: &'a mut SymbolTable,
     lambda_counter: usize,
     options: CompilerOptions,
+    offset: usize,
 }
 
 impl<'a> Compiler<'a> {
@@ -409,7 +407,13 @@ impl<'a> Compiler<'a> {
             symbol_table,
             lambda_counter: 0,
             options,
+            offset: 0,
         }
+    }
+
+    fn with_offset(mut self, offset: usize) -> Self {
+        self.offset = offset;
+        self
     }
 
     fn compile(&mut self, ast: &[Spanned<Expr>]) -> Result<Vec<Instruction>> {
@@ -488,6 +492,10 @@ impl<'a> Compiler<'a> {
             SymbolKind::Lambda => todo!(),
         }
     }
+
+    fn get_program_size(&self, program: &Program) -> usize {
+        self.offset + program.program_size()
+    }
 }
 
 impl AstWalker<Program> for Compiler<'_> {
@@ -538,7 +546,7 @@ impl AstWalker<Program> for Compiler<'_> {
             );
         };
 
-        let start = program.program_size() + jump_forward_instruciion_size;
+        let start = self.get_program_size(program) + jump_forward_instruciion_size;
         self.symbol_table
             .set_location(Some(name), name, start as u32);
 
@@ -563,7 +571,7 @@ impl AstWalker<Program> for Compiler<'_> {
 
         self.symbol_table.exit_scope();
 
-        let body_size = body.program_size();
+        let body_size = self.get_program_size(&body);
         program.push(Instruction::Jump(start + body_size));
         program.extend(body);
 
@@ -592,13 +600,13 @@ impl AstWalker<Program> for Compiler<'_> {
 
         let mut then_chunk = Vec::new();
         self.walk_expr(&mut then_chunk, if_else.then);
-        let then_offset = then_chunk.program_size() + Instruction::JumpForward(0).size();
+        let then_offset = self.get_program_size(&then_chunk);
 
         let mut else_chunk = Vec::new();
         if let Some(else_spanned) = if_else.otherwise.as_ref() {
             self.walk_expr(&mut else_chunk, else_spanned);
         };
-        let else_offset = else_chunk.program_size();
+        let else_offset = self.get_program_size(&else_chunk);
         program.push(Instruction::JumpIf(then_offset));
         program.extend(then_chunk);
         program.push(Instruction::JumpForward(else_offset));
@@ -681,6 +689,15 @@ impl Frame {
     }
 }
 
+impl TryFrom<(&str, CompilerOptions)> for Machine {
+    type Error = anyhow::Error;
+    fn try_from((src, options): (&str, CompilerOptions)) -> std::result::Result<Self, Self::Error> {
+        let instructions = compile(src, options)?;
+        let program: Vec<u8> = instructions.iter().flat_map(|i| i.to_bytecode()).collect();
+        Ok(Self::new(program))
+    }
+}
+
 #[derive(Debug)]
 pub struct Machine {
     program: Vec<u8>,
@@ -689,12 +706,18 @@ pub struct Machine {
     stack: Vec<Frame>,
     ip: usize,
     is_running: bool,
-    #[cfg(debug_assertions)]
+    symbol_table: Option<SymbolTable>,
     breakpoints: Vec<usize>,
     #[cfg(debug_assertions)]
     debug_mode: DebugMode,
     #[cfg(any(debug_assertions, test))]
     cycle_count: usize,
+}
+
+impl Default for Machine {
+    fn default() -> Self {
+        Self::new(Vec::new())
+    }
 }
 
 impl Machine {
@@ -712,13 +735,48 @@ impl Machine {
             stack,
             ip: 0,
             is_running: true,
-            #[cfg(debug_assertions)]
+            symbol_table: None,
             breakpoints: Vec::new(),
             #[cfg(debug_assertions)]
             debug_mode: DebugMode::Off,
             #[cfg(any(debug_assertions, test))]
             cycle_count: 0,
         }
+    }
+
+    pub fn run_from_string(&mut self, src: &str) -> Result<()> {
+        self.is_running = true;
+
+        let ast = parser().parse(src).map_err(|e| {
+            anyhow::anyhow!(e.iter().map(|e| e.to_string() + "\n").collect::<String>())
+        })?;
+        let mut symbol_table = match self.symbol_table.take() {
+            Some(mut table) => {
+                SymbolTableBuilder::default().build_from_scope(&ast, &mut table);
+                table
+            }
+            None => SymbolTableBuilder::default().build(&ast),
+        };
+        let instructions = Compiler::new(&mut symbol_table, CompilerOptions { no_main: true })
+            .with_offset(self.program.len())
+            .compile(&ast)?;
+        self.symbol_table = Some(symbol_table);
+
+        let program: Vec<u8> = instructions.iter().flat_map(|i| i.to_bytecode()).collect();
+        self.program.extend(program);
+
+        self.run()?;
+        Ok(())
+    }
+
+    pub fn peek_last_stack_value(&self) -> Option<&Value> {
+        let frame = self.get_current_frame().ok()?;
+        frame.stack.last()
+    }
+
+    pub fn pop(&mut self) -> Option<Value> {
+        let frame = self.get_current_frame_mut().ok()?;
+        frame.stack.pop()
     }
 
     #[cfg(debug_assertions)]
@@ -782,8 +840,8 @@ impl Machine {
     }
 }
 
-#[cfg(debug_assertions)]
 impl Machine {
+    #[cfg(debug_assertions)]
     fn debugger(&mut self) -> Result<()> {
         use std::io::Write;
         let mut input = String::new();

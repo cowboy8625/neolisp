@@ -247,6 +247,9 @@ pub struct SymbolTableBuilder {
 }
 
 impl SymbolTableBuilder {
+    pub fn build_from_scope(&mut self, ast: &[Spanned<Expr>], table: &mut SymbolTable) {
+        self.walk(table, ast);
+    }
     pub fn build(&mut self, ast: &[Spanned<Expr>]) -> SymbolTable {
         let mut table = SymbolTable::default();
         self.walk(&mut table, ast);
