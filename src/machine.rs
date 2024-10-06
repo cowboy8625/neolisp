@@ -619,8 +619,26 @@ impl AstWalker<Program> for Compiler<'_> {
         program.push(Instruction::Call(call.args.len()));
     }
 
-    fn handle_var(&mut self, _: &mut Program, _: &VarExpr) {
-        todo!()
+    fn handle_var(&mut self, program: &mut Program, var: &VarExpr) {
+        let Expr::Symbol(name) = &var.name.expr else {
+            // TODO: REPORT ERROR
+            panic!("var name must be a symbol but found {:?}", var.name.expr);
+        };
+
+        self.walk_expr(program, var.body);
+
+        let Some(symbol) = self.symbol_table.lookup(name) else {
+            // TODO: REPORT ERROR
+            panic!("unknown symbol: {}", name);
+        };
+
+        let instruction = if symbol.scope == SymbolScope::Global {
+            Instruction::SetGlobal
+        } else {
+            Instruction::SetLocal
+        };
+
+        program.push(instruction);
     }
 
     fn handle_if_else(&mut self, program: &mut Program, if_else: &IfElseExpr) {
@@ -1506,7 +1524,14 @@ impl Machine {
     }
 
     fn instruction_get_global(&mut self) -> Result<()> {
-        todo!()
+        let index = self.get_u32()? as usize;
+        let Some(value) = self.global.get(index).cloned() else {
+            // TODO: ERROR REPORTING
+            panic!("no value on the global stack");
+        };
+        let frame = self.get_current_frame_mut()?;
+        frame.stack.push(value);
+        Ok(())
     }
 
     fn instruction_set_free(&mut self) -> Result<()> {
