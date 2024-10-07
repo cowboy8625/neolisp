@@ -624,11 +624,6 @@ impl AstWalker<Program> for Compiler<'_> {
             }
         }
 
-        eprintln!(
-            "name: {name} index: {index} start: {start} body_size: {body_size} total: {}",
-            start + body_size
-        );
-
         program[index] = Instruction::Jump(start + body_size);
 
         program.push(Instruction::Push(Box::new(Value::Callable(start))));
