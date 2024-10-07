@@ -582,9 +582,10 @@ impl AstWalker<Program> for Compiler<'_> {
     }
 
     fn handle_lambda(&mut self, program: &mut Program, lambda: &LambdaExpr) {
-        let jump_forward_instruciion_size = Instruction::Jump(0).size();
+        program.push(Instruction::Jump(usize::MAX));
+        let index = program.len() - 1;
+        let start = self.get_program_size(program);
         let name = self.get_lambda_name();
-        let start = self.get_program_size(program) + jump_forward_instruciion_size;
         self.symbol_table
             .set_location(Some(&name), &name, start as u32);
 
@@ -598,21 +599,38 @@ impl AstWalker<Program> for Compiler<'_> {
             );
         };
 
-        let mut body = Vec::new();
-        self.walk_expr(&mut body, lambda.body);
-        body.push(Instruction::Return);
+        self.walk_expr(program, lambda.body);
+        program.push(Instruction::Return);
 
         self.symbol_table.exit_scope();
 
-        let body_size = self.get_program_size(&body);
-        program.push(Instruction::Jump(start + body_size));
-        program.extend(body);
+        let Some(local_scope) = self.symbol_table.get_function_scope(&name) else {
+            // TODO: REPORT ERROR
+            panic!("no scope for {name:?}");
+        };
+
+        let body_size = self.get_program_size(program) - start;
+
+        for (_, symbol) in local_scope.iter() {
+            if symbol.kind == SymbolKind::FreeVariable {
+                let instruction = if symbol.scope == SymbolScope::Global {
+                    Instruction::GetGlobal(symbol.id)
+                } else {
+                    Instruction::GetLocal(symbol.id)
+                };
+                program.push(instruction);
+                // Self::emit_get_instruction(program, symbol);
+                program.push(Instruction::SetFree);
+            }
+        }
+
+        program[index] = Instruction::Jump(start + body_size);
 
         program.push(Instruction::Push(Box::new(Value::Callable(start))));
     }
 
     fn handle_call(&mut self, program: &mut Program, call: &CallExpr) {
-        for arg in call.args.iter() {
+        for arg in call.args.iter().rev() {
             self.walk_expr(program, arg);
         }
         self.walk_expr(program, call.callee);
@@ -1535,11 +1553,24 @@ impl Machine {
     }
 
     fn instruction_set_free(&mut self) -> Result<()> {
-        todo!()
+        let frame = self.get_current_frame_mut()?;
+        let Some(value) = frame.stack.pop() else {
+            // TODO: ERROR REPORTING
+            panic!("no value on the stack for SetFree");
+        };
+        self.free.push(value);
+        Ok(())
     }
 
     fn instruction_get_free(&mut self) -> Result<()> {
-        todo!()
+        let index = self.get_u32()? as usize;
+        let Some(value) = self.free.get(index).cloned() else {
+            // TODO: ERROR REPORTING
+            panic!("no value on the free stack at index {index}");
+        };
+        let frame = self.get_current_frame_mut()?;
+        frame.stack.push(value);
+        Ok(())
     }
 
     fn instruction_jump_if(&mut self) -> Result<()> {
