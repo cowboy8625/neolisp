@@ -1491,7 +1491,17 @@ impl Machine {
     }
 
     fn instruction_not(&mut self) -> Result<()> {
-        todo!()
+        let frame = self.get_current_frame_mut()?;
+        let Some(value) = frame.stack.pop() else {
+            panic!("expected value on stack for Not")
+        };
+        match value {
+            Value::Bool(b) => {
+                frame.stack.push(Value::Bool(!b));
+            }
+            _ => panic!("invalid types for Not"),
+        }
+        Ok(())
     }
 
     fn instruction_mod(&mut self) -> Result<()> {
