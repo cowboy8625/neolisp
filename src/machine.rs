@@ -9,7 +9,6 @@ use super::{
 };
 use anyhow::{anyhow, Result};
 use chumsky::prelude::Parser;
-use core::panic;
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
 
@@ -53,6 +52,7 @@ pub enum OpCode {
     Mod,
     Rot,
     Call,
+    TailCall,
     SetLocal,
     SetGlobal,
     SetFree,
@@ -85,6 +85,7 @@ pub enum Instruction {
     Mod,
     Rot,
     Call(usize),
+    TailCall(usize),
     SetLocal,
     SetGlobal,
     SetFree,
@@ -118,6 +119,7 @@ impl Instruction {
             Self::Mod => 1,
             Self::Rot => 1,
             Self::Call(_) => 2,
+            Self::TailCall(_) => 2,
             Self::SetLocal => 1,
             Self::SetGlobal => 1,
             Self::SetFree => 1,
@@ -151,6 +153,7 @@ impl Instruction {
             Self::Mod => OpCode::Mod,
             Self::Rot => OpCode::Rot,
             Self::Call(..) => OpCode::Call,
+            Self::TailCall(..) => OpCode::TailCall,
             Self::SetLocal => OpCode::SetLocal,
             Self::SetGlobal => OpCode::SetGlobal,
             Self::SetFree => OpCode::SetFree,
@@ -193,7 +196,7 @@ impl Instruction {
             | Self::SetLocal
             | Self::SetGlobal
             | Self::SetFree => bytes.push(self.opcode() as u8),
-            Self::Call(count) => {
+            Self::Call(count) | Self::TailCall(count) => {
                 bytes.push(self.opcode() as u8);
                 bytes.push(*count as u8);
             }
@@ -554,7 +557,7 @@ impl AstWalker<Program> for Compiler<'_> {
 
         self.symbol_table.enter_scope(name);
 
-        let Expr::List(_expr_params) = &function.params.expr else {
+        if !function.params.expr.is_list() {
             // TODO: REPORT ERROR
             panic!(
                 "expected list for params but found {:?}",
@@ -633,6 +636,25 @@ impl AstWalker<Program> for Compiler<'_> {
             self.walk_expr(program, arg);
         }
         self.walk_expr(program, call.callee);
+        if let Expr::Symbol(name) = &call.callee.expr {
+            let Some(symbol) = self.symbol_table.lookup(name) else {
+                // TODO: REPORT ERROR
+                panic!("unknown symbol: {}", name);
+            };
+
+            let has_same_scope_name = matches!(
+                self.symbol_table.get_current_scope_name(),
+                Some(name) if name == &symbol.name
+            );
+            let last_instruction_is_call = matches!(
+                program.last(),
+                Some(Instruction::Call(_)) | Some(Instruction::TailCall(_))
+            );
+            if symbol.is_self_reference() && has_same_scope_name && last_instruction_is_call {
+                program.push(Instruction::TailCall(call.args.len()));
+                return;
+            }
+        }
         program.push(Instruction::Call(call.args.len()));
     }
 
@@ -663,7 +685,7 @@ impl AstWalker<Program> for Compiler<'_> {
 
         let mut then_chunk = Vec::new();
         self.walk_expr(&mut then_chunk, if_else.then);
-        let then_offset = self.get_program_size(&then_chunk);
+        let then_offset = self.get_program_size(&then_chunk) + Instruction::JumpForward(0).size();
 
         let mut else_chunk = Vec::new();
         if let Some(else_spanned) = if_else.otherwise.as_ref() {
@@ -717,7 +739,7 @@ impl AstWalker<Program> for Compiler<'_> {
     }
 }
 
-const INSTRUCTION_CALL: [fn(&mut Machine) -> Result<()>; 28] = [
+const INSTRUCTION_CALL: [fn(&mut Machine) -> Result<()>; 29] = [
     Machine::instruction_halt,
     Machine::instruction_return,
     Machine::instruction_push,
@@ -736,6 +758,7 @@ const INSTRUCTION_CALL: [fn(&mut Machine) -> Result<()>; 28] = [
     Machine::instruction_mod,
     Machine::instruction_rot,
     Machine::instruction_call_function,
+    Machine::instruction_tail_call_function,
     Machine::instruction_set_local,
     Machine::instruction_set_global,
     Machine::instruction_set_free,
@@ -758,19 +781,17 @@ struct Frame {
 }
 
 impl Frame {
-    fn bring_to_top_of_stack(&mut self, count: usize) {
-        let length = self.stack.len();
-        self.stack[length - count..].rotate_left(count.saturating_sub(1));
-    }
-}
-
-impl Frame {
     fn new(return_address: usize, args: Vec<Value>) -> Self {
         Self {
             return_address: Some(return_address),
             args,
             stack: Vec::new(),
         }
+    }
+
+    fn bring_to_top_of_stack(&mut self, count: usize) {
+        let length = self.stack.len();
+        self.stack[length - count..].rotate_left(count.saturating_sub(1));
     }
 }
 
@@ -805,6 +826,12 @@ impl Default for Machine {
     }
 }
 
+// Constants
+impl Machine {
+    const MAX_STACK_FRAME_SIZE: usize = 1024;
+}
+
+// Public
 impl Machine {
     pub fn new(program: Vec<u8>) -> Self {
         let mut stack = Vec::with_capacity(1024);
@@ -1072,7 +1099,7 @@ impl Machine {
     }
 }
 
-// Helpers
+// Private
 impl Machine {
     fn shutdown(&mut self) {
         self.is_running = false;
@@ -1532,6 +1559,9 @@ impl Machine {
     }
 
     fn instruction_call_function(&mut self) -> Result<()> {
+        if self.stack.len() >= Self::MAX_STACK_FRAME_SIZE {
+            return Err(anyhow!("stack frame overflow at {}", self.ip));
+        }
         let count = self.get_u8()? as usize;
         let value = {
             let frame = self.get_current_frame_mut()?;
@@ -1552,14 +1582,41 @@ impl Machine {
                 panic!("can not call '{}' type", value);
             }
         };
-        let param_values = {
+        let mut param_values = {
             let frame = self.get_current_frame_mut()?;
             let length = frame.stack.len();
             frame.stack.split_off(length - count)
         };
 
+        param_values.reverse();
+
         let new_frame = Frame::new(self.ip, param_values);
         self.stack.push(new_frame);
+        self.ip = address;
+        Ok(())
+    }
+
+    fn instruction_tail_call_function(&mut self) -> Result<()> {
+        if self.stack.len() >= Self::MAX_STACK_FRAME_SIZE {
+            return Err(anyhow!("stack frame overflow at {}", self.ip));
+        }
+        let count = self.get_u8()? as usize;
+        let frame = self.get_current_frame_mut()?;
+
+        let Some(value) = frame.stack.pop() else {
+            // TODO: ERROR REPORT;
+            panic!("missing callable value on stack");
+        };
+        let Value::Callable(address) = value else {
+            // TODO: ERROR REPORT;
+            panic!("can not call '{}' type", value);
+        };
+
+        let length = frame.stack.len();
+        let mut param_values = frame.stack.split_off(length - count);
+        param_values.reverse();
+
+        frame.args = param_values;
         self.ip = address;
         Ok(())
     }
@@ -1697,6 +1754,9 @@ impl Machine {
                 OpCode::Mod => instructions.push(Instruction::Mod),
                 OpCode::Rot => instructions.push(Instruction::Rot),
                 OpCode::Call => instructions.push(Instruction::Call(self.get_u8()? as usize)),
+                OpCode::TailCall => {
+                    instructions.push(Instruction::TailCall(self.get_u8()? as usize))
+                }
                 OpCode::SetLocal => instructions.push(Instruction::SetLocal),
                 OpCode::SetGlobal => instructions.push(Instruction::SetGlobal),
                 OpCode::SetFree => instructions.push(Instruction::SetFree),

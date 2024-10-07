@@ -12,6 +12,9 @@ pub struct SymbolTable {
     global_scope: HashMap<String, Symbol>, // Permanent global scope
     function_scopes: HashMap<String, HashMap<String, Symbol>>, // Persistent function scopes
     scope_stack: Vec<HashMap<String, Symbol>>, // Stack for temporary scopes during AST walk
+    // TODO: scope_stack needs to hold the scope name too some how.  While it technically does
+    // already there is not a good way to get it out.
+    scope_name: Vec<String>, // Name of the current scope
 }
 
 impl SymbolTable {
@@ -33,25 +36,37 @@ impl SymbolTable {
                 location: None,
             },
         )]);
+        self.scope_name.push(name.to_string());
         self.scope_stack.push(scope);
     }
 
-    /// Exit the current scope (pops the top scope off the stack)
+    // TODO: get ride of the need to pass the name as we are storing the name already.
+
+    /// Exit the current scope (pops the top scope off the stac)
     pub fn exit_new_scope(&mut self, current_function: Option<&str>) {
         let Some(scope) = self.scope_stack.pop() else {
+            // TODO: REPORT ERROR
             panic!("No current scope for {}", current_function.unwrap_or("N/A"));
         };
         // If exiting a function, store the scope in `function_scopes`
         if let Some(func_name) = current_function {
             self.function_scopes.insert(func_name.to_string(), scope);
         }
+        let name = self.scope_name.pop();
+        debug_assert_eq!(name, current_function.map(ToString::to_string));
     }
 
     pub fn enter_scope(&mut self, name: &str) {
         let Some(scope) = self.function_scopes.get(name) else {
+            // TODO: REPORT ERROR
             panic!("Can not enter scope {name} as it does not exist");
         };
+        self.scope_name.push(name.to_string());
         self.scope_stack.push(scope.clone());
+    }
+
+    pub fn get_current_scope_name(&self) -> Option<&String> {
+        self.scope_name.last()
     }
 
     pub fn exit_scope(&mut self) {
@@ -78,6 +93,7 @@ impl SymbolTable {
 
         // Fall back to global scope
         let Some(symbol) = self.global_scope.get_mut(name) else {
+            // TODO: REPORT ERROR
             panic!("location of `{name}` has not initialized {:#?}", self);
         };
 
@@ -203,6 +219,15 @@ pub struct Symbol {
 }
 
 impl Symbol {
+    pub fn is_self_reference(&self) -> bool {
+        match self.symbol_type {
+            SymbolType::Function {
+                ref self_reference, ..
+            } => *self_reference,
+            _ => false,
+        }
+    }
+
     pub fn make_recursive(&mut self) {
         match self.symbol_type {
             SymbolType::Function {
