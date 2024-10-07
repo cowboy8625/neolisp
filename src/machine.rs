@@ -695,8 +695,9 @@ impl AstWalker<Program> for Compiler<'_> {
         program.push(Instruction::JumpBackward(start_offset));
     }
 
-    fn handle_bool(&mut self, _: &mut Program, _: bool) {
-        todo!()
+    fn handle_bool(&mut self, program: &mut Program, b: bool) {
+        let value = Value::Bool(b);
+        program.push(Instruction::Push(Box::new(value)));
     }
 
     fn handle_string(&mut self, program: &mut Program, string: &str) {
