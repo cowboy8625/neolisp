@@ -1505,7 +1505,24 @@ impl Machine {
     }
 
     fn instruction_mod(&mut self) -> Result<()> {
-        todo!()
+        let frame = self.get_current_frame_mut()?;
+        let Some(right) = frame.stack.pop() else {
+            panic!("expected value on stack for Mod")
+        };
+        let Some(left) = frame.stack.last() else {
+            panic!("expected value on stack for Mod")
+        };
+        let last_index = frame.stack.len() - 1;
+        match (left, right) {
+            (Value::I32(left), Value::I32(right)) => {
+                frame.stack[last_index] = Value::I32(left % right);
+            }
+            (Value::F64(left), Value::F64(right)) => {
+                frame.stack[last_index] = Value::F64(left % right);
+            }
+            _ => panic!("invalid types for Mod"),
+        }
+        Ok(())
     }
 
     fn instruction_rot(&mut self) -> Result<()> {
