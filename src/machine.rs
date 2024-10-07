@@ -1565,6 +1565,12 @@ impl Machine {
     }
 
     fn instruction_set_local(&mut self) -> Result<()> {
+        let frame = self.get_current_frame_mut()?;
+        let Some(value) = frame.stack.pop() else {
+            // TODO: ERROR REPORT;
+            panic!("no value on stack for SetLocal");
+        };
+        frame.args.push(value);
         Ok(())
     }
 
