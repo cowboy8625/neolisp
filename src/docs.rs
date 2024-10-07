@@ -38,10 +38,7 @@ fn doc_parser() -> impl Parser<char, HashMap<String, String>, Error = Simple<cha
 }
 
 pub fn load_doc() -> HashMap<String, String> {
-    let mut path = std::env::current_dir().unwrap();
-    path.push("Docs.md");
-
-    let src = std::fs::read_to_string(path).unwrap();
+    let src = include_str!("../Docs.md");
     let ast = doc_parser().parse(src);
     match ast {
         Ok(ast) => ast,

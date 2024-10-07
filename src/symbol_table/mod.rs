@@ -348,7 +348,9 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         }
 
         // Body of the function
-        self.walk_expr(table, function.body);
+        for spanned in function.body.iter() {
+            self.walk_expr(table, spanned);
+        }
 
         {
             let function_symbol = table
@@ -403,7 +405,9 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         }
 
         // Body of the function
-        self.walk_expr(table, lambda.body);
+        for spanned in lambda.body.iter() {
+            self.walk_expr(table, spanned);
+        }
 
         {
             let lambda_symbol = table

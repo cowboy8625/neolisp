@@ -399,11 +399,18 @@ impl ProgramSize for Program {
 }
 
 #[derive(Debug)]
+struct UnsetLocation {
+    index: usize,
+    name: String,
+}
+
+#[derive(Debug)]
 pub struct Compiler<'a> {
     symbol_table: &'a mut SymbolTable,
     lambda_counter: usize,
     options: CompilerOptions,
     offset: usize,
+    unset_locations: Vec<UnsetLocation>,
 }
 
 impl<'a> Compiler<'a> {
@@ -413,6 +420,7 @@ impl<'a> Compiler<'a> {
             lambda_counter: 0,
             options,
             offset: 0,
+            unset_locations: Vec::new(),
         }
     }
 
@@ -434,6 +442,32 @@ impl<'a> Compiler<'a> {
                 panic!("Main function location is unknown");
             };
             program.push(Instruction::Jump(location as usize));
+        }
+
+        for UnsetLocation { index, name } in self.unset_locations.iter() {
+            eprintln!("{index} {name}");
+            let Some(symbol) = self.symbol_table.lookup(name) else {
+                // TODO: REPORT ERROR
+                panic!("Variable `{}` is not defined", name,);
+            };
+            let Some(location) = symbol.location else {
+                // TODO: REPORT ERROR
+                panic!("Variable `{}` location is unknown", name,);
+            };
+            let instruction = &mut program[*index];
+            match instruction {
+                Instruction::Push(value) => match value.as_mut() {
+                    Value::Callable(i) => *i = location as usize,
+                    _ => {
+                        // TODO: REPORT ERROR
+                        panic!("expected push but found {instruction:?}");
+                    }
+                },
+                _ => {
+                    // TODO: REPORT ERROR
+                    panic!("expected push but found {instruction:?}");
+                }
+            }
         }
         Ok(program)
     }
@@ -461,7 +495,7 @@ impl<'a> Compiler<'a> {
     }
 
     #[allow(dead_code)]
-    fn emit_set_instruction(program: &mut Program, symbol: &Symbol) {
+    fn emit_set_instruction(&mut self, program: &mut Program, symbol: &Symbol) {
         match symbol.kind {
             SymbolKind::FreeVariable => program.push(Instruction::SetFree),
             SymbolKind::Variable => match symbol.scope {
@@ -475,7 +509,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    fn emit_get_instruction(program: &mut Program, symbol: &Symbol) {
+    fn emit_get_instruction(&mut self, program: &mut Program, symbol: Symbol) {
         let id = symbol.id;
         match symbol.kind {
             SymbolKind::FreeVariable => program.push(Instruction::GetFree(id)),
@@ -493,7 +527,16 @@ impl<'a> Compiler<'a> {
             SymbolKind::Function if BUILTINS.contains(&symbol.name.as_str()) => {
                 todo!("BUILTINS {}", symbol.name)
             }
-            SymbolKind::Function => todo!("Function {}", symbol.name),
+            SymbolKind::Function => {
+                let location = usize::MAX;
+                let value = Value::Callable(location);
+                program.push(Instruction::Push(Box::new(value)));
+                let index = program.len();
+                self.unset_locations.push(UnsetLocation {
+                    index,
+                    name: symbol.name.clone(),
+                });
+            }
             SymbolKind::Lambda => todo!(),
         }
     }
@@ -566,7 +609,9 @@ impl AstWalker<Program> for Compiler<'_> {
         };
 
         let mut body = Vec::new();
-        self.walk_expr(&mut body, function.body);
+        for spanned in function.body.iter() {
+            self.walk_expr(&mut body, spanned);
+        }
 
         if name == "main" {
             body.push(Instruction::Halt);
@@ -602,7 +647,9 @@ impl AstWalker<Program> for Compiler<'_> {
             );
         };
 
-        self.walk_expr(program, lambda.body);
+        for spanned in lambda.body.iter() {
+            self.walk_expr(program, spanned);
+        }
         program.push(Instruction::Return);
 
         self.symbol_table.exit_scope();
@@ -731,11 +778,11 @@ impl AstWalker<Program> for Compiler<'_> {
     }
 
     fn handle_symbol(&mut self, program: &mut Program, name: &str) {
-        let Some(symbol) = self.symbol_table.lookup(name) else {
+        let Some(symbol) = self.symbol_table.lookup(name).cloned() else {
             // TODO: REPORT ERROR
             panic!("Variable `{}` is not defined", name,);
         };
-        Self::emit_get_instruction(program, symbol);
+        self.emit_get_instruction(program, symbol);
     }
 }
 
@@ -1507,6 +1554,14 @@ impl Machine {
         let mut left = args[0].clone();
         for right in args.iter().skip(1) {
             match (left, right) {
+                (Value::Bool(true), Value::Bool(_)) => {
+                    left = Value::Bool(true);
+                    break;
+                }
+                (Value::Bool(_), Value::Bool(true)) => {
+                    left = Value::Bool(true);
+                    break;
+                }
                 (Value::Bool(l), Value::Bool(r)) => {
                     left = Value::Bool(l || *r);
                 }

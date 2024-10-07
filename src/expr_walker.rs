@@ -25,14 +25,14 @@ pub struct LoopExpr<'a> {
 #[derive(Debug)]
 pub struct LambdaExpr<'a> {
     pub params: &'a Spanned<Expr>,
-    pub body: &'a Spanned<Expr>,
+    pub body: &'a [&'a Spanned<Expr>],
 }
 
 #[derive(Debug)]
 pub struct FunctionExpr<'a> {
     pub name: &'a Spanned<Expr>,
     pub params: &'a Spanned<Expr>,
-    pub body: &'a Spanned<Expr>,
+    pub body: &'a [&'a Spanned<Expr>],
 }
 
 #[derive(Debug)]
@@ -165,20 +165,12 @@ pub trait AstWalker<T> {
         const PARAMS: usize = 1;
         const BODY: usize = 2;
 
-        // TODO: Remove this once we report good errors
-        debug_assert_eq!(
-            elements.len(),
-            3,
-            "(lambda (<params>) ( <body> ) | expr) {:#?}",
-            elements
-        );
-
         let Some(params_spanned) = &elements.get(PARAMS) else {
             // TODO: REPORT ERROR
             panic!("expected list for params");
         };
 
-        let Expr::List(_) = &params_spanned.expr else {
+        if !params_spanned.expr.is_list() {
             // TODO: REPORT ERROR
             panic!(
                 "expected list for params but found {:?}",
@@ -186,14 +178,11 @@ pub trait AstWalker<T> {
             );
         };
 
-        let Some(body_spanned) = &elements.get(BODY) else {
-            // TODO: REPORT ERROR
-            panic!("expected expr for body");
-        };
+        let body_list = &elements.iter().skip(BODY).collect::<Vec<_>>();
 
         let function = LambdaExpr {
             params: params_spanned,
-            body: body_spanned,
+            body: body_list,
         };
 
         self.handle_lambda(t, &function);
@@ -203,11 +192,6 @@ pub trait AstWalker<T> {
         const NAME: usize = 1;
         const PARAMS: usize = 2;
         const BODY: usize = 3;
-
-        debug_assert!(
-            elements.len() == 4,
-            "(fn <name> (<params>) ( <body> ) | expr)"
-        );
 
         let Some(name_spanned) = elements.get(NAME) else {
             // TODO: REPORT ERROR: This should call a self.report_error(FunctionMissingName(span))
@@ -219,23 +203,20 @@ pub trait AstWalker<T> {
             panic!("expected list for params");
         };
 
-        let Expr::List(_) = &params_spanned.expr else {
+        if !params_spanned.expr.is_list() {
             // TODO: REPORT ERROR
             panic!(
                 "expected list for params but found {:?}",
                 params_spanned.expr
             );
-        };
+        }
 
-        let Some(body_spanned) = &elements.get(BODY) else {
-            // TODO: REPORT ERROR
-            panic!("expected expr for body");
-        };
+        let body_list = &elements.iter().skip(BODY).collect::<Vec<_>>();
 
         let function = FunctionExpr {
             name: name_spanned,
             params: params_spanned,
-            body: body_spanned,
+            body: body_list,
         };
 
         self.handle_function(t, &function);

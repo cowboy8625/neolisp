@@ -7,22 +7,28 @@
 - arguments
    1. `Symbol`: name of the function
    2. `List`: arguments
-   3. `List`: body
+   3. `expressions`: body
 - example:
 ```lisp
 (fn add (x y) (+ x y))
 (add 10 20) ; -> 30
+(fn id (x) x)
+(id 10) ; -> 10
+(fn any-number-of-expressions-in-body (x y z) (var a 10)(+ a x y z))
 ```
 
 ### lambda
 - returns a `Function`
 - arguments
    1. `List`: arguments
-   2. `List`: body
+   2. `expression`: body
 - example:
 ```lisp
 (lambda (x y) (+ x y))
 (10 20) ; -> 30
+(fn id (x) x)
+(id 10) ; -> 10
+(fn any-number-of-expressions-in-body (x y z) (var a 10)(+ a x y z))
 ```
 
 ### var
