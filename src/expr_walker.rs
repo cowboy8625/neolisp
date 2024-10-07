@@ -165,7 +165,13 @@ pub trait AstWalker<T> {
         const PARAMS: usize = 1;
         const BODY: usize = 2;
 
-        debug_assert!(elements.len() == 3, "(lambda (<params>) ( <body> ) | expr)");
+        // TODO: Remove this once we report good errors
+        debug_assert_eq!(
+            elements.len(),
+            3,
+            "(lambda (<params>) ( <body> ) | expr) {:#?}",
+            elements
+        );
 
         let Some(params_spanned) = &elements.get(PARAMS) else {
             // TODO: REPORT ERROR
