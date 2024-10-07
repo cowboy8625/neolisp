@@ -619,7 +619,6 @@ impl AstWalker<Program> for Compiler<'_> {
                     Instruction::GetLocal(symbol.id)
                 };
                 program.push(instruction);
-                // Self::emit_get_instruction(program, symbol);
                 program.push(Instruction::SetFree);
             }
         }
@@ -756,6 +755,13 @@ struct Frame {
     pub return_address: Option<usize>,
     pub args: Vec<Value>,
     pub stack: Vec<Value>,
+}
+
+impl Frame {
+    fn bring_to_top_of_stack(&mut self, count: usize) {
+        let length = self.stack.len();
+        self.stack[length - count..].rotate_left(count.saturating_sub(1));
+    }
 }
 
 impl Frame {
@@ -1493,7 +1499,9 @@ impl Machine {
     }
 
     fn instruction_rot(&mut self) -> Result<()> {
-        todo!()
+        let frame = self.get_current_frame_mut()?;
+        frame.bring_to_top_of_stack(2);
+        Ok(())
     }
 
     fn instruction_call_function(&mut self) -> Result<()> {
