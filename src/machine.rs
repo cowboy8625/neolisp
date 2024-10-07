@@ -677,8 +677,22 @@ impl AstWalker<Program> for Compiler<'_> {
         program.extend(else_chunk);
     }
 
-    fn handle_loop(&mut self, _: &mut Program, _: &LoopExpr) {
-        todo!()
+    fn handle_loop(&mut self, program: &mut Program, r#loop: &LoopExpr) {
+        let mut chunk_condition = Vec::new();
+        self.walk_expr(&mut chunk_condition, r#loop.condition);
+
+        let mut chunk_body = Vec::new();
+        self.walk_expr(&mut chunk_body, r#loop.body);
+
+        let body_offset = chunk_body.program_size();
+        let start_offset = body_offset
+            + chunk_condition.program_size()
+            + Instruction::JumpIf(0).size()
+            + Instruction::JumpBackward(0).size();
+        program.extend(chunk_condition);
+        program.push(Instruction::JumpIf(body_offset));
+        program.extend(chunk_body);
+        program.push(Instruction::JumpBackward(start_offset));
     }
 
     fn handle_bool(&mut self, _: &mut Program, _: bool) {
