@@ -1,7 +1,8 @@
 use super::{
     ast::{Expr, Spanned},
     expr_walker::{
-        AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LoopExpr, OperatorExpr, VarExpr,
+        AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr, LoopExpr,
+        OperatorExpr, VarExpr,
     },
     parser::parser,
     symbol_table::{Symbol, SymbolKind, SymbolScope, SymbolTable, SymbolTableBuilder},
@@ -11,25 +12,7 @@ use anyhow::{anyhow, Result};
 use chumsky::prelude::Parser;
 use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::FromPrimitive;
-
-#[cfg(debug_assertions)]
-const RED: &str = "\x1b[31m";
-const GREEN: &str = "\x1b[32m";
-const UNDERLINE: &str = "\x1b[4m";
-const RESET: &str = "\x1b[0m";
-
-#[cfg(debug_assertions)]
-#[derive(Debug, Default)]
-pub enum DebugMode {
-    #[default]
-    Off,
-    Pause,
-    PauseAndDisplay,
-    Step,
-    StepAndDisplay,
-    Continue,
-    ContinueStart,
-}
+use std::io::Write;
 
 #[derive(Debug, Clone, PartialEq, FromPrimitive, ToPrimitive)]
 #[repr(u8)]
@@ -493,7 +476,6 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    #[allow(dead_code)]
     fn emit_set_instruction(&mut self, program: &mut Program, symbol: &Symbol) {
         match symbol.kind {
             SymbolKind::FreeVariable => program.push(Instruction::SetFree),
@@ -912,7 +894,7 @@ const INTRISICS: [fn(&mut Machine, u8) -> Result<()>; 25] = [
 ];
 
 #[derive(Debug)]
-struct Frame {
+pub(crate) struct Frame {
     pub return_address: Option<usize>,
     pub args: Vec<Value>,
     pub stack: Vec<Value>,
@@ -942,20 +924,23 @@ impl TryFrom<(&str, CompilerOptions)> for Machine {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct MachineOptions {
+    pub quiet: bool,
+}
+
 #[derive(Debug)]
 pub struct Machine {
-    program: Vec<u8>,
-    global: Vec<Value>,
-    free: Vec<Value>,
-    stack: Vec<Frame>,
-    ip: usize,
-    is_running: bool,
-    symbol_table: Option<SymbolTable>,
-    breakpoints: Vec<usize>,
-    #[cfg(debug_assertions)]
-    debug_mode: DebugMode,
+    pub(crate) options: MachineOptions,
+    pub(crate) program: Vec<u8>,
+    pub(crate) global: Vec<Value>,
+    pub(crate) free: Vec<Value>,
+    pub(crate) stack: Vec<Frame>,
+    pub(crate) ip: usize,
+    pub(crate) is_running: bool,
+    pub(crate) symbol_table: Option<SymbolTable>,
     #[cfg(any(debug_assertions, test))]
-    cycle_count: usize,
+    pub(crate) cycle_count: usize,
 }
 
 impl Default for Machine {
@@ -979,6 +964,7 @@ impl Machine {
             stack: Vec::with_capacity(1024),
         });
         Self {
+            options: MachineOptions::default(),
             program,
             global: Vec::with_capacity(1024),
             free: Vec::with_capacity(1024),
@@ -986,15 +972,20 @@ impl Machine {
             ip: 0,
             is_running: true,
             symbol_table: None,
-            breakpoints: Vec::new(),
-            #[cfg(debug_assertions)]
-            debug_mode: DebugMode::Off,
             #[cfg(any(debug_assertions, test))]
             cycle_count: 0,
         }
     }
 
-    pub fn run_from_string(&mut self, src: &str) -> Result<()> {
+    pub fn set_options(&mut self, options: MachineOptions) {
+        self.options = options;
+    }
+
+    pub fn is_running(&self) -> bool {
+        self.is_running
+    }
+
+    pub fn load_from_string(&mut self, src: &str) -> Result<()> {
         self.is_running = true;
 
         let ast = parser().parse(src).map_err(|e| {
@@ -1014,7 +1005,11 @@ impl Machine {
 
         let program: Vec<u8> = instructions.iter().flat_map(|i| i.to_bytecode()).collect();
         self.program.extend(program);
+        Ok(())
+    }
 
+    pub fn run_from_string(&mut self, src: &str) -> Result<()> {
+        self.load_from_string(src)?;
         self.run()?;
         Ok(())
     }
@@ -1024,14 +1019,40 @@ impl Machine {
         frame.stack.last()
     }
 
-    pub fn pop(&mut self) -> Option<Value> {
-        let frame = self.get_current_frame_mut().ok()?;
-        frame.stack.pop()
+    pub fn push(&mut self, value: Value) -> Result<()> {
+        let frame = self.get_current_frame_mut()?;
+        frame.stack.push(value);
+        Ok(())
     }
 
-    #[cfg(debug_assertions)]
-    pub fn add_breakpoint(&mut self, ip: usize) {
-        self.breakpoints.push(ip);
+    pub fn pop(&mut self) -> Result<Option<Value>> {
+        let frame = self.get_current_frame_mut()?;
+        Ok(frame.stack.pop())
+    }
+
+    pub fn call_from_address(&mut self, address: usize, count: u8) -> Result<()> {
+        let param_values = {
+            let frame = self.get_current_frame_mut()?;
+            let length = frame.stack.len();
+            frame.stack.split_off(length - count as usize)
+        };
+
+        let new_frame = Frame::new(self.ip, param_values);
+        self.stack.push(new_frame);
+        self.ip = address;
+
+        while self.ip < self.program.len() {
+            let Some(byte) = self.peek_u8() else {
+                // TODO: ERROR REPORTING
+                panic!("missing opcode on stack");
+            };
+            if let Some(OpCode::Return) = OpCode::from_u8(*byte) {
+                self.instruction_return()?;
+                break;
+            }
+            self.run_once()?;
+        }
+        Ok(())
     }
 
     pub fn run_once(&mut self) -> Result<()> {
@@ -1040,37 +1061,12 @@ impl Machine {
             self.cycle_count += 1;
         }
 
-        #[cfg(debug_assertions)]
-        match self.debug_mode {
-            DebugMode::Off if self.breakpoints.contains(&self.ip) => {
-                self.debug_mode = DebugMode::PauseAndDisplay;
-                return Ok(());
-            }
-            DebugMode::Off => {}
-            DebugMode::Pause => {
-                self.debugger()?;
-                return Ok(());
-            }
-            DebugMode::PauseAndDisplay => {
-                self.debug_mode = DebugMode::Pause;
-                self.debug()?;
-                self.debugger()?;
-                return Ok(());
-            }
-            DebugMode::Step => self.debug_mode = DebugMode::Pause,
-            DebugMode::StepAndDisplay => self.debug_mode = DebugMode::PauseAndDisplay,
-            DebugMode::Continue if self.breakpoints.contains(&self.ip) => {
-                self.debug_mode = DebugMode::PauseAndDisplay;
-                return Ok(());
-            }
-            DebugMode::Continue => {}
-            DebugMode::ContinueStart => self.debug_mode = DebugMode::Continue,
-        }
-
         let Ok(opcode) = self.get_u8() else {
             self.shutdown();
             #[cfg(debug_assertions)]
-            eprintln!("END PROGRAM {}..{}", self.ip, self.program.len());
+            if !self.options.quiet {
+                eprintln!("END PROGRAM {}..{}", self.ip, self.program.len());
+            }
             return Ok(());
         };
         INSTRUCTION_CALL[opcode as usize](self)?;
@@ -1083,155 +1079,9 @@ impl Machine {
             self.run_once()?;
         }
         #[cfg(any(debug_assertions, test))]
-        eprintln!("cycles: {}", self.cycle_count);
-        #[cfg(any(debug_assertions, test))]
-        eprintln!("stack {:#?}", self.stack);
-        Ok(())
-    }
-}
-
-impl Machine {
-    #[cfg(debug_assertions)]
-    fn debugger(&mut self) -> Result<()> {
-        use std::io::Write;
-        let mut input = String::new();
-        let mut result = Vec::new();
-        while input.is_empty() {
-            print!("{RED}debugger> {RESET}");
-            std::io::stdout().flush().unwrap();
-            std::io::stdin().read_line(&mut input).unwrap();
-            result = input.trim().split(' ').collect::<Vec<_>>();
-        }
-        match result[0] {
-            "ni" => {
-                let temp = self.ip;
-                eprintln!("{:?}", OpCode::from_u8(self.get_u8()?));
-                self.ip = temp;
-            }
-            "set-ip" if result.len() == 2 => {
-                let Ok(ip) = result[1].parse::<usize>() else {
-                    println!("set-ip <ip> not {RED}{}{RESET}", result[1]);
-                    return Ok(());
-                };
-                self.ip = ip;
-            }
-            "d" | "display" => self.debug()?,
-            "h" | "help" => {
-                println!("h  help");
-                println!("pfs  print-free-stack");
-                println!("pls  print-local-stack");
-                println!("pgs  print-global-stack");
-                println!("ps   print-stack");
-                println!("p    print <index>");
-                println!("b    breakpoint <ip>");
-                println!("c    continue");
-                println!("n    next");
-                println!("rot  rotate <count>");
-                println!("ip   shows ip address");
-                println!("nd   run <next> and <display>");
-                println!("q    quit");
-            }
-            "pfs" | "print-free-stack" => {
-                println!("FREE STACK:");
-                for (i, item) in self.free.iter().rev().enumerate() {
-                    println!("0x{i:02X}: {item}");
-                }
-            }
-            "pls" | "print-local-stack" => {
-                let frame = self.get_current_frame()?;
-                for (i, item) in frame.stack.iter().rev().enumerate() {
-                    println!("0x{i:02X}: {item:?}");
-                }
-            }
-            "pgs" | "print-global-stack" => {
-                println!("GLOBAL STACK:");
-                for (i, item) in self.global.iter().rev().enumerate() {
-                    println!("0x{i:02X}: {item}");
-                }
-            }
-            "ps" | "print-stack" => {
-                println!("STACK:");
-                for (i, item) in self.stack.iter().rev().enumerate() {
-                    println!("0x{i:02X}: {item:#?}");
-                }
-            }
-            "p" | "print" if result.len() == 2 => {
-                let Ok(stack_index) = result[1].parse::<usize>() else {
-                    println!("print <index> not {RED}{}{RESET}", result[1]);
-                    return Ok(());
-                };
-
-                if stack_index >= self.stack.len() {
-                    println!(
-                        "The stack size is {} but your index is out of range {}",
-                        self.stack.len(),
-                        stack_index
-                    );
-                    return Ok(());
-                }
-
-                let frame = self.get_current_frame()?;
-                let item = &frame.stack[self.stack.len() - 1 - stack_index];
-                println!("{item}");
-            }
-            "b" | "breakpoint" if result.len() == 2 => {
-                let Ok(ip) = result[1].parse::<usize>() else {
-                    println!("breakpoint <ip> not {RED}{}{RESET}", result[1]);
-                    return Ok(());
-                };
-                self.add_breakpoint(ip);
-            }
-            "p" | "print" => eprintln!("print <index>"),
-            "c" | "continue" => self.debug_mode = DebugMode::ContinueStart,
-            "n" | "next" => self.debug_mode = DebugMode::Step,
-            "rot" if result.len() == 2 => {
-                let Ok(count) = result[1].parse::<usize>() else {
-                    println!("rotate <count> not {RED}{}{RESET}", result[1]);
-                    return Ok(());
-                };
-                println!("ROT BY: {count}");
-                println!("{:?}", self.stack);
-                let mut temp = Vec::new();
-                for _ in 0..count {
-                    temp.push(self.stack.pop().unwrap());
-                }
-                for item in temp.into_iter() {
-                    self.stack.push(item);
-                }
-                println!("{:?}", self.stack);
-            }
-            "ip" => println!("ip: 0x{:02X}, {0}", self.ip),
-            "nd" => self.debug_mode = DebugMode::StepAndDisplay,
-            "q" | "quit" => self.shutdown(),
-            _ => println!("{RED}unknown command{RESET} {input}"),
-        }
-        Ok(())
-    }
-
-    pub fn debug(&mut self) -> Result<()> {
-        let instructions = self.decompile()?;
-        let mut offset = 0;
-        for int in instructions.iter() {
-            let selected = if self.ip == offset {
-                format!("{GREEN}{UNDERLINE}0x{offset:02X} {offset:>3} ")
-            } else {
-                format!("0x{offset:02X} {offset:>3} ")
-            };
-            let breakpoint = if self.breakpoints.contains(&offset) {
-                "🔴".to_string()
-            } else {
-                "  ".to_string()
-            };
-            let bytecode = int
-                .to_bytecode()
-                .into_iter()
-                .fold(String::new(), |acc, i| format!("{acc}{i:02X} "));
-            let debug_int = format!("{int:?}");
-            eprintln!(
-                "{breakpoint}{selected} {debug_int:<20} {}{RESET}",
-                bytecode.trim()
-            );
-            offset += int.size();
+        if !self.options.quiet {
+            eprintln!("cycles: {}", self.cycle_count);
+            eprintln!("stack {:#?}", self.stack);
         }
         Ok(())
     }
@@ -1292,6 +1142,10 @@ impl Machine {
             }
             _ => Err(anyhow!("Unknown value `{}`", self.program[self.ip])),
         }
+    }
+
+    fn peek_u8(&mut self) -> Option<&u8> {
+        self.program.get(self.ip)
     }
 
     fn get_u8(&mut self) -> Result<u8> {
@@ -1386,7 +1240,7 @@ impl Machine {
         Ok(String::from_utf8(bytes)?)
     }
 
-    fn get_current_frame(&self) -> Result<&Frame> {
+    pub(crate) fn get_current_frame(&self) -> Result<&Frame> {
         self.stack
             .last()
             .map_or_else(|| Err(anyhow!("Stack is empty")), Ok)
@@ -1865,7 +1719,7 @@ impl Machine {
 
 // --------------------- Decompiler ---------------------
 impl Machine {
-    fn decompile(&mut self) -> Result<Vec<Instruction>> {
+    pub fn decompile(&mut self) -> Result<Vec<Instruction>> {
         let mut instructions = Vec::new();
         let program_size = self.program.len();
         let ip_address = self.ip;

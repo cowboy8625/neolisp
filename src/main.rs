@@ -23,20 +23,10 @@ fn main() -> anyhow::Result<()> {
         Command::Run {
             decompile,
             file,
-            #[cfg(debug_assertions)]
-            breakpoints,
             new_vm,
             no_main,
             ..
-        } if new_vm => run_new_vm(
-            file,
-            #[cfg(debug_assertions)]
-            {
-                breakpoints
-            },
-            decompile,
-            no_main,
-        ),
+        } if new_vm => run_new_vm(file, decompile, no_main),
         Command::Run {
             #[cfg(debug_assertions)]
             breakpoints,
@@ -115,12 +105,7 @@ fn run(
     Ok(())
 }
 
-fn run_new_vm(
-    file: Option<String>,
-    #[cfg(any(debug_assertions, test))] breakpoints: Vec<usize>,
-    decompile: bool,
-    no_main: bool,
-) -> anyhow::Result<()> {
+fn run_new_vm(file: Option<String>, decompile: bool, no_main: bool) -> anyhow::Result<()> {
     let filename = file.unwrap_or("main.nl".to_string());
 
     let src = std::fs::read_to_string(filename)?;
@@ -138,11 +123,6 @@ fn run_new_vm(
     }
     let program: Vec<u8> = instructions.iter().flat_map(|i| i.to_bytecode()).collect();
     let mut vm = neolisp::machine::Machine::new(program);
-
-    #[cfg(debug_assertions)]
-    for breakpoint in breakpoints {
-        vm.add_breakpoint(breakpoint);
-    }
 
     vm.run()?;
 

@@ -1,8 +1,9 @@
 use crate::cli::Cli;
+use crate::debugger::Debugger;
 use crate::docs;
-use crate::parser::parser;
+use crate::machine::{Machine, MachineOptions};
 use anyhow::Result;
-use chumsky::prelude::Parser;
+use crossterm::style::Stylize;
 use rustyline::config::Configurer;
 use rustyline::highlight::MatchingBracketHighlighter;
 use rustyline::validate::MatchingBracketValidator;
@@ -10,11 +11,12 @@ use rustyline::{Cmd, Editor, EventHandler, KeyCode, KeyEvent, Modifiers};
 use rustyline::{Completer, Helper, Highlighter, Hinter, Validator};
 const HELP: &str = r#"
 commands
-:q|e|exit|quit             - quit
-:help                      - show this help message
-:clear                     - clear the terminal screen
-:help-doc <function name>  - with a give function name will return the help documentation
-:output-mode <ast|op|eval> - set the output mode
+:q|e|exit|quit              - quit
+:help                       - show this help message
+:clear                      - clear the terminal screen
+:help-doc <function name>   - with a give function name will return the help documentation
+:debugger                   - start the debugger
+:builtin-id <function name> - with a give function name will return the builtin id
 "#;
 struct ShouldRunIfThereIsANewLine;
 
@@ -43,20 +45,22 @@ impl rustyline::ConditionalEventHandler for ShouldRunIfThereIsANewLine {
     }
 }
 
+enum ReplCommand {
+    Exit,
+    Help,
+    Clear,
+    HelpDoc(String),
+    Debugger,
+    BuiltinId(usize),
+    Error,
+}
+
 #[derive(Completer, Helper, Highlighter, Hinter, Validator)]
 struct InputValidator {
     #[rustyline(Validator)]
     brackets: MatchingBracketValidator,
     #[rustyline(Highlighter)]
     highlighter: MatchingBracketHighlighter,
-}
-
-#[derive(Debug, Default)]
-enum ReplOutputMode {
-    Ast,
-    Op,
-    #[default]
-    Eval,
 }
 
 pub fn run(args: Cli) -> Result<()> {
@@ -80,8 +84,7 @@ pub fn run(args: Cli) -> Result<()> {
     }
 
     let help_docs = docs::load_doc();
-    let mut repl_output_mode = ReplOutputMode::default();
-    let mut machine = crate::machine::Machine::default();
+    let mut machine = Machine::default();
 
     loop {
         let input = match rl.readline("> ") {
@@ -100,65 +103,48 @@ pub fn run(args: Cli) -> Result<()> {
             continue;
         }
 
-        // Run command
-        let command = input.split(' ').collect::<Vec<&str>>();
-        if command.is_empty() {
-            continue;
-        }
-        match command[0] {
-            ":q" | ":e" | ":exit" | ":quit" => break,
-            ":output-mode" if command.len() == 2 => match command[1] {
-                "ast" => repl_output_mode = ReplOutputMode::Ast,
-                "op" => repl_output_mode = ReplOutputMode::Op,
-                "eval" => repl_output_mode = ReplOutputMode::Eval,
-                _ => {
-                    println!("unknown option {}", command[0]);
-                    continue;
-                }
-            },
-            ":help" => println!("{HELP}"),
-            ":clear" => rl.clear_screen()?,
-            ":help-doc" if command.len() == 2 => {
-                let name = command[1];
-                let Some(docs) = help_docs.get(name) else {
-                    println!("No docs for {name}");
-                    continue;
-                };
-
-                println!("{docs}");
-            }
-            _ => (),
-        }
-
-        // Ignore commands
-        match command[0] {
-            ":help-doc" | ":help" | ":clear" | ":env" | ":output-mode" => continue,
-            _ => (),
-        };
-
         rl.add_history_entry(input.as_str())?;
-        match repl_output_mode {
-            ReplOutputMode::Ast => {
-                let ast = parser().parse(input).map_err(|e| {
-                    anyhow::anyhow!(e.iter().map(|e| e.to_string() + "\n").collect::<String>())
-                });
-                match ast {
-                    Ok(v) => println!("{v:#?}"),
-                    Err(e) => println!("{e}"),
+        if let Some(command) = parse_input(&input) {
+            match command {
+                ReplCommand::Exit => break,
+                ReplCommand::Help => {
+                    println!("{HELP}");
+                    continue;
+                }
+                ReplCommand::Clear => {
+                    rl.clear_screen()?;
+                    continue;
+                }
+                ReplCommand::HelpDoc(name) => {
+                    let Some(docs) = help_docs.get(&name) else {
+                        println!("No docs for {name}");
+                        continue;
+                    };
+                    println!("{docs}");
+                }
+                ReplCommand::Debugger => {
+                    machine.set_options(MachineOptions { quiet: true });
+                    Debugger::new(&mut machine)?.run()?;
+                    machine.set_options(MachineOptions::default());
+                    continue;
+                }
+                ReplCommand::BuiltinId(idx) => {
+                    println!("{idx}: {}", &super::BUILTINS[idx]);
+                    continue;
+                }
+                ReplCommand::Error => {
+                    println!("Invalid input {}", input.red());
+                    continue;
                 }
             }
-            ReplOutputMode::Op => {
-                machine.debug()?;
-            }
-            ReplOutputMode::Eval => {
-                match machine.run_from_string(&input) {
-                    Ok(()) => (),
-                    Err(e) => println!("{e}"),
-                }
-                if let Some(last) = machine.pop() {
-                    eprintln!(":{last}");
-                }
-            }
+        }
+
+        match machine.run_from_string(&input) {
+            Ok(()) => (),
+            Err(e) => println!("{e}"),
+        }
+        if let Some(last) = machine.pop()? {
+            eprintln!(":{last}");
         }
     }
     if rl.append_history(&args.history_path).is_err() {
@@ -166,4 +152,23 @@ pub fn run(args: Cli) -> Result<()> {
         rl.save_history(&args.history_path)?;
     }
     Ok(())
+}
+
+fn parse_input(input: &str) -> Option<ReplCommand> {
+    if !input.starts_with(':') {
+        return None;
+    }
+
+    let command = input.split(' ').collect::<Vec<_>>();
+    match command[0] {
+        ":q" | ":e" | ":exit" | ":quit" => Some(ReplCommand::Exit),
+        ":help" => Some(ReplCommand::Help),
+        ":clear" => Some(ReplCommand::Clear),
+        ":help-doc" if command.len() == 2 => Some(ReplCommand::HelpDoc(command[1].to_string())),
+        ":debugger" => Some(ReplCommand::Debugger),
+        ":builtin-id" if command.len() == 2 => {
+            Some(ReplCommand::BuiltinId(command[1].parse().ok()?))
+        }
+        _ => Some(ReplCommand::Error),
+    }
 }
