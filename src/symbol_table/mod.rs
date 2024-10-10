@@ -3,7 +3,8 @@ mod test;
 
 use crate::ast::{Expr, Spanned};
 use crate::expr_walker::{
-    AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LoopExpr, OperatorExpr, VarExpr,
+    AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr, LoopExpr,
+    OperatorExpr, VarExpr,
 };
 use std::collections::HashMap;
 
@@ -12,9 +13,7 @@ pub struct SymbolTable {
     global_scope: HashMap<String, Symbol>, // Permanent global scope
     function_scopes: HashMap<String, HashMap<String, Symbol>>, // Persistent function scopes
     scope_stack: Vec<HashMap<String, Symbol>>, // Stack for temporary scopes during AST walk
-    // TODO: scope_stack needs to hold the scope name too some how.  While it technically does
-    // already there is not a good way to get it out.
-    scope_name: Vec<String>, // Name of the current scope
+    scope_name: Vec<String>,               // Name of the current scope
 }
 
 impl SymbolTable {
@@ -70,6 +69,7 @@ impl SymbolTable {
     }
 
     pub fn exit_scope(&mut self) {
+        self.scope_name.pop();
         self.scope_stack.pop();
     }
 
@@ -195,6 +195,7 @@ pub enum SymbolKind {
     Function,
     // Test,
     Lambda,
+    Let,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
@@ -204,6 +205,7 @@ pub enum SymbolScope {
     Function,
     Free,
     // Test,
+    Let,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -417,6 +419,61 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
             lambda_symbol.params(params_symbol_types);
         }
         table.exit_new_scope(Some(&name));
+        self.current_scope = scope;
+        self.local_counter = old_local_counter;
+        self.is_in_lambda = false;
+    }
+
+    fn handle_let_binding(&mut self, table: &mut SymbolTable, let_binding: &LetBindingExpr) {
+        // NOTE: Let bindings are just lambdas under the hood we are going to treat them as functions
+        // This may have performace cost but it's a lot simpler to implement.. I think
+        self.is_in_lambda = true;
+        let old_local_counter = self.local_counter;
+        self.local_counter = 0;
+        let scope = self.current_scope;
+        self.current_scope = SymbolScope::Let;
+        let names = let_binding
+            .bindings
+            .iter()
+            .filter_map(|binding| binding.expr.first_list_item())
+            .map(|item| &item.expr)
+            .map(|expr| match expr {
+                Expr::Symbol(name) => name.clone(),
+                _ => panic!("expected symbol in let binding, got: {expr:?}"),
+            })
+            .collect::<Vec<_>>();
+        let scope_name = format!("let_{}|{}", table.get_id(), names.join("|"));
+        table.enter_new_scope(&scope_name, SymbolKind::Let);
+
+        for spanned in let_binding.bindings.iter() {
+            match &spanned.expr {
+                Expr::List(list) => {
+                    self.walk_expr(table, &list[1]);
+
+                    let Expr::Symbol(binding_name) = &list[0].expr else {
+                        // TODO: REPORT ERROR
+                        panic!("expected symbol in let binding, got: {list:?}");
+                    };
+                    let symbol = Symbol {
+                        id: table.get_id(),
+                        name: binding_name.clone(),
+                        symbol_type: SymbolType::Dynamic,
+                        kind: SymbolKind::Parameter,
+                        scope: self.current_scope,
+                        scope_level: table.get_scope_level() as u32,
+                        location: None,
+                    };
+                    table.insert(binding_name.clone(), symbol);
+                }
+                _ => {
+                    // TODO: REPORT ERROR
+                    panic!("expected list for let binding but found {:?}", spanned.expr);
+                }
+            }
+        }
+
+        self.walk_expr(table, let_binding.body);
+        table.exit_new_scope(Some(&scope_name));
         self.current_scope = scope;
         self.local_counter = old_local_counter;
         self.is_in_lambda = false;

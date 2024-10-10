@@ -48,12 +48,19 @@ pub struct IfElseExpr<'a> {
     pub otherwise: Option<&'a Spanned<Expr>>,
 }
 
+#[derive(Debug)]
+pub struct LetBindingExpr<'a> {
+    pub bindings: &'a [&'a Spanned<Expr>],
+    pub body: &'a Spanned<Expr>,
+}
+
 pub trait AstWalker<T> {
     fn get_lambda_name(&mut self) -> String;
     fn handle_operator(&mut self, _: &mut T, _: &str, _: &OperatorExpr);
     fn handle_builtin(&mut self, _: &mut T, _: &str, _: &[Spanned<Expr>]);
     fn handle_function(&mut self, _: &mut T, _: &FunctionExpr);
     fn handle_lambda(&mut self, _: &mut T, _: &LambdaExpr);
+    fn handle_let_binding(&mut self, _: &mut T, _: &LetBindingExpr);
     fn handle_call(&mut self, _: &mut T, _: &CallExpr);
     fn handle_var(&mut self, _: &mut T, _: &VarExpr);
     fn handle_if_else(&mut self, _: &mut T, _: &IfElseExpr);
@@ -133,6 +140,7 @@ pub trait AstWalker<T> {
             "lambda" => self.walk_lambda(t, exprs),
             "fn" => self.walk_fn(t, exprs),
             "if" => self.walk_if(t, exprs),
+            "let" => self.walk_let_binding(t, exprs),
             _ => panic!("Unknown keyword: {name}"),
         }
     }
@@ -159,6 +167,43 @@ pub trait AstWalker<T> {
         };
 
         self.handle_if_else(t, &if_else);
+    }
+
+    fn walk_let_binding(&mut self, t: &mut T, elements: &[Spanned<Expr>]) {
+        const BINDINGS: usize = 1;
+        const BODY: usize = 2;
+
+        let Some(bindings_spanned) = elements.get(BINDINGS) else {
+            // TODO: REPORT ERROR
+            panic!("expected list for bindings");
+        };
+
+        let Expr::List(mabindings) = &bindings_spanned.expr else {
+            // TODO: REPORT ERROR
+            panic!("expected list for bindings");
+        };
+        let is_single_binding = bindings_spanned
+            .expr
+            .first_list_item()
+            .map(|item| item.expr.is_symbol())
+            .unwrap_or(false);
+
+        let bindings = if is_single_binding {
+            &vec![bindings_spanned]
+        } else {
+            &mabindings.iter().collect::<Vec<_>>()
+        };
+
+        let Some(body_spanned) = &elements.get(BODY) else {
+            // TODO: REPORT ERROR
+            panic!("expected list for body");
+        };
+
+        let let_binding_expr = LetBindingExpr {
+            bindings,
+            body: body_spanned,
+        };
+        self.handle_let_binding(t, &let_binding_expr);
     }
 
     fn walk_lambda(&mut self, t: &mut T, elements: &[Spanned<Expr>]) {

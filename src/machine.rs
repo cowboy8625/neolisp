@@ -445,7 +445,6 @@ impl<'a> Compiler<'a> {
         }
 
         for UnsetLocation { index, name } in self.unset_locations.iter() {
-            eprintln!("{index} {name}");
             let Some(symbol) = self.symbol_table.lookup(name) else {
                 // TODO: REPORT ERROR
                 panic!("Variable `{}` is not defined", name,);
@@ -537,7 +536,8 @@ impl<'a> Compiler<'a> {
                     name: symbol.name.clone(),
                 });
             }
-            SymbolKind::Lambda => todo!(),
+            SymbolKind::Lambda => todo!("Lambda"),
+            SymbolKind::Let => todo!("Let"),
         }
     }
 
@@ -580,12 +580,14 @@ impl AstWalker<Program> for Compiler<'_> {
             // TODO: ERROR REPORTING
             panic!("Unknown builtin: {name}");
         };
-        program.push(Instruction::Push(Box::new(Value::Builtin(0))));
+        program.push(Instruction::Push(Box::new(Value::Builtin(id))));
         program.push(Instruction::Call(args.len() - ARGS));
     }
 
     fn handle_function(&mut self, program: &mut Program, function: &FunctionExpr) {
-        let jump_forward_instruciion_size = Instruction::Jump(0).size();
+        program.push(Instruction::Jump(usize::MAX));
+        let index = program.len() - 1;
+        let start = self.get_program_size(program);
         let Expr::Symbol(name) = &function.name.expr else {
             // TODO: REPORT ERROR
             panic!(
@@ -594,7 +596,6 @@ impl AstWalker<Program> for Compiler<'_> {
             );
         };
 
-        let start = self.get_program_size(program) + jump_forward_instruciion_size;
         self.symbol_table
             .set_location(Some(name), name, start as u32);
 
@@ -608,22 +609,20 @@ impl AstWalker<Program> for Compiler<'_> {
             );
         };
 
-        let mut body = Vec::new();
         for spanned in function.body.iter() {
-            self.walk_expr(&mut body, spanned);
+            self.walk_expr(program, spanned);
         }
 
         if name == "main" {
-            body.push(Instruction::Halt);
+            program.push(Instruction::Halt);
         } else {
-            body.push(Instruction::Return);
+            program.push(Instruction::Return);
         }
 
         self.symbol_table.exit_scope();
 
-        let body_size = self.get_program_size(&body);
-        program.push(Instruction::Jump(start + body_size));
-        program.extend(body);
+        let body_size = self.get_program_size(program) - start;
+        program[index] = Instruction::Jump(start + body_size);
 
         program.push(Instruction::Push(Box::new(Value::Callable(start))));
         program.push(Instruction::SetGlobal);
@@ -676,6 +675,69 @@ impl AstWalker<Program> for Compiler<'_> {
         program[index] = Instruction::Jump(start + body_size);
 
         program.push(Instruction::Push(Box::new(Value::Callable(start))));
+    }
+
+    fn handle_let_binding(&mut self, program: &mut Program, let_binding: &LetBindingExpr) {
+        let id = self.symbol_table.get_id();
+
+        let names = let_binding
+            .bindings
+            .iter()
+            .filter_map(|binding| binding.expr.first_list_item())
+            .map(|item| &item.expr)
+            .map(|expr| match expr {
+                Expr::Symbol(name) => name.clone(),
+                _ => panic!("expected symbol in let binding, got: {expr:?}"),
+            })
+            .collect::<Vec<_>>();
+        let name = format!("let_{}|{}", id, names.join("|"));
+        let Some(local_scope) = self.symbol_table.get_function_scope(&name) else {
+            // TODO: REPORT ERROR
+            panic!("no scope for {name:?}");
+        };
+
+        for (_, symbol) in local_scope.iter() {
+            if symbol.kind == SymbolKind::FreeVariable {
+                let instruction = if symbol.scope == SymbolScope::Global {
+                    Instruction::GetGlobal(symbol.id)
+                } else {
+                    Instruction::GetLocal(symbol.id)
+                };
+                program.push(instruction);
+                program.push(Instruction::SetFree);
+            }
+        }
+
+        self.symbol_table.enter_scope(&name);
+
+        for spanned in let_binding.bindings.iter() {
+            match &spanned.expr {
+                Expr::List(list) => {
+                    self.walk_expr(program, &list[1]);
+
+                    let Expr::Symbol(binding_name) = &list[0].expr else {
+                        // TODO: REPORT ERROR
+                        panic!("expected symbol in let binding, got: {list:?}");
+                    };
+                    let Some(symbol) = self.symbol_table.lookup(binding_name).cloned() else {
+                        // TODO: REPORT ERROR
+                        panic!("expected symbol in let binding, got: {list:?}");
+                    };
+                    self.emit_set_instruction(program, &symbol);
+                }
+                _ => {
+                    // TODO: REPORT ERROR
+                    panic!("expected list for let binding but found {:?}", spanned.expr);
+                }
+            }
+        }
+
+        self.walk_expr(program, let_binding.body);
+        // for spanned in lambda.body.iter() {
+        //     self.walk_expr(program, spanned);
+        // }
+
+        self.symbol_table.exit_scope();
     }
 
     fn handle_call(&mut self, program: &mut Program, call: &CallExpr) {

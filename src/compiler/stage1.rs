@@ -1,7 +1,8 @@
 use super::CompilerOptions;
 use crate::ast::{Expr, Spanned};
 use crate::expr_walker::{
-    AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LoopExpr, OperatorExpr, VarExpr,
+    AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr, LoopExpr,
+    OperatorExpr, VarExpr,
 };
 use crate::symbol_table::{SymbolKind, SymbolScope, SymbolTable};
 use crate::vm::Direction;
@@ -374,6 +375,10 @@ impl<'a> AstWalker<Chunk> for Stage1Compiler<'a> {
         });
     }
 
+    fn handle_let_binding(&mut self, _: &mut Chunk, _: &LetBindingExpr) {
+        todo!("handle_let_binding");
+    }
+
     fn handle_call(&mut self, chunk: &mut Chunk, call: &CallExpr) {
         let arg_count = call.args.len() as u8;
         for arg in call.args.iter().rev() {
@@ -469,6 +474,7 @@ impl<'a> AstWalker<Chunk> for Stage1Compiler<'a> {
             SymbolKind::FreeVariable => {
                 chunk.push(Stage1Instruction::GetFree(IState::Set(symbol.id)));
             }
+            SymbolKind::Let => todo!("Let {}", name),
         }
     }
 
