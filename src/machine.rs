@@ -10,347 +10,334 @@ use super::{
 };
 use anyhow::{anyhow, Result};
 use chumsky::prelude::Parser;
-use num_derive::{FromPrimitive, ToPrimitive};
+pub use instruction::{Instruction, OpCode, Value};
+use intrinsic::Intrinsic;
 use num_traits::FromPrimitive;
-use std::io::Write;
 
-#[derive(Debug, Clone, PartialEq, FromPrimitive, ToPrimitive)]
-#[repr(u8)]
-pub enum OpCode {
-    Halt,
-    Return,
-    Push,
-    Add,
-    Sub,
-    Mul,
-    Div,
-    Eq,
-    GreaterThan,
-    LessThan,
-    GreaterThanOrEqual,
-    LessThanOrEqual,
-    And,
-    Or,
-    Not,
-    Mod,
-    Rot,
-    Call,
-    TailCall,
-    SetLocal,
-    SetGlobal,
-    SetFree,
-    GetLocal,
-    GetGlobal,
-    GetFree,
-    JumpIf,
-    JumpForward,
-    JumpBackward,
-    Jump,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Instruction {
-    Halt,
-    Return,
-    Push(Box<Value>),
-    Add(usize),
-    Sub(usize),
-    Mul(usize),
-    Div(usize),
-    Eq(usize),
-    GreaterThan(usize),
-    LessThan(usize),
-    GreaterThanOrEqual(usize),
-    LessThanOrEqual(usize),
-    And(usize),
-    Or(usize),
-    Not,
-    Mod,
-    Rot,
-    Call(usize),
-    TailCall(usize),
-    SetLocal,
-    SetGlobal,
-    SetFree,
-    GetLocal(usize),
-    GetGlobal(usize),
-    GetFree(usize),
-    JumpIf(usize),
-    JumpForward(usize),
-    JumpBackward(usize),
-    Jump(usize),
-}
-
-impl Instruction {
-    pub fn size(&self) -> usize {
-        match self {
-            Self::Halt => 1,
-            Self::Return => 1,
-            Self::Push(value) => 1 + value.size(),
-            Self::Add(_) => 2,
-            Self::Sub(_) => 2,
-            Self::Mul(_) => 2,
-            Self::Div(_) => 2,
-            Self::Eq(_) => 2,
-            Self::GreaterThan(_) => 2,
-            Self::LessThan(_) => 2,
-            Self::GreaterThanOrEqual(_) => 2,
-            Self::LessThanOrEqual(_) => 2,
-            Self::And(_) => 2,
-            Self::Or(_) => 2,
-            Self::Not => 1,
-            Self::Mod => 1,
-            Self::Rot => 1,
-            Self::Call(_) => 2,
-            Self::TailCall(_) => 2,
-            Self::SetLocal => 1,
-            Self::SetGlobal => 1,
-            Self::SetFree => 1,
-            Self::GetLocal(_) => 5,
-            Self::GetGlobal(_) => 5,
-            Self::GetFree(_) => 5,
-            Self::JumpIf(_) => 5,
-            Self::JumpForward(_) => 5,
-            Self::JumpBackward(_) => 5,
-            Self::Jump(_) => 5,
-        }
+mod instruction {
+    use super::BUILTINS;
+    use num_derive::{FromPrimitive, ToPrimitive};
+    #[derive(Debug, Clone, PartialEq, FromPrimitive, ToPrimitive)]
+    #[repr(u8)]
+    pub enum OpCode {
+        Halt,
+        Return,
+        Push,
+        Add,
+        Sub,
+        Mul,
+        Div,
+        Eq,
+        GreaterThan,
+        LessThan,
+        GreaterThanOrEqual,
+        LessThanOrEqual,
+        And,
+        Or,
+        Not,
+        Mod,
+        Rot,
+        Call,
+        TailCall,
+        SetLocal,
+        SetGlobal,
+        SetFree,
+        GetLocal,
+        GetGlobal,
+        GetFree,
+        JumpIf,
+        JumpForward,
+        JumpBackward,
+        Jump,
     }
 
-    pub fn opcode(&self) -> OpCode {
-        match self {
-            Self::Halt => OpCode::Halt,
-            Self::Return => OpCode::Return,
-            Self::Push(_) => OpCode::Push,
-            Self::Add(_) => OpCode::Add,
-            Self::Sub(_) => OpCode::Sub,
-            Self::Mul(_) => OpCode::Mul,
-            Self::Div(_) => OpCode::Div,
-            Self::Eq(_) => OpCode::Eq,
-            Self::GreaterThan(_) => OpCode::GreaterThan,
-            Self::LessThan(_) => OpCode::LessThan,
-            Self::GreaterThanOrEqual(_) => OpCode::GreaterThanOrEqual,
-            Self::LessThanOrEqual(_) => OpCode::LessThanOrEqual,
-            Self::And(_) => OpCode::And,
-            Self::Or(_) => OpCode::Or,
-            Self::Not => OpCode::Not,
-            Self::Mod => OpCode::Mod,
-            Self::Rot => OpCode::Rot,
-            Self::Call(..) => OpCode::Call,
-            Self::TailCall(..) => OpCode::TailCall,
-            Self::SetLocal => OpCode::SetLocal,
-            Self::SetGlobal => OpCode::SetGlobal,
-            Self::SetFree => OpCode::SetFree,
-            Self::GetLocal(_) => OpCode::GetLocal,
-            Self::GetGlobal(_) => OpCode::GetGlobal,
-            Self::GetFree(_) => OpCode::GetFree,
-            Self::JumpIf(_) => OpCode::JumpIf,
-            Self::JumpForward(_) => OpCode::JumpForward,
-            Self::JumpBackward(_) => OpCode::JumpBackward,
-            Self::Jump(_) => OpCode::Jump,
-        }
+    #[derive(Debug, Clone, PartialEq)]
+    pub enum Instruction {
+        Halt,
+        Return,
+        Push(Box<Value>),
+        Add(usize),
+        Sub(usize),
+        Mul(usize),
+        Div(usize),
+        Eq(usize),
+        GreaterThan(usize),
+        LessThan(usize),
+        GreaterThanOrEqual(usize),
+        LessThanOrEqual(usize),
+        And(usize),
+        Or(usize),
+        Not,
+        Mod,
+        Rot,
+        Call(usize),
+        TailCall(usize),
+        SetLocal,
+        SetGlobal,
+        SetFree,
+        GetLocal(usize),
+        GetGlobal(usize),
+        GetFree(usize),
+        JumpIf(usize),
+        JumpForward(usize),
+        JumpBackward(usize),
+        Jump(usize),
     }
 
-    pub fn to_bytecode(&self) -> Vec<u8> {
-        let mut bytes = Vec::new();
-        match self {
-            Self::Halt => bytes.push(OpCode::Halt as u8),
-            Self::Return => bytes.push(OpCode::Return as u8),
-            Self::Push(value) => {
-                bytes.push(OpCode::Push as u8);
-                bytes.extend(&value.to_bytecode());
-            }
-            Self::Add(count)
-            | Self::Sub(count)
-            | Self::Mul(count)
-            | Self::Div(count)
-            | Self::Eq(count)
-            | Self::GreaterThan(count)
-            | Self::LessThan(count)
-            | Self::GreaterThanOrEqual(count)
-            | Self::LessThanOrEqual(count)
-            | Self::And(count)
-            | Self::Or(count) => {
-                bytes.push(self.opcode() as u8);
-                bytes.push(*count as u8);
-            }
-            Self::Not
-            | Self::Mod
-            | Self::Rot
-            | Self::SetLocal
-            | Self::SetGlobal
-            | Self::SetFree => bytes.push(self.opcode() as u8),
-            Self::Call(count) | Self::TailCall(count) => {
-                bytes.push(self.opcode() as u8);
-                bytes.push(*count as u8);
-            }
-            Self::GetLocal(address)
-            | Self::GetGlobal(address)
-            | Self::GetFree(address)
-            | Self::JumpIf(address)
-            | Self::JumpForward(address)
-            | Self::JumpBackward(address)
-            | Self::Jump(address) => {
-                bytes.push(self.opcode() as u8);
-                bytes.extend(&(*address as u32).to_le_bytes());
+    impl Instruction {
+        pub fn size(&self) -> usize {
+            match self {
+                Self::Halt => 1,
+                Self::Return => 1,
+                Self::Push(value) => 1 + value.size(),
+                Self::Add(_) => 2,
+                Self::Sub(_) => 2,
+                Self::Mul(_) => 2,
+                Self::Div(_) => 2,
+                Self::Eq(_) => 2,
+                Self::GreaterThan(_) => 2,
+                Self::LessThan(_) => 2,
+                Self::GreaterThanOrEqual(_) => 2,
+                Self::LessThanOrEqual(_) => 2,
+                Self::And(_) => 2,
+                Self::Or(_) => 2,
+                Self::Not => 1,
+                Self::Mod => 1,
+                Self::Rot => 1,
+                Self::Call(_) => 2,
+                Self::TailCall(_) => 2,
+                Self::SetLocal => 1,
+                Self::SetGlobal => 1,
+                Self::SetFree => 1,
+                Self::GetLocal(_) => 5,
+                Self::GetGlobal(_) => 5,
+                Self::GetFree(_) => 5,
+                Self::JumpIf(_) => 5,
+                Self::JumpForward(_) => 5,
+                Self::JumpBackward(_) => 5,
+                Self::Jump(_) => 5,
             }
         }
 
-        bytes
-    }
-}
-
-/*
-
-
-(fn add (a b) (+ a b))
-
-LoadLocal a
-LoadLocal b
-GetLocal 0
-GetLocal 1
-Add
-Return
-
-DefineGlobal add 0 0..6
-
-
-*/
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Value {
-    U8(u8),
-    I32(i32),
-    U32(u32),
-    F32(f32),
-    F64(f64),
-    String(Box<String>),
-    Bool(bool),
-    List(Box<Vec<Value>>),
-    Callable(usize),
-    Builtin(usize),
-}
-
-impl Value {
-    pub const CODE_U8: u8 = 0x00;
-    pub const CODE_I32: u8 = 0x01;
-    pub const CODE_U32: u8 = 0x02;
-    pub const CODE_F32: u8 = 0x03;
-    pub const CODE_F64: u8 = 0x04;
-    pub const CODE_STRING: u8 = 0x05;
-    pub const CODE_BOOL: u8 = 0x06;
-    pub const CODE_LIST: u8 = 0x07;
-    pub const CODE_CALLABLE: u8 = 0x08;
-    pub const CODE_BUILTIN: u8 = 0x09;
-
-    pub fn to_bytecode(&self) -> Vec<u8> {
-        match self {
-            Value::U8(v) => vec![Self::CODE_U8, *v],
-            Value::I32(v) => {
-                let mut bytes = vec![Self::CODE_I32];
-                bytes.extend_from_slice(&v.to_le_bytes());
-                bytes
+        pub fn opcode(&self) -> OpCode {
+            match self {
+                Self::Halt => OpCode::Halt,
+                Self::Return => OpCode::Return,
+                Self::Push(_) => OpCode::Push,
+                Self::Add(_) => OpCode::Add,
+                Self::Sub(_) => OpCode::Sub,
+                Self::Mul(_) => OpCode::Mul,
+                Self::Div(_) => OpCode::Div,
+                Self::Eq(_) => OpCode::Eq,
+                Self::GreaterThan(_) => OpCode::GreaterThan,
+                Self::LessThan(_) => OpCode::LessThan,
+                Self::GreaterThanOrEqual(_) => OpCode::GreaterThanOrEqual,
+                Self::LessThanOrEqual(_) => OpCode::LessThanOrEqual,
+                Self::And(_) => OpCode::And,
+                Self::Or(_) => OpCode::Or,
+                Self::Not => OpCode::Not,
+                Self::Mod => OpCode::Mod,
+                Self::Rot => OpCode::Rot,
+                Self::Call(..) => OpCode::Call,
+                Self::TailCall(..) => OpCode::TailCall,
+                Self::SetLocal => OpCode::SetLocal,
+                Self::SetGlobal => OpCode::SetGlobal,
+                Self::SetFree => OpCode::SetFree,
+                Self::GetLocal(_) => OpCode::GetLocal,
+                Self::GetGlobal(_) => OpCode::GetGlobal,
+                Self::GetFree(_) => OpCode::GetFree,
+                Self::JumpIf(_) => OpCode::JumpIf,
+                Self::JumpForward(_) => OpCode::JumpForward,
+                Self::JumpBackward(_) => OpCode::JumpBackward,
+                Self::Jump(_) => OpCode::Jump,
             }
-            Value::U32(v) => {
-                let mut bytes = vec![Self::CODE_U32];
-                bytes.extend_from_slice(&v.to_le_bytes());
-                bytes
-            }
-            Value::F32(v) => {
-                let mut bytes = vec![Self::CODE_F32];
-                bytes.extend_from_slice(&v.to_le_bytes());
-                bytes
-            }
-            Value::F64(v) => {
-                let mut bytes = vec![Self::CODE_F64];
-                bytes.extend_from_slice(&v.to_le_bytes());
-                bytes
-            }
-            Value::String(v) => {
-                let mut bytes = vec![Self::CODE_STRING];
-                bytes.extend_from_slice(&(v.len() as u32).to_le_bytes());
-                bytes.extend_from_slice(v.as_bytes());
-                bytes
-            }
-            Value::Bool(v) => vec![Self::CODE_BOOL, if *v { 1 } else { 0 }],
-            Value::List(vec) => {
-                let mut bytes = vec![Self::CODE_LIST];
-                bytes.extend_from_slice(&(vec.len() as u32).to_le_bytes());
-                for v in vec.iter() {
-                    bytes.extend(v.to_bytecode());
+        }
+
+        pub fn to_bytecode(&self) -> Vec<u8> {
+            let mut bytes = Vec::new();
+            match self {
+                Self::Halt => bytes.push(OpCode::Halt as u8),
+                Self::Return => bytes.push(OpCode::Return as u8),
+                Self::Push(value) => {
+                    bytes.push(OpCode::Push as u8);
+                    bytes.extend(&value.to_bytecode());
                 }
-                bytes
+                Self::Add(count)
+                | Self::Sub(count)
+                | Self::Mul(count)
+                | Self::Div(count)
+                | Self::Eq(count)
+                | Self::GreaterThan(count)
+                | Self::LessThan(count)
+                | Self::GreaterThanOrEqual(count)
+                | Self::LessThanOrEqual(count)
+                | Self::And(count)
+                | Self::Or(count) => {
+                    bytes.push(self.opcode() as u8);
+                    bytes.push(*count as u8);
+                }
+                Self::Not
+                | Self::Mod
+                | Self::Rot
+                | Self::SetLocal
+                | Self::SetGlobal
+                | Self::SetFree => bytes.push(self.opcode() as u8),
+                Self::Call(count) | Self::TailCall(count) => {
+                    bytes.push(self.opcode() as u8);
+                    bytes.push(*count as u8);
+                }
+                Self::GetLocal(address)
+                | Self::GetGlobal(address)
+                | Self::GetFree(address)
+                | Self::JumpIf(address)
+                | Self::JumpForward(address)
+                | Self::JumpBackward(address)
+                | Self::Jump(address) => {
+                    bytes.push(self.opcode() as u8);
+                    bytes.extend(&(*address as u32).to_le_bytes());
+                }
             }
-            Value::Callable(index) => {
-                let mut bytes = vec![Self::CODE_CALLABLE];
-                bytes.extend_from_slice(&(*index as u32).to_le_bytes());
-                bytes
+
+            bytes
+        }
+    }
+
+    #[derive(Debug, Clone, PartialEq)]
+    pub enum Value {
+        U8(u8),
+        I32(i32),
+        U32(u32),
+        F32(f32),
+        F64(f64),
+        String(Box<String>),
+        Bool(bool),
+        List(Box<Vec<Value>>),
+        Callable(usize),
+        Builtin(usize),
+    }
+
+    impl Value {
+        pub const CODE_U8: u8 = 0x00;
+        pub const CODE_I32: u8 = 0x01;
+        pub const CODE_U32: u8 = 0x02;
+        pub const CODE_F32: u8 = 0x03;
+        pub const CODE_F64: u8 = 0x04;
+        pub const CODE_STRING: u8 = 0x05;
+        pub const CODE_BOOL: u8 = 0x06;
+        pub const CODE_LIST: u8 = 0x07;
+        pub const CODE_CALLABLE: u8 = 0x08;
+        pub const CODE_BUILTIN: u8 = 0x09;
+
+        pub fn to_bytecode(&self) -> Vec<u8> {
+            match self {
+                Value::U8(v) => vec![Self::CODE_U8, *v],
+                Value::I32(v) => {
+                    let mut bytes = vec![Self::CODE_I32];
+                    bytes.extend_from_slice(&v.to_le_bytes());
+                    bytes
+                }
+                Value::U32(v) => {
+                    let mut bytes = vec![Self::CODE_U32];
+                    bytes.extend_from_slice(&v.to_le_bytes());
+                    bytes
+                }
+                Value::F32(v) => {
+                    let mut bytes = vec![Self::CODE_F32];
+                    bytes.extend_from_slice(&v.to_le_bytes());
+                    bytes
+                }
+                Value::F64(v) => {
+                    let mut bytes = vec![Self::CODE_F64];
+                    bytes.extend_from_slice(&v.to_le_bytes());
+                    bytes
+                }
+                Value::String(v) => {
+                    let mut bytes = vec![Self::CODE_STRING];
+                    bytes.extend_from_slice(&(v.len() as u32).to_le_bytes());
+                    bytes.extend_from_slice(v.as_bytes());
+                    bytes
+                }
+                Value::Bool(v) => vec![Self::CODE_BOOL, if *v { 1 } else { 0 }],
+                Value::List(vec) => {
+                    let mut bytes = vec![Self::CODE_LIST];
+                    bytes.extend_from_slice(&(vec.len() as u32).to_le_bytes());
+                    for v in vec.iter() {
+                        bytes.extend(v.to_bytecode());
+                    }
+                    bytes
+                }
+                Value::Callable(index) => {
+                    let mut bytes = vec![Self::CODE_CALLABLE];
+                    bytes.extend_from_slice(&(*index as u32).to_le_bytes());
+                    bytes
+                }
+                Value::Builtin(index) => {
+                    let mut bytes = vec![Self::CODE_BUILTIN];
+                    bytes.extend_from_slice(&(*index as u32).to_le_bytes());
+                    bytes
+                }
             }
-            Value::Builtin(index) => {
-                let mut bytes = vec![Self::CODE_BUILTIN];
-                bytes.extend_from_slice(&(*index as u32).to_le_bytes());
-                bytes
+        }
+
+        pub fn size(&self) -> usize {
+            let conent_size = match self {
+                Value::U8(_) => 1,
+                Value::I32(_) => 4,
+                Value::U32(_) => 4,
+                Value::F32(_) => 4,
+                Value::F64(_) => 8,
+                Value::String(v) => 4 + v.len(),
+                Value::Bool(_) => 1,
+                Value::List(vec) => 4 + vec.iter().map(|v| v.size()).sum::<usize>(),
+                // 4 bytes    4 bytes
+                // start......end
+                Value::Callable(_) => 4,
+                Value::Builtin(_) => 4,
+            };
+            // opcode + content
+            1 + conent_size
+        }
+
+        pub fn type_of(&self) -> String {
+            match self {
+                Self::U8(_) => "u8".to_string(),
+                Self::I32(_) => "i32".to_string(),
+                Self::U32(_) => "u32".to_string(),
+                Self::F32(_) => "f32".to_string(),
+                Self::F64(_) => "f64".to_string(),
+                Self::String(_) => "String".to_string(),
+                Self::Bool(_) => "Bool".to_string(),
+                Self::List(_) => "List".to_string(),
+                Self::Callable(_) => "Function".to_string(),
+                Self::Builtin(_) => "Builtin".to_string(),
             }
         }
     }
 
-    pub fn size(&self) -> usize {
-        let conent_size = match self {
-            Value::U8(_) => 1,
-            Value::I32(_) => 4,
-            Value::U32(_) => 4,
-            Value::F32(_) => 4,
-            Value::F64(_) => 8,
-            Value::String(v) => 4 + v.len(),
-            Value::Bool(_) => 1,
-            Value::List(vec) => 4 + vec.iter().map(|v| v.size()).sum::<usize>(),
-            // 4 bytes    4 bytes
-            // start......end
-            Value::Callable(_) => 4,
-            Value::Builtin(_) => 4,
-        };
-        // opcode + content
-        1 + conent_size
-    }
-
-    pub fn type_of(&self) -> String {
-        match self {
-            Self::U8(_) => "u8".to_string(),
-            Self::I32(_) => "i32".to_string(),
-            Self::U32(_) => "u32".to_string(),
-            Self::F32(_) => "f32".to_string(),
-            Self::F64(_) => "f64".to_string(),
-            Self::String(_) => "String".to_string(),
-            Self::Bool(_) => "Bool".to_string(),
-            Self::List(_) => "List".to_string(),
-            Self::Callable(_) => "Function".to_string(),
-            Self::Builtin(_) => "Builtin".to_string(),
-        }
-    }
-}
-
-impl std::fmt::Display for Value {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::U8(value) => write!(f, "{value}"),
-            Self::I32(value) => write!(f, "{value}"),
-            Self::U32(value) => write!(f, "{value}"),
-            Self::F32(value) => write!(f, "{value}"),
-            Self::F64(value) => write!(f, "{value}"),
-            Self::String(value) => write!(f, "{value}"),
-            Self::Bool(value) => write!(f, "{value}"),
-            Self::List(value) => {
-                write!(
-                    f,
-                    "({})",
-                    value
-                        .iter()
-                        .map(|v| format!("{}", v))
-                        .collect::<Vec<String>>()
-                        .join(" ")
-                )
+    impl std::fmt::Display for Value {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                Self::U8(value) => write!(f, "{value}"),
+                Self::I32(value) => write!(f, "{value}"),
+                Self::U32(value) => write!(f, "{value}"),
+                Self::F32(value) => write!(f, "{value}"),
+                Self::F64(value) => write!(f, "{value}"),
+                Self::String(value) => write!(f, "{value}"),
+                Self::Bool(value) => write!(f, "{value}"),
+                Self::List(value) => {
+                    write!(
+                        f,
+                        "({})",
+                        value
+                            .iter()
+                            .map(|v| format!("{}", v))
+                            .collect::<Vec<String>>()
+                            .join(" ")
+                    )
+                }
+                Self::Callable(index) => write!(f, "<function {index:?}>"),
+                Self::Builtin(index) => write!(f, "<function {:?}>", BUILTINS[*index]),
             }
-            Self::Callable(index) => write!(f, "<function {index:?}>"),
-            Self::Builtin(index) => write!(f, "<function {:?}>", BUILTINS[*index]),
         }
     }
 }
@@ -1784,533 +1771,540 @@ impl Machine {
     }
 }
 
-struct Intrinsic;
-impl Intrinsic {
-    fn intrinsic_sleep(machine: &mut Machine, count: u8) -> Result<()> {
-        // (sleep 1000) ; -> false
-        if count != 1 {
-            anyhow::bail!("sleep only support 1 arg");
-        }
-        let frame = machine.get_current_frame_mut()?;
-        let Some(Value::F64(value)) = frame.stack.pop() else {
-            anyhow::bail!("expected number on stack for sleep")
-        };
-        std::thread::sleep(std::time::Duration::from_millis(value as u64));
-        Ok(())
-    }
+// --------------------- Intrinsics ---------------------
+mod intrinsic {
+    use super::{Machine, Value};
+    use anyhow::Result;
+    use std::io::Write;
 
-    fn intrinsic_is_atom(machine: &mut Machine, count: u8) -> Result<()> {
-        // (atom? 10) ; -> true
-        // (atom? "10") ; -> true
-        // (atom? "abc") ; -> true
-        // (atom? '(1 2 3)) ; -> false
-        if count != 1 {
-            anyhow::bail!("atom? only support 1 arg");
-        }
-        let frame = machine.get_current_frame_mut()?;
-        let Some(item) = frame.stack.pop() else {
-            anyhow::bail!("expected atom on stack for atom?")
-        };
-        let result = !matches!(item, Value::List(_) | Value::Callable(_));
-        frame.stack.push(Value::Bool(result));
-        Ok(())
-    }
-
-    fn intrinsic_is_number(machine: &mut Machine, count: u8) -> Result<()> {
-        // (number? 10) ; -> true
-        // (number? "10") ; -> true
-        // (number? "abc") ; -> false
-        // (number? '(1 2 3)) ; -> false
-        if count != 1 {
-            anyhow::bail!("number? only support 1 arg");
-        }
-        let frame = machine.get_current_frame_mut()?;
-        let Some(item) = frame.stack.pop() else {
-            anyhow::bail!("expected number on stack for number?")
-        };
-        let result = matches!(
-            item,
-            Value::F64(_) | Value::U32(_) | Value::I32(_) | Value::F32(_) | Value::U8(_)
-        );
-        frame.stack.push(Value::Bool(result));
-        Ok(())
-    }
-
-    fn intrinsic_slice(machine: &mut Machine, count: u8) -> Result<()> {
-        // (slice "abc" 1 2) ; -> "b"
-        // (slice (list 1 2 3) 1 2) ; -> (2)
-        if count != 3 {
-            anyhow::bail!("slice only support 3 args");
-        }
-        let frame = machine.get_current_frame_mut()?;
-        let Some(Value::F64(end)) = frame.stack.pop() else {
-            anyhow::bail!("expected int on stack for slice")
-        };
-        let Some(Value::F64(start)) = frame.stack.pop() else {
-            anyhow::bail!("expected int on stack for slice")
-        };
-        let Some(item) = frame.stack.pop() else {
-            anyhow::bail!("expected string or list on stack for slice")
-        };
-
-        match item {
-            Value::String(string) => {
-                let result = string
-                    .chars()
-                    .skip(start as usize)
-                    .take((end - start) as usize)
-                    .collect::<String>();
-                frame.stack.push(Value::String(Box::new(result)));
+    pub(crate) struct Intrinsic;
+    impl Intrinsic {
+        pub(crate) fn intrinsic_sleep(machine: &mut Machine, count: u8) -> Result<()> {
+            // (sleep 1000) ; -> false
+            if count != 1 {
+                anyhow::bail!("sleep only support 1 arg");
             }
-            Value::List(list) => {
-                let result = list
-                    .iter()
-                    .skip(start as usize)
-                    .take((end - start) as usize)
-                    .cloned()
-                    .collect::<Vec<_>>();
-                frame.stack.push(Value::List(Box::new(result)));
+            let frame = machine.get_current_frame_mut()?;
+            let Some(Value::F64(value)) = frame.stack.pop() else {
+                anyhow::bail!("expected number on stack for sleep")
+            };
+            std::thread::sleep(std::time::Duration::from_millis(value as u64));
+            Ok(())
+        }
+
+        pub(crate) fn intrinsic_is_atom(machine: &mut Machine, count: u8) -> Result<()> {
+            // (atom? 10) ; -> true
+            // (atom? "10") ; -> true
+            // (atom? "abc") ; -> true
+            // (atom? '(1 2 3)) ; -> false
+            if count != 1 {
+                anyhow::bail!("atom? only support 1 arg");
             }
-            _ => panic!("expected string or list on stack for slice"),
-        }
-        Ok(())
-    }
-
-    fn intrinsic_join(machine: &mut Machine, count: u8) -> Result<()> {
-        // (join " " "abc") ; -> "abc"
-        // (join " " (list "1" "2" "3")) ; -> "1 2 3"
-        if count != 2 {
-            anyhow::bail!("join only support 2 args");
-        }
-        let frame = machine.get_current_frame_mut()?;
-        let Some(Value::List(list)) = frame.stack.pop() else {
-            anyhow::bail!("expected list on stack for join")
-        };
-        let Some(Value::String(string)) = frame.stack.pop() else {
-            anyhow::bail!("expected string on stack for join")
-        };
-        let result = list
-            .iter()
-            .map(|i| i.to_string())
-            .collect::<Vec<_>>()
-            .join(&string);
-        frame.stack.push(Value::String(Box::new(result)));
-        Ok(())
-    }
-
-    fn intrinsic_split(machine: &mut Machine, count: u8) -> Result<()> {
-        // (split " " "abc") ; -> ("a" "b" "c")
-        // (split " " "(+ 1 1)") ; ->  ("(+" "1" "1)")
-        if count != 2 {
-            anyhow::bail!("split only support 2 args");
-        }
-        let frame = machine.get_current_frame_mut()?;
-        let Some(Value::String(string)) = frame.stack.pop() else {
-            anyhow::bail!("expected string on stack for split")
-        };
-        let Some(Value::String(item)) = frame.stack.pop() else {
-            anyhow::bail!("expected string on stack for split")
-        };
-        let result = string
-            .split(&*item)
-            .map(|i| Value::String(Box::new(i.to_string())))
-            .collect::<Vec<_>>();
-        frame.stack.push(Value::List(Box::new(result)));
-
-        Ok(())
-    }
-    fn intrinsic_to_string(machine: &mut Machine, count: u8) -> Result<()> {
-        // (to-string 1000) => "1000"
-        if count != 1 {
-            anyhow::bail!("to-string only support 1 args");
-        }
-
-        let frame = machine.get_current_frame_mut()?;
-
-        let Some(value) = frame.stack.pop() else {
-            panic!("expected value on stack for to-string")
-        };
-        frame.stack.push(Value::String(Box::new(value.to_string())));
-
-        Ok(())
-    }
-
-    fn intrinsic_filter(machine: &mut Machine, count: u8) -> Result<()> {
-        // (filter (lambda (x) (> x 1)) (list 1 2 3)) ; -> (2 3)
-
-        if count != 2 {
-            anyhow::bail!("filter only support 2 args");
-        }
-
-        let Some(Value::List(mut list)) = machine.pop()? else {
-            anyhow::bail!("expected list on stack for filter")
-        };
-        let Some(Value::Callable(address)) = machine.pop()? else {
-            anyhow::bail!("expected lambda on stack for filter")
-        };
-        let mut result = Vec::new();
-        for value in list.drain(..) {
-            machine.push(value.clone())?;
-            machine.call_from_address(address, 1)?;
-            let Some(Value::Bool(true)) = machine.pop()? else {
-                continue;
+            let frame = machine.get_current_frame_mut()?;
+            let Some(item) = frame.stack.pop() else {
+                anyhow::bail!("expected atom on stack for atom?")
             };
-            result.push(value);
-        }
-        machine.push(Value::List(Box::new(result)))?;
-        Ok(())
-    }
-    fn intrinsic_fold_right(machine: &mut Machine, count: u8) -> Result<()> {
-        // (fold-right 0 (lambda (x y) (+ x y)) (list 1 2 3)) => 6
-        if count != 3 {
-            anyhow::bail!("fold only support 3 args");
-        }
-        let Some(Value::List(mut list)) = machine.pop()? else {
-            anyhow::bail!("expected list on stack for fold")
-        };
-        let Some(Value::Callable(address)) = machine.pop()? else {
-            anyhow::bail!("expected lambda on stack for fold")
-        };
-        let Some(initial) = machine.pop()? else {
-            anyhow::bail!("expected number on stack for fold")
-        };
-        let mut result = initial;
-        for value in list.drain(..).rev() {
-            machine.push(result)?;
-            machine.push(value)?;
-            machine.call_from_address(address, 2)?;
-            let Some(v) = machine.pop()? else {
-                // TODO: ERROR REPORTING
-                anyhow::bail!("expected value on stack for fold right")
-            };
-            result = v;
-        }
-        machine.push(result)?;
-        Ok(())
-    }
-
-    fn intrinsic_fold(machine: &mut Machine, count: u8) -> Result<()> {
-        // (fold 0 (lambda (x y) (+ x y)) (list 1 2 3)) => 6
-        if count != 3 {
-            anyhow::bail!("fold only support 3 args");
-        }
-        let Some(Value::List(mut list)) = machine.pop()? else {
-            anyhow::bail!("expected list on stack for fold")
-        };
-        let Some(Value::Callable(address)) = machine.pop()? else {
-            anyhow::bail!("expected lambda on stack for fold")
-        };
-        let Some(initial) = machine.pop()? else {
-            anyhow::bail!("expected number on stack for fold")
-        };
-        let mut result = initial;
-        for value in list.drain(..) {
-            machine.push(result)?;
-            machine.push(value)?;
-            machine.call_from_address(address, 2)?;
-            let Some(v) = machine.pop()? else {
-                // TODO: ERROR REPORTING
-                anyhow::bail!("expected value on stack for fold")
-            };
-            result = v;
-        }
-        machine.push(result)?;
-        Ok(())
-    }
-
-    fn intrinsic_map(machine: &mut Machine, count: u8) -> Result<()> {
-        // (map (lambda (x) (+ x 1)) (list 1 2 3)) => (2 3 4)
-        if count != 2 {
-            anyhow::bail!("map only support 2 args");
+            let result = !matches!(item, Value::List(_) | Value::Callable(_));
+            frame.stack.push(Value::Bool(result));
+            Ok(())
         }
 
-        let Some(Value::List(mut list)) = machine.pop()? else {
-            anyhow::bail!("expected list on stack for map")
-        };
-
-        let Some(Value::Callable(address)) = machine.pop()? else {
-            anyhow::bail!("expected lambda on stack for map")
-        };
-        let mut result = Vec::new();
-        for value in list.drain(..) {
-            machine.push(value)?;
-            machine.call_from_address(address, 1)?;
-            let Some(v) = machine.pop()? else {
-                // TODO: ERROR REPORTING
-                anyhow::bail!("expected value on stack for map")
-            };
-            result.push(v);
-        }
-
-        machine.push(Value::List(Box::new(result)))?;
-        Ok(())
-    }
-
-    fn intrinsic_nth(machine: &mut Machine, count: u8) -> Result<()> {
-        // (nth (list 1 2 3) 1) => 2
-        if count != 2 {
-            anyhow::bail!("nth only support 2 args");
-        }
-        let frame = machine.get_current_frame_mut()?;
-        let Some(Value::F64(index)) = frame.stack.pop() else {
-            anyhow::bail!("expected number on stack for nth")
-        };
-        let Some(Value::List(mut list)) = frame.stack.pop() else {
-            anyhow::bail!("expected list on stack for nth")
-        };
-        let index = index as usize;
-        if index >= list.len() {
-            anyhow::bail!("nth index out of range");
-        }
-        let value = list.remove(index);
-        frame.stack.push(value);
-        Ok(())
-    }
-
-    fn intrinsic_reverse(machine: &mut Machine, count: u8) -> Result<()> {
-        // (reverse (list 1 2 3)) => (3 2 1)
-        if count != 1 {
-            anyhow::bail!("reverse only support 1 args");
-        }
-
-        let frame = machine.get_current_frame_mut()?;
-
-        let Some(Value::List(mut list)) = frame.stack.pop() else {
-            anyhow::bail!("expected list on stack for reverse")
-        };
-        list.reverse();
-        frame.stack.push(Value::List(list));
-        Ok(())
-    }
-
-    fn intrinsic_append(machine: &mut Machine, count: u8) -> Result<()> {
-        // (append (list 1 2) (list 3 4)) => (1 2 3 4)
-        if count != 2 {
-            anyhow::bail!("append only support 2 args");
-        }
-        let frame = machine.get_current_frame_mut()?;
-        let Some(Value::List(mut list2)) = frame.stack.pop() else {
-            anyhow::bail!("expected list on stack for append")
-        };
-        let Some(Value::List(mut list1)) = frame.stack.pop() else {
-            anyhow::bail!("expected list on stack for append")
-        };
-
-        list1.append(&mut list2);
-        frame.stack.push(Value::List(list1));
-        Ok(())
-    }
-
-    fn intrinsic_last(machine: &mut Machine, count: u8) -> Result<()> {
-        // (last (list 1 2 3 4)) => 4
-        if count != 1 {
-            anyhow::bail!("last only support 1 args");
-        }
-        let frame = machine.get_current_frame_mut()?;
-        let Some(value) = frame.stack.pop() else {
-            panic!("expected value on stack for last")
-        };
-        match &value {
-            Value::List(list) if list.is_empty() => {
-                frame.stack.push(Value::List(Box::default()));
+        pub(crate) fn intrinsic_is_number(machine: &mut Machine, count: u8) -> Result<()> {
+            // (number? 10) ; -> true
+            // (number? "10") ; -> true
+            // (number? "abc") ; -> false
+            // (number? '(1 2 3)) ; -> false
+            if count != 1 {
+                anyhow::bail!("number? only support 1 arg");
             }
-            Value::List(list) => {
-                if let Some(value) = list.last() {
-                    frame.stack.push(value.clone());
-                    return Ok(());
+            let frame = machine.get_current_frame_mut()?;
+            let Some(item) = frame.stack.pop() else {
+                anyhow::bail!("expected number on stack for number?")
+            };
+            let result = matches!(
+                item,
+                Value::F64(_) | Value::U32(_) | Value::I32(_) | Value::F32(_) | Value::U8(_)
+            );
+            frame.stack.push(Value::Bool(result));
+            Ok(())
+        }
+
+        pub(crate) fn intrinsic_slice(machine: &mut Machine, count: u8) -> Result<()> {
+            // (slice "abc" 1 2) ; -> "b"
+            // (slice (list 1 2 3) 1 2) ; -> (2)
+            if count != 3 {
+                anyhow::bail!("slice only support 3 args");
+            }
+            let frame = machine.get_current_frame_mut()?;
+            let Some(Value::F64(end)) = frame.stack.pop() else {
+                anyhow::bail!("expected int on stack for slice")
+            };
+            let Some(Value::F64(start)) = frame.stack.pop() else {
+                anyhow::bail!("expected int on stack for slice")
+            };
+            let Some(item) = frame.stack.pop() else {
+                anyhow::bail!("expected string or list on stack for slice")
+            };
+
+            match item {
+                Value::String(string) => {
+                    let result = string
+                        .chars()
+                        .skip(start as usize)
+                        .take((end - start) as usize)
+                        .collect::<String>();
+                    frame.stack.push(Value::String(Box::new(result)));
                 }
-                anyhow::bail!("expected list to have at least 1 for `last`");
+                Value::List(list) => {
+                    let result = list
+                        .iter()
+                        .skip(start as usize)
+                        .take((end - start) as usize)
+                        .cloned()
+                        .collect::<Vec<_>>();
+                    frame.stack.push(Value::List(Box::new(result)));
+                }
+                _ => panic!("expected string or list on stack for slice"),
             }
-            _ => anyhow::bail!("expected list on stack for last"),
-        }
-        Ok(())
-    }
-
-    fn intrinsic_cdr(machine: &mut Machine, count: u8) -> Result<()> {
-        // (cdr (list 1 2)) => (2)
-        if count != 1 {
-            anyhow::bail!("cdr only support 1 args");
+            Ok(())
         }
 
-        let frame = machine.get_current_frame_mut()?;
-
-        let Some(value) = frame.stack.pop() else {
-            panic!("expected value on stack for cdr")
-        };
-        match &value {
-            Value::List(list) if list.is_empty() => {
-                frame.stack.push(Value::List(Box::default()));
+        pub(crate) fn intrinsic_join(machine: &mut Machine, count: u8) -> Result<()> {
+            // (join " " "abc") ; -> "abc"
+            // (join " " (list "1" "2" "3")) ; -> "1 2 3"
+            if count != 2 {
+                anyhow::bail!("join only support 2 args");
             }
-            Value::List(list) => {
-                frame.stack.push(Value::List(Box::new(list[1..].to_vec())));
-            }
-            _ => anyhow::bail!("expected list on stack for cdr"),
-        }
-
-        if let Value::List(list) = value {
-            if let Some(Value::List(list)) = list.last() {
-                frame.stack.push(list[0].clone());
-            }
-        }
-        Ok(())
-    }
-
-    fn intrinsic_typeof(machine: &mut Machine, count: u8) -> Result<()> {
-        // (typeof 1) => "Number"
-        if count != 1 {
-            anyhow::bail!("typeof only support 1 args");
-        }
-        let frame = machine.get_current_frame_mut()?;
-        let Some(value) = frame.stack.pop() else {
-            panic!("expected value on stack for typeof")
-        };
-        frame.stack.push(Value::String(Box::new(value.type_of())));
-        Ok(())
-    }
-
-    fn intrinsic_print(machine: &mut Machine, count: u8) -> Result<()> {
-        use std::io::Write;
-        let lock = std::io::stdout().lock();
-        let mut writer = std::io::BufWriter::new(lock);
-        let mut output = String::new();
-
-        let mut items = Vec::new();
-        let frame = machine.get_current_frame_mut()?;
-        for i in 0..count {
-            let Some(value) = frame.stack.pop() else {
-                panic!("expected value on stack for print")
+            let frame = machine.get_current_frame_mut()?;
+            let Some(Value::List(list)) = frame.stack.pop() else {
+                anyhow::bail!("expected list on stack for join")
             };
-            output.insert_str(0, &format!("{}", value));
-            if i == count - 1 {
-                items.push(value);
+            let Some(Value::String(string)) = frame.stack.pop() else {
+                anyhow::bail!("expected string on stack for join")
+            };
+            let result = list
+                .iter()
+                .map(|i| i.to_string())
+                .collect::<Vec<_>>()
+                .join(&string);
+            frame.stack.push(Value::String(Box::new(result)));
+            Ok(())
+        }
+
+        pub(crate) fn intrinsic_split(machine: &mut Machine, count: u8) -> Result<()> {
+            // (split " " "abc") ; -> ("a" "b" "c")
+            // (split " " "(+ 1 1)") ; ->  ("(+" "1" "1)")
+            if count != 2 {
+                anyhow::bail!("split only support 2 args");
             }
+            let frame = machine.get_current_frame_mut()?;
+            let Some(Value::String(string)) = frame.stack.pop() else {
+                anyhow::bail!("expected string on stack for split")
+            };
+            let Some(Value::String(item)) = frame.stack.pop() else {
+                anyhow::bail!("expected string on stack for split")
+            };
+            let result = string
+                .split(&*item)
+                .map(|i| Value::String(Box::new(i.to_string())))
+                .collect::<Vec<_>>();
+            frame.stack.push(Value::List(Box::new(result)));
+
+            Ok(())
         }
-        writer.write_all(output.as_bytes())?;
-        writer.flush()?;
+        pub(crate) fn intrinsic_to_string(machine: &mut Machine, count: u8) -> Result<()> {
+            // (to-string 1000) => "1000"
+            if count != 1 {
+                anyhow::bail!("to-string only support 1 args");
+            }
 
-        for items in items.into_iter().rev() {
-            frame.stack.push(items);
-        }
+            let frame = machine.get_current_frame_mut()?;
 
-        Ok(())
-    }
-
-    fn intrinsic_length(machine: &mut Machine, count: u8) -> Result<()> {
-        // (length (list 1 2 3)) -> 3
-        if count != 1 {
-            anyhow::bail!("length only support 1 args");
-        }
-
-        let frame = machine.get_current_frame_mut()?;
-        let Some(Value::List(list)) = frame.stack.pop() else {
-            anyhow::bail!("expected a List on stack for nth");
-        };
-
-        frame.stack.push(Value::F64(list.len() as f64));
-        Ok(())
-    }
-
-    fn intrinsic_assert_eq(machine: &mut Machine, count: u8) -> Result<()> {
-        // (assert-eq 1 2)
-        if count < 2 {
-            anyhow::bail!("assert-eq at least 2 args");
-        }
-
-        let frame = machine.get_current_frame_mut()?;
-
-        let Some(result) = frame.stack.pop() else {
-            anyhow::bail!("expected a value on stack for assert-eq");
-        };
-
-        let mut failed = false;
-        let mut message = String::new();
-        for _ in 0..count - 1 {
             let Some(value) = frame.stack.pop() else {
+                panic!("expected value on stack for to-string")
+            };
+            frame.stack.push(Value::String(Box::new(value.to_string())));
+
+            Ok(())
+        }
+
+        pub(crate) fn intrinsic_filter(machine: &mut Machine, count: u8) -> Result<()> {
+            // (filter (lambda (x) (> x 1)) (list 1 2 3)) ; -> (2 3)
+
+            if count != 2 {
+                anyhow::bail!("filter only support 2 args");
+            }
+
+            let Some(Value::List(mut list)) = machine.pop()? else {
+                anyhow::bail!("expected list on stack for filter")
+            };
+            let Some(Value::Callable(address)) = machine.pop()? else {
+                anyhow::bail!("expected lambda on stack for filter")
+            };
+            let mut result = Vec::new();
+            for value in list.drain(..) {
+                machine.push(value.clone())?;
+                machine.call_from_address(address, 1)?;
+                let Some(Value::Bool(true)) = machine.pop()? else {
+                    continue;
+                };
+                result.push(value);
+            }
+            machine.push(Value::List(Box::new(result)))?;
+            Ok(())
+        }
+        pub(crate) fn intrinsic_fold_right(machine: &mut Machine, count: u8) -> Result<()> {
+            // (fold-right 0 (lambda (x y) (+ x y)) (list 1 2 3)) => 6
+            if count != 3 {
+                anyhow::bail!("fold only support 3 args");
+            }
+            let Some(Value::List(mut list)) = machine.pop()? else {
+                anyhow::bail!("expected list on stack for fold")
+            };
+            let Some(Value::Callable(address)) = machine.pop()? else {
+                anyhow::bail!("expected lambda on stack for fold")
+            };
+            let Some(initial) = machine.pop()? else {
+                anyhow::bail!("expected number on stack for fold")
+            };
+            let mut result = initial;
+            for value in list.drain(..).rev() {
+                machine.push(result)?;
+                machine.push(value)?;
+                machine.call_from_address(address, 2)?;
+                let Some(v) = machine.pop()? else {
+                    // TODO: ERROR REPORTING
+                    anyhow::bail!("expected value on stack for fold right")
+                };
+                result = v;
+            }
+            machine.push(result)?;
+            Ok(())
+        }
+
+        pub(crate) fn intrinsic_fold(machine: &mut Machine, count: u8) -> Result<()> {
+            // (fold 0 (lambda (x y) (+ x y)) (list 1 2 3)) => 6
+            if count != 3 {
+                anyhow::bail!("fold only support 3 args");
+            }
+            let Some(Value::List(mut list)) = machine.pop()? else {
+                anyhow::bail!("expected list on stack for fold")
+            };
+            let Some(Value::Callable(address)) = machine.pop()? else {
+                anyhow::bail!("expected lambda on stack for fold")
+            };
+            let Some(initial) = machine.pop()? else {
+                anyhow::bail!("expected number on stack for fold")
+            };
+            let mut result = initial;
+            for value in list.drain(..) {
+                machine.push(result)?;
+                machine.push(value)?;
+                machine.call_from_address(address, 2)?;
+                let Some(v) = machine.pop()? else {
+                    // TODO: ERROR REPORTING
+                    anyhow::bail!("expected value on stack for fold")
+                };
+                result = v;
+            }
+            machine.push(result)?;
+            Ok(())
+        }
+
+        pub(crate) fn intrinsic_map(machine: &mut Machine, count: u8) -> Result<()> {
+            // (map (lambda (x) (+ x 1)) (list 1 2 3)) => (2 3 4)
+            if count != 2 {
+                anyhow::bail!("map only support 2 args");
+            }
+
+            let Some(Value::List(mut list)) = machine.pop()? else {
+                anyhow::bail!("expected list on stack for map")
+            };
+
+            let Some(Value::Callable(address)) = machine.pop()? else {
+                anyhow::bail!("expected lambda on stack for map")
+            };
+            let mut result = Vec::new();
+            for value in list.drain(..) {
+                machine.push(value)?;
+                machine.call_from_address(address, 1)?;
+                let Some(v) = machine.pop()? else {
+                    // TODO: ERROR REPORTING
+                    anyhow::bail!("expected value on stack for map")
+                };
+                result.push(v);
+            }
+
+            machine.push(Value::List(Box::new(result)))?;
+            Ok(())
+        }
+
+        pub(crate) fn intrinsic_nth(machine: &mut Machine, count: u8) -> Result<()> {
+            // (nth (list 1 2 3) 1) => 2
+            if count != 2 {
+                anyhow::bail!("nth only support 2 args");
+            }
+            let frame = machine.get_current_frame_mut()?;
+            let Some(Value::F64(index)) = frame.stack.pop() else {
+                anyhow::bail!("expected number on stack for nth")
+            };
+            let Some(Value::List(mut list)) = frame.stack.pop() else {
+                anyhow::bail!("expected list on stack for nth")
+            };
+            let index = index as usize;
+            if index >= list.len() {
+                anyhow::bail!("nth index out of range");
+            }
+            let value = list.remove(index);
+            frame.stack.push(value);
+            Ok(())
+        }
+
+        pub(crate) fn intrinsic_reverse(machine: &mut Machine, count: u8) -> Result<()> {
+            // (reverse (list 1 2 3)) => (3 2 1)
+            if count != 1 {
+                anyhow::bail!("reverse only support 1 args");
+            }
+
+            let frame = machine.get_current_frame_mut()?;
+
+            let Some(Value::List(mut list)) = frame.stack.pop() else {
+                anyhow::bail!("expected list on stack for reverse")
+            };
+            list.reverse();
+            frame.stack.push(Value::List(list));
+            Ok(())
+        }
+
+        pub(crate) fn intrinsic_append(machine: &mut Machine, count: u8) -> Result<()> {
+            // (append (list 1 2) (list 3 4)) => (1 2 3 4)
+            if count != 2 {
+                anyhow::bail!("append only support 2 args");
+            }
+            let frame = machine.get_current_frame_mut()?;
+            let Some(Value::List(mut list2)) = frame.stack.pop() else {
+                anyhow::bail!("expected list on stack for append")
+            };
+            let Some(Value::List(mut list1)) = frame.stack.pop() else {
+                anyhow::bail!("expected list on stack for append")
+            };
+
+            list1.append(&mut list2);
+            frame.stack.push(Value::List(list1));
+            Ok(())
+        }
+
+        pub(crate) fn intrinsic_last(machine: &mut Machine, count: u8) -> Result<()> {
+            // (last (list 1 2 3 4)) => 4
+            if count != 1 {
+                anyhow::bail!("last only support 1 args");
+            }
+            let frame = machine.get_current_frame_mut()?;
+            let Some(value) = frame.stack.pop() else {
+                panic!("expected value on stack for last")
+            };
+            match &value {
+                Value::List(list) if list.is_empty() => {
+                    frame.stack.push(Value::List(Box::default()));
+                }
+                Value::List(list) => {
+                    if let Some(value) = list.last() {
+                        frame.stack.push(value.clone());
+                        return Ok(());
+                    }
+                    anyhow::bail!("expected list to have at least 1 for `last`");
+                }
+                _ => anyhow::bail!("expected list on stack for last"),
+            }
+            Ok(())
+        }
+
+        pub(crate) fn intrinsic_cdr(machine: &mut Machine, count: u8) -> Result<()> {
+            // (cdr (list 1 2)) => (2)
+            if count != 1 {
+                anyhow::bail!("cdr only support 1 args");
+            }
+
+            let frame = machine.get_current_frame_mut()?;
+
+            let Some(value) = frame.stack.pop() else {
+                panic!("expected value on stack for cdr")
+            };
+            match &value {
+                Value::List(list) if list.is_empty() => {
+                    frame.stack.push(Value::List(Box::default()));
+                }
+                Value::List(list) => {
+                    frame.stack.push(Value::List(Box::new(list[1..].to_vec())));
+                }
+                _ => anyhow::bail!("expected list on stack for cdr"),
+            }
+
+            if let Value::List(list) = value {
+                if let Some(Value::List(list)) = list.last() {
+                    frame.stack.push(list[0].clone());
+                }
+            }
+            Ok(())
+        }
+
+        pub(crate) fn intrinsic_typeof(machine: &mut Machine, count: u8) -> Result<()> {
+            // (typeof 1) => "Number"
+            if count != 1 {
+                anyhow::bail!("typeof only support 1 args");
+            }
+            let frame = machine.get_current_frame_mut()?;
+            let Some(value) = frame.stack.pop() else {
+                panic!("expected value on stack for typeof")
+            };
+            frame.stack.push(Value::String(Box::new(value.type_of())));
+            Ok(())
+        }
+
+        pub(crate) fn intrinsic_print(machine: &mut Machine, count: u8) -> Result<()> {
+            use std::io::Write;
+            let lock = std::io::stdout().lock();
+            let mut writer = std::io::BufWriter::new(lock);
+            let mut output = String::new();
+
+            let mut items = Vec::new();
+            let frame = machine.get_current_frame_mut()?;
+            for i in 0..count {
+                let Some(value) = frame.stack.pop() else {
+                    panic!("expected value on stack for print")
+                };
+                output.insert_str(0, &format!("{}", value));
+                if i == count - 1 {
+                    items.push(value);
+                }
+            }
+            writer.write_all(output.as_bytes())?;
+            writer.flush()?;
+
+            for items in items.into_iter().rev() {
+                frame.stack.push(items);
+            }
+
+            Ok(())
+        }
+
+        pub(crate) fn intrinsic_length(machine: &mut Machine, count: u8) -> Result<()> {
+            // (length (list 1 2 3)) -> 3
+            if count != 1 {
+                anyhow::bail!("length only support 1 args");
+            }
+
+            let frame = machine.get_current_frame_mut()?;
+            let Some(Value::List(list)) = frame.stack.pop() else {
+                anyhow::bail!("expected a List on stack for nth");
+            };
+
+            frame.stack.push(Value::F64(list.len() as f64));
+            Ok(())
+        }
+
+        pub(crate) fn intrinsic_assert_eq(machine: &mut Machine, count: u8) -> Result<()> {
+            // (assert-eq 1 2)
+            if count < 2 {
+                anyhow::bail!("assert-eq at least 2 args");
+            }
+
+            let frame = machine.get_current_frame_mut()?;
+
+            let Some(result) = frame.stack.pop() else {
                 anyhow::bail!("expected a value on stack for assert-eq");
             };
-            failed = result != value;
+
+            let mut failed = false;
+            let mut message = String::new();
+            for _ in 0..count - 1 {
+                let Some(value) = frame.stack.pop() else {
+                    anyhow::bail!("expected a value on stack for assert-eq");
+                };
+                failed = result != value;
+                if failed {
+                    message = format!("assert-eq failed expected {} got {}", result, value);
+                    break;
+                }
+            }
             if failed {
-                message = format!("assert-eq failed expected {} got {}", result, value);
-                break;
+                if let Some(Value::String(result)) = frame.stack.pop() {
+                    eprintln!("TEST: {}", result);
+                }
+                anyhow::bail!(message);
             }
+
+            Ok(())
         }
-        if failed {
-            if let Some(Value::String(result)) = frame.stack.pop() {
-                eprintln!("TEST: {}", result);
+
+        pub(crate) fn intrinsic_assert(machine: &mut Machine, count: u8) -> Result<()> {
+            // (assert (> 1 2) "1 is not greater than 2")
+            if count != 2 {
+                anyhow::bail!("assert only support 2 args");
             }
-            anyhow::bail!(message);
-        }
 
-        Ok(())
-    }
+            let frame = machine.get_current_frame_mut()?;
 
-    fn intrinsic_assert(machine: &mut Machine, count: u8) -> Result<()> {
-        // (assert (> 1 2) "1 is not greater than 2")
-        if count != 2 {
-            anyhow::bail!("assert only support 2 args");
-        }
-
-        let frame = machine.get_current_frame_mut()?;
-
-        let Some(Value::String(message)) = frame.stack.pop() else {
-            anyhow::bail!("expected string on stack for assert")
-        };
-        let Some(Value::Bool(value)) = frame.stack.pop() else {
-            anyhow::bail!("expected boolean on stack for assert")
-        };
-        if !value {
-            let _ = writeln!(std::io::stderr(), "{message}");
-            std::process::exit(1);
-        }
-
-        Ok(())
-    }
-
-    fn intrinsic_create_list(machine: &mut Machine, count: u8) -> Result<()> {
-        // (create-list 1 2 3) => (1 2 3)
-        let mut items = Vec::new();
-        let frame = machine.get_current_frame_mut()?;
-        for _ in 0..count {
-            let Some(item) = frame.stack.pop() else {
-                panic!("expected value on stack for CreateList")
+            let Some(Value::String(message)) = frame.stack.pop() else {
+                anyhow::bail!("expected string on stack for assert")
             };
-            items.insert(0, item);
-        }
-        frame.stack.push(Value::List(Box::new(items)));
-        Ok(())
-    }
+            let Some(Value::Bool(value)) = frame.stack.pop() else {
+                anyhow::bail!("expected boolean on stack for assert")
+            };
+            if !value {
+                let _ = writeln!(std::io::stderr(), "{message}");
+                std::process::exit(1);
+            }
 
-    fn intrinsic_cons(machine: &mut Machine, count: u8) -> Result<()> {
-        // (cons 1 (list 2 3)) => (1 2 3)
-        if count != 2 {
-            anyhow::bail!("cons only support 2 args");
-        }
-        let frame = machine.get_current_frame_mut()?;
-        let Some(Value::List(mut list)) = frame.stack.pop() else {
-            panic!("expected a List on stack for cons")
-        };
-        let Some(item) = frame.stack.pop() else {
-            panic!("expected value on stack for cons")
-        };
-        list.insert(0, item);
-        frame.stack.push(Value::List(Box::new(*list)));
-        Ok(())
-    }
-
-    fn intrinsic_car(machine: &mut Machine, count: u8) -> Result<()> {
-        // (car (list 1 2)) => 1
-        if count != 1 {
-            anyhow::bail!("car only support 2 args");
+            Ok(())
         }
 
-        let frame = machine.get_current_frame_mut()?;
+        pub(crate) fn intrinsic_create_list(machine: &mut Machine, count: u8) -> Result<()> {
+            // (create-list 1 2 3) => (1 2 3)
+            let mut items = Vec::new();
+            let frame = machine.get_current_frame_mut()?;
+            for _ in 0..count {
+                let Some(item) = frame.stack.pop() else {
+                    panic!("expected value on stack for CreateList")
+                };
+                items.insert(0, item);
+            }
+            frame.stack.push(Value::List(Box::new(items)));
+            Ok(())
+        }
 
-        let Some(Value::List(list)) = frame.stack.pop() else {
-            panic!("expected a List on stack for car")
-        };
-        let item = list.first().cloned().unwrap_or(Value::Bool(false));
+        pub(crate) fn intrinsic_cons(machine: &mut Machine, count: u8) -> Result<()> {
+            // (cons 1 (list 2 3)) => (1 2 3)
+            if count != 2 {
+                anyhow::bail!("cons only support 2 args");
+            }
+            let frame = machine.get_current_frame_mut()?;
+            let Some(Value::List(mut list)) = frame.stack.pop() else {
+                panic!("expected a List on stack for cons")
+            };
+            let Some(item) = frame.stack.pop() else {
+                panic!("expected value on stack for cons")
+            };
+            list.insert(0, item);
+            frame.stack.push(Value::List(Box::new(*list)));
+            Ok(())
+        }
 
-        frame.stack.push(item);
-        Ok(())
+        pub(crate) fn intrinsic_car(machine: &mut Machine, count: u8) -> Result<()> {
+            // (car (list 1 2)) => 1
+            if count != 1 {
+                anyhow::bail!("car only support 2 args");
+            }
+
+            let frame = machine.get_current_frame_mut()?;
+
+            let Some(Value::List(list)) = frame.stack.pop() else {
+                panic!("expected a List on stack for car")
+            };
+            let item = list.first().cloned().unwrap_or(Value::Bool(false));
+
+            frame.stack.push(item);
+            Ok(())
+        }
     }
 }
