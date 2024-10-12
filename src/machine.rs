@@ -1358,105 +1358,75 @@ impl Machine {
     fn instruction_eq(&mut self) -> Result<()> {
         let count = self.get_u8()? as usize;
         let frame = self.get_current_frame_mut()?;
-        let length = frame.stack.len();
-        let args = frame.stack.split_off(length - count);
-        let mut left = args[0].clone();
-        for right in args.iter().skip(1) {
-            match (left, right) {
-                (Value::I32(l), Value::I32(r)) => {
-                    left = Value::Bool(l == *r);
-                }
-                (Value::F64(l), Value::F64(r)) => {
-                    left = Value::Bool(l == *r);
-                }
-                _ => panic!("invalid types for Eq"),
-            }
-        }
-        frame.stack.push(left);
+        let index = frame.stack.len() - count;
+        let args = frame.stack.split_off(index);
+        let left = &args[0];
+        let value = args.iter().skip(1).all(|right| match (left, right) {
+            (Value::I32(l), Value::I32(r)) => l == r,
+            (Value::F64(l), Value::F64(r)) => l == r,
+            _ => panic!("invalid types for Less Than"),
+        });
+        frame.stack.push(Value::Bool(value));
         Ok(())
     }
 
     fn instruction_greater_than(&mut self) -> Result<()> {
         let count = self.get_u8()? as usize;
         let frame = self.get_current_frame_mut()?;
-        let length = frame.stack.len();
-        let args = frame.stack.split_off(length - count);
-        let mut left = args[0].clone();
-        for right in args.iter().skip(1) {
-            match (left, right) {
-                (Value::I32(l), Value::I32(r)) => {
-                    left = Value::Bool(l > *r);
-                }
-                (Value::F64(l), Value::F64(r)) => {
-                    left = Value::Bool(l > *r);
-                }
-                _ => panic!("invalid types for GreaterThan"),
-            }
-        }
-        frame.stack.push(left);
+        let index = frame.stack.len() - count;
+        let args = frame.stack.split_off(index);
+        let left = &args[0];
+        let value = args.iter().skip(1).all(|right| match (left, right) {
+            (Value::I32(l), Value::I32(r)) => l > r,
+            (Value::F64(l), Value::F64(r)) => l > r,
+            _ => panic!("invalid types for Less Than"),
+        });
+        frame.stack.push(Value::Bool(value));
         Ok(())
     }
 
     fn instruction_less_than(&mut self) -> Result<()> {
         let count = self.get_u8()? as usize;
         let frame = self.get_current_frame_mut()?;
-        let length = frame.stack.len();
-        let args = frame.stack.split_off(length - count);
-        let mut left = args[0].clone();
-        for right in args.iter().skip(1) {
-            match (left, right) {
-                (Value::I32(l), Value::I32(r)) => {
-                    left = Value::Bool(l < *r);
-                }
-                (Value::F64(l), Value::F64(r)) => {
-                    left = Value::Bool(l < *r);
-                }
-                _ => panic!("invalid types for LessThan"),
-            }
-        }
-        frame.stack.push(left);
+        let index = frame.stack.len() - count;
+        let args = frame.stack.split_off(index);
+        let left = &args[0];
+        let value = args.iter().skip(1).all(|right| match (left, right) {
+            (Value::I32(l), Value::I32(r)) => l < r,
+            (Value::F64(l), Value::F64(r)) => l < r,
+            _ => panic!("invalid types for Less Than"),
+        });
+        frame.stack.push(Value::Bool(value));
         Ok(())
     }
 
     fn instruction_greater_than_or_equal(&mut self) -> Result<()> {
         let count = self.get_u8()? as usize;
         let frame = self.get_current_frame_mut()?;
-        let length = frame.stack.len();
-        let args = frame.stack.split_off(length - count);
-        let mut left = args[0].clone();
-        for right in args.iter().skip(1) {
-            match (left, right) {
-                (Value::I32(l), Value::I32(r)) => {
-                    left = Value::Bool(l >= *r);
-                }
-                (Value::F64(l), Value::F64(r)) => {
-                    left = Value::Bool(l >= *r);
-                }
-                _ => panic!("invalid types for GreaterThanOrEqual"),
-            }
-        }
-        frame.stack.push(left);
+        let index = frame.stack.len() - count;
+        let args = frame.stack.split_off(index);
+        let left = &args[0];
+        let value = args.iter().skip(1).all(|right| match (left, right) {
+            (Value::I32(l), Value::I32(r)) => l >= r,
+            (Value::F64(l), Value::F64(r)) => l >= r,
+            _ => panic!("invalid types for Greater Than Or Equal"),
+        });
+        frame.stack.push(Value::Bool(value));
         Ok(())
     }
 
     fn instruction_less_than_or_equal(&mut self) -> Result<()> {
         let count = self.get_u8()? as usize;
         let frame = self.get_current_frame_mut()?;
-        let length = frame.stack.len();
-        let args = frame.stack.split_off(length - count);
-        let mut left = args[0].clone();
-        for right in args.iter().skip(1) {
-            match (left, right) {
-                (Value::I32(l), Value::I32(r)) => {
-                    left = Value::Bool(l <= *r);
-                }
-                (Value::F64(l), Value::F64(r)) => {
-                    left = Value::Bool(l <= *r);
-                }
-                _ => panic!("invalid types for LessThanOrEqual"),
-            }
-        }
-        frame.stack.push(left);
+        let index = frame.stack.len() - count;
+        let args = frame.stack.split_off(index);
+        let left = &args[0];
+        let value = args.iter().skip(1).all(|right| match (left, right) {
+            (Value::I32(l), Value::I32(r)) => l <= r,
+            (Value::F64(l), Value::F64(r)) => l <= r,
+            _ => panic!("invalid types for Greater Than Or Equal"),
+        });
+        frame.stack.push(Value::Bool(value));
         Ok(())
     }
 
@@ -1768,6 +1738,290 @@ impl Machine {
         }
         self.ip = ip_address;
         Ok(instructions)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Machine, Value};
+    use anyhow::Result;
+    #[test]
+    fn test_single_value() -> Result<()> {
+        let mut machine = Machine::default();
+        machine.run_from_string(r#"12345"#)?;
+        machine.run()?;
+        let frame = machine.get_current_frame()?;
+        assert_eq!(frame.stack[0], Value::F64(12345.0));
+        assert_eq!(machine.cycle_count, 2);
+
+        let mut machine = Machine::default();
+        machine.run_from_string(r#"321.123"#)?;
+        machine.run()?;
+        let frame = machine.get_current_frame()?;
+        assert_eq!(frame.stack[0], Value::F64(321.123));
+
+        let mut machine = Machine::default();
+        machine.run_from_string(r#""string :)""#)?;
+        machine.run()?;
+        let frame = machine.get_current_frame()?;
+        assert_eq!(
+            frame.stack[0],
+            Value::String(Box::new(String::from("string :)")))
+        );
+        assert_eq!(machine.cycle_count, 2);
+        assert_eq!(machine.cycle_count, 2);
+        Ok(())
+    }
+
+    #[test]
+    fn test_add_function() -> Result<()> {
+        let src = r#"(+ 1 2)"#;
+        let mut machine = Machine::default();
+        machine.run_from_string(src)?;
+        machine.run()?;
+
+        let frame = machine.get_current_frame()?;
+        assert_eq!(frame.stack[0], Value::F64(3.0));
+        assert_eq!(machine.cycle_count, 4);
+        Ok(())
+    }
+
+    #[test]
+    fn test_sub_function() -> Result<()> {
+        let src = r#"(- 2 1)"#;
+        let mut machine = Machine::default();
+        machine.run_from_string(src)?;
+        machine.run()?;
+
+        let frame = machine.get_current_frame()?;
+        assert_eq!(frame.stack[0], Value::F64(1.0));
+        assert_eq!(machine.cycle_count, 4);
+        Ok(())
+    }
+
+    #[test]
+    fn test_mul_function() -> Result<()> {
+        let src = r#"(* 2 1)"#;
+        let mut machine = Machine::default();
+        machine.run_from_string(src)?;
+        machine.run()?;
+
+        let frame = machine.get_current_frame()?;
+        assert_eq!(frame.stack[0], Value::F64(2.0));
+        assert_eq!(machine.cycle_count, 4);
+        Ok(())
+    }
+
+    #[test]
+    fn test_div_function() -> Result<()> {
+        let src = r#"(/ 2 1)"#;
+        let mut machine = Machine::default();
+        machine.run_from_string(src)?;
+        machine.run()?;
+
+        let frame = machine.get_current_frame()?;
+        assert_eq!(frame.stack[0], Value::F64(2.0));
+        assert_eq!(machine.cycle_count, 4);
+        Ok(())
+    }
+
+    #[test]
+    fn test_eq_function() -> Result<()> {
+        let src = r#"(= 2 2 2)"#;
+        let mut machine = Machine::default();
+        machine.run_from_string(src)?;
+        machine.run()?;
+
+        let frame = machine.get_current_frame()?;
+        assert_eq!(frame.stack[0], Value::Bool(true));
+        assert_eq!(machine.cycle_count, 5);
+        Ok(())
+    }
+
+    #[test]
+    fn test_gt_function() -> Result<()> {
+        let src = r#"(> 3 2 1)"#;
+        let mut machine = Machine::default();
+        machine.run_from_string(src)?;
+        machine.run()?;
+
+        let frame = machine.get_current_frame()?;
+        assert_eq!(frame.stack[0], Value::Bool(true));
+        assert_eq!(machine.cycle_count, 5);
+        Ok(())
+    }
+
+    #[test]
+    fn test_lt_function() -> Result<()> {
+        let src = r#"(< 2 3 4)"#;
+        let mut machine = Machine::default();
+        machine.run_from_string(src)?;
+        machine.run()?;
+
+        let frame = machine.get_current_frame()?;
+        assert_eq!(frame.stack[0], Value::Bool(true));
+        assert_eq!(machine.cycle_count, 5);
+        Ok(())
+    }
+
+    #[test]
+    fn test_gte_function() -> Result<()> {
+        let src = r#"(>= 3 3 2 1)"#;
+        let mut machine = Machine::default();
+        machine.run_from_string(src)?;
+        machine.run()?;
+
+        let frame = machine.get_current_frame()?;
+        assert_eq!(frame.stack[0], Value::Bool(true));
+        assert_eq!(machine.cycle_count, 6);
+        Ok(())
+    }
+
+    #[test]
+    fn test_lte_function() -> Result<()> {
+        let src = r#"(<= 1 3 2 1)"#;
+        let mut machine = Machine::default();
+        machine.run_from_string(src)?;
+        machine.run()?;
+
+        let frame = machine.get_current_frame()?;
+        assert_eq!(frame.stack[0], Value::Bool(true));
+        assert_eq!(machine.cycle_count, 6);
+        Ok(())
+    }
+
+    #[test]
+    fn test_and_function() -> Result<()> {
+        let src = r#"(and true true)"#;
+        let mut machine = Machine::default();
+        machine.run_from_string(src)?;
+        machine.run()?;
+
+        let frame = machine.get_current_frame()?;
+        assert_eq!(frame.stack[0], Value::Bool(true));
+        assert_eq!(machine.cycle_count, 4);
+        Ok(())
+    }
+
+    #[test]
+    fn test_or_function() -> Result<()> {
+        let src = r#"(or false true)"#;
+        let mut machine = Machine::default();
+        machine.run_from_string(src)?;
+        machine.run()?;
+
+        let frame = machine.get_current_frame()?;
+        assert_eq!(frame.stack[0], Value::Bool(true));
+        assert_eq!(machine.cycle_count, 4);
+        Ok(())
+    }
+
+    #[test]
+    fn test_not_function() -> Result<()> {
+        let src = r#"(not false)"#;
+        let mut machine = Machine::default();
+        machine.run_from_string(src)?;
+        machine.run()?;
+
+        let frame = machine.get_current_frame()?;
+        assert_eq!(frame.stack[0], Value::Bool(true));
+        assert_eq!(machine.cycle_count, 3);
+        Ok(())
+    }
+
+    #[test]
+    fn test_mod_function() -> Result<()> {
+        let src = r#"(mod 4 2)"#;
+        let mut machine = Machine::default();
+        machine.run_from_string(src)?;
+        machine.run()?;
+
+        let frame = machine.get_current_frame()?;
+        assert_eq!(frame.stack[0], Value::F64(0.0));
+        assert_eq!(machine.cycle_count, 4);
+        Ok(())
+    }
+
+    #[test]
+    fn test_calling_a_function() -> Result<()> {
+        let src = r#"
+        (fn add (x y) (+ x y))
+        (add 123 321)
+        "#;
+        let mut machine = Machine::default();
+        machine.run_from_string(src)?;
+        machine.run()?;
+
+        let frame = machine.get_current_frame()?;
+        assert_eq!(frame.stack[0], Value::F64(444.0));
+        assert_eq!(machine.cycle_count, 12);
+        Ok(())
+    }
+
+    #[test]
+    fn test_calling_a_lambda() -> Result<()> {
+        let src = r#"
+        (var add (lambda (x y) (+ x y)))
+        (add 123 321)
+        "#;
+        let mut machine = Machine::default();
+        machine.run_from_string(src)?;
+        machine.run()?;
+
+        let frame = machine.get_current_frame()?;
+        assert_eq!(frame.stack[0], Value::F64(444.0));
+        assert_eq!(machine.cycle_count, 12);
+        Ok(())
+    }
+
+    #[test]
+    fn test_var_function() -> Result<()> {
+        let src = r#"
+        (var X 100)
+        (var Y 300)
+        (fn add (x y) (+ x y))
+        (add X Y)
+        "#;
+        let mut machine = Machine::default();
+        machine.run_from_string(src)?;
+        machine.run()?;
+
+        let frame = machine.get_current_frame()?;
+        assert_eq!(frame.stack[0], Value::F64(200.0));
+        assert_eq!(machine.cycle_count, 16);
+        Ok(())
+    }
+
+    #[test]
+    fn test_if_else_function() -> Result<()> {
+        let mut machine = Machine::default();
+        machine.run_from_string("(if true 1 3)")?;
+        machine.run()?;
+
+        let frame = machine.get_current_frame()?;
+        assert_eq!(frame.stack[0], Value::F64(1.0));
+        assert_eq!(machine.cycle_count, 5);
+
+        let mut machine = Machine::default();
+        machine.run_from_string("(if false 1 3)")?;
+        machine.run()?;
+
+        let frame = machine.get_current_frame()?;
+        assert_eq!(frame.stack[0], Value::F64(5.0));
+        assert_eq!(machine.cycle_count, 5);
+        Ok(())
+    }
+
+    #[test]
+    fn test_let_function() -> Result<()> {
+        let mut machine = Machine::default();
+        machine.run_from_string("(let (x 10) x)")?;
+        machine.run()?;
+
+        let frame = machine.get_current_frame()?;
+        assert_eq!(frame.stack[0], Value::F64(10.0));
+        assert_eq!(machine.cycle_count, 4);
+        Ok(())
     }
 }
 
