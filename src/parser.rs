@@ -81,11 +81,10 @@ pub fn parse_expr() -> impl Parser<char, Spanned<Expr>, Error = Error> {
             .or(string)
             .or(boolean)
             .or(symbol)
-            .or(expr.clone())
             .padded_by(comment.repeated());
 
         let quoted = just('\'')
-            .ignore_then(atom.clone())
+            .ignore_then(expr.clone())
             .padded_by(comment.repeated())
             .map_with_span(|e: Spanned<Expr>, span: Span| {
                 (
@@ -98,7 +97,7 @@ pub fn parse_expr() -> impl Parser<char, Spanned<Expr>, Error = Error> {
                     .into()
             });
 
-        let list = atom
+        let list = expr
             .repeated()
             .delimited_by(
                 just('(').map_err(|e| Error::with_label(e, ErrorType::MissingOpeningParenthesis)),
@@ -108,10 +107,37 @@ pub fn parse_expr() -> impl Parser<char, Spanned<Expr>, Error = Error> {
             .padded()
             .map_with_span(|list, span| Spanned::from((Expr::List(list), span)));
 
-        list.or(quoted)
+        list.or(quoted).or(atom)
     })
 }
 
 pub fn parser() -> impl Parser<char, Vec<Spanned<Expr>>, Error = Error> {
     parse_expr().repeated().padded().then_ignore(end())
+}
+
+pub fn parse_or_report(filename: &str, src: &str) -> Vec<Spanned<Expr>> {
+    use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
+    match parser().parse(src) {
+        Ok(ast) => ast,
+        Err(errors) => {
+            errors.into_iter().for_each(|error| {
+                Report::build(ReportKind::Error, filename, error.span().start)
+                    .with_code(1)
+                    .with_message(error.message())
+                    .with_label(
+                        Label::new((filename, error.span().clone()))
+                            .with_message(format!("This is of type {}", "Nat".fg(Color::Cyan)))
+                            .with_color(Color::Red),
+                    )
+                    .with_note(format!(
+                        "Outputs of {} expressions must coerce to the same type",
+                        "match".fg(Color::Green)
+                    ))
+                    .finish()
+                    .eprint(("main.nl", Source::from(src)))
+                    .unwrap();
+            });
+            Vec::new()
+        }
+    }
 }

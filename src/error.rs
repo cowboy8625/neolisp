@@ -13,6 +13,26 @@ pub enum Error {
     MissingOpeningParenthesis(Span),
 }
 
+impl Error {
+    pub fn span(&self) -> &Span {
+        match self {
+            Self::ExpectedFound(span, ..) => span,
+            Self::MissingClosingParenthesis(span) => span,
+            Self::MissingOpeningParenthesis(span) => span,
+        }
+    }
+
+    pub fn message(&self) -> String {
+        match self {
+            Self::ExpectedFound(_, expected, found) => {
+                format!("expected {expected:?} found {found:?}")
+            }
+            Self::MissingClosingParenthesis(_) => "missing closing parenthesis".to_string(),
+            Self::MissingOpeningParenthesis(_) => "missing opening parenthesis".to_string(),
+        }
+    }
+}
+
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

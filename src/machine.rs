@@ -4,7 +4,7 @@ use super::{
         AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr, LoopExpr,
         OperatorExpr, VarExpr,
     },
-    parser::parser,
+    parser::{parse_or_report, parser},
     symbol_table::{Symbol, SymbolKind, SymbolScope, SymbolTable, SymbolTableBuilder},
     BUILTINS,
 };
@@ -975,9 +975,11 @@ impl Machine {
     pub fn load_from_string(&mut self, src: &str) -> Result<()> {
         self.is_running = true;
 
-        let ast = parser().parse(src).map_err(|e| {
-            anyhow::anyhow!(e.iter().map(|e| e.to_string() + "\n").collect::<String>())
-        })?;
+        // let ast = parser().parse(src).map_err(|e| {
+        //     anyhow::anyhow!(e.iter().map(|e| e.to_string() + "\n").collect::<String>())
+        // })?;
+        let ast = parse_or_report("none", src);
+        eprintln!("{ast:?}");
         let mut symbol_table = match self.symbol_table.take() {
             Some(mut table) => {
                 SymbolTableBuilder::default().build_from_scope(&ast, &mut table);

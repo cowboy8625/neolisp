@@ -13,11 +13,17 @@ num-traits = "0.2.19"
 num-derive = "0.4.2"
 ratatui = "0.28.1"
 crossterm = "0.28.1"
+ariadne = "0.4.1"
 
 [dev-dependencies]
 pretty_assertions = "1.4.1"
 criterion = "0.5.1"
 
+[package.metadata.clippy]
+# Enable additional strict lints
+# "pedantic" catches more minor issues
+# "restriction" imposes stricter coding rules, but not all are practical
+lints = ["pedantic", "restriction"]
 
 [[bin]]
 name = "neolisp"
