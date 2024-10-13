@@ -1,5 +1,6 @@
 use super::{
-    compiler::{compile, Compiler, CompilerOptions},
+    compiler::{Compiler, CompilerOptions},
+    error::Error,
     instruction::{Instruction, OpCode, Value},
     parser::parse_or_report,
     symbol_table::{SymbolTable, SymbolTableBuilder},
@@ -90,15 +91,6 @@ impl Frame {
     }
 }
 
-impl TryFrom<(&str, CompilerOptions)> for Machine {
-    type Error = anyhow::Error;
-    fn try_from((src, options): (&str, CompilerOptions)) -> std::result::Result<Self, Self::Error> {
-        let instructions = compile(src, options)?;
-        let program: Vec<u8> = instructions.iter().flat_map(|i| i.to_bytecode()).collect();
-        Ok(Self::new(program))
-    }
-}
-
 #[derive(Debug, Default)]
 pub struct MachineOptions {
     pub quiet: bool,
@@ -160,16 +152,17 @@ impl Machine {
         self.is_running
     }
 
-    pub fn load_from_string(&mut self, src: &str) -> Result<()> {
+    pub fn load_from_string(&mut self, src: &str) -> std::result::Result<(), Vec<Error>> {
         self.is_running = true;
-        let ast = parse_or_report("none", src);
+        let ast = parse_or_report("repl", src);
         let mut symbol_table = match self.symbol_table.take() {
             Some(mut table) => {
-                SymbolTableBuilder::default().build_from_scope(&ast, &mut table);
+                SymbolTableBuilder::default().build_from_scope(&ast, &mut table)?;
                 table
             }
-            None => SymbolTableBuilder::default().build(&ast),
+            None => SymbolTableBuilder::default().build(&ast)?,
         };
+
         let instructions = Compiler::new(&mut symbol_table, CompilerOptions { no_main: true })
             .with_offset(self.program.len())
             .compile(&ast)?;
@@ -181,7 +174,15 @@ impl Machine {
     }
 
     pub fn run_from_string(&mut self, src: &str) -> Result<()> {
-        self.load_from_string(src)?;
+        match self.load_from_string(src) {
+            Ok(_) => (),
+            Err(errors) => {
+                for error in errors {
+                    error.report("repl", src)?;
+                }
+                return Ok(());
+            }
+        }
         self.run()?;
         Ok(())
     }

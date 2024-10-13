@@ -1,50 +1,3 @@
-// use ariadne::{Color, ColorGenerator, Fmt, Label, Report, ReportKind, Source};
-// use chumsky::prelude::*;
-// use neolisp::parser::parser;
-// fn main() {
-//     let src = include_str!("../main.nl");
-//     let (ast, errors) = match parser().parse(src) {
-//         Ok(ast) => (ast, vec![]),
-//         Err(errors) => (vec![], errors),
-//     };
-//     println!("{ast:#?}");
-//     println!("{errors:#?}");
-//
-//     let mut colors = ColorGenerator::new();
-//
-//     // Generate & choose some colours for each of our elements
-//
-//     for error in errors {
-//         Report::build(ReportKind::Error, "main.nl", error.span().start)
-//             .with_code(1)
-//             .with_message(error.message())
-//             .with_label(
-//                 Label::new(("main.nl", error.span().clone()))
-//                     .with_message(format!("This is of type {}", "Nat".fg(Color::Cyan)))
-//                     .with_color(Color::Red),
-//             )
-//             // .with_label(
-//             //     Label::new(("main.nl", error.span().clone()))
-//             //         .with_message(format!("This is of type {}", "Str".fg(b)))
-//             //         .with_color(b),
-//             // )
-//             // .with_label(
-//             //     Label::new(("main.nl", error.span().clone()))
-//             //         .with_message(format!(
-//             //             "The values are outputs of this {} expression",
-//             //             "match".fg(out),
-//             //         ))
-//             //         .with_color(out),
-//             // )
-//             .with_note(format!(
-//                 "Outputs of {} expressions must coerce to the same type",
-//                 "match".fg(Color::Green)
-//             ))
-//             .finish()
-//             .print(("main.nl", Source::from(src)))
-//             .unwrap();
-//     }
-// }
 use neolisp::{
     cli::{Cli, Command},
     compiler::{compile, CompilerOptions},
@@ -114,10 +67,18 @@ fn main() -> anyhow::Result<()> {
 fn run(file: Option<String>, decompile: bool, no_main: bool) -> anyhow::Result<()> {
     let filename = file.unwrap_or("main.nl".to_string());
 
-    let src = std::fs::read_to_string(filename)?;
+    let src = std::fs::read_to_string(&filename)?;
 
     let options = CompilerOptions { no_main };
-    let instructions = compile(&src, options)?;
+    let instructions = match compile(&src, options) {
+        Ok(program) => program,
+        Err(errors) => {
+            for error in errors {
+                error.report(&filename, &src)?;
+            }
+            return Ok(());
+        }
+    };
 
     if decompile {
         let mut offset = 0;

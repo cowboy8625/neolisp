@@ -248,7 +248,14 @@ impl<'a> Debugger<'a> {
                         }
                         Command::Run(Some(file)) => match std::fs::read_to_string(&file) {
                             Result::Ok(src) => {
-                                self.machine.load_from_string(&src)?;
+                                match self.machine.load_from_string(&src) {
+                                    Result::Ok(_) => {}
+                                    Result::Err(errors) => {
+                                        for error in errors {
+                                            error.report(&file, &src)?;
+                                        }
+                                    }
+                                };
                                 let instructions = self.machine.decompile()?;
                                 self.instructions = instructions;
                             }

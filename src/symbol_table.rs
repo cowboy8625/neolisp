@@ -1,7 +1,10 @@
-use crate::ast::{Expr, Spanned};
-use crate::expr_walker::{
-    AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr, LoopExpr,
-    OperatorExpr, VarExpr,
+use super::{
+    ast::{Expr, Span, Spanned},
+    error::Error,
+    expr_walker::{
+        AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr, LoopExpr,
+        OperatorExpr, VarExpr,
+    },
 };
 use std::collections::HashMap;
 
@@ -268,16 +271,30 @@ pub struct SymbolTableBuilder {
     local_counter: usize,
     free_counter: usize,
     is_in_lambda: bool,
+    errors: Vec<Error>,
 }
 
 impl SymbolTableBuilder {
-    pub fn build_from_scope(&mut self, ast: &[Spanned<Expr>], table: &mut SymbolTable) {
+    pub fn build_from_scope(
+        mut self,
+        ast: &[Spanned<Expr>],
+        table: &mut SymbolTable,
+    ) -> std::result::Result<(), Vec<Error>> {
         self.walk(table, ast);
+        if !self.errors.is_empty() {
+            return Err(self.errors);
+        }
+        Ok(())
     }
-    pub fn build(&mut self, ast: &[Spanned<Expr>]) -> SymbolTable {
+
+    pub fn build(mut self, ast: &[Spanned<Expr>]) -> std::result::Result<SymbolTable, Vec<Error>> {
         let mut table = SymbolTable::default();
         self.walk(&mut table, ast);
-        table
+        if !self.errors.is_empty() {
+            return Err(self.errors);
+        }
+
+        Ok(table)
     }
 
     fn get_free_id(&mut self) -> usize {
@@ -288,6 +305,10 @@ impl SymbolTableBuilder {
 }
 
 impl AstWalker<SymbolTable> for SymbolTableBuilder {
+    fn error(&mut self, error: Error) {
+        self.errors.push(error);
+    }
+
     fn get_lambda_name(&mut self) -> String {
         let name = format!("lambda_{}", self.lambda_counter);
         self.lambda_counter += 1;
@@ -517,7 +538,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         self.walk_expr(table, loop_expr.body);
     }
 
-    fn handle_symbol(&mut self, table: &mut SymbolTable, name: &str) {
+    fn handle_symbol(&mut self, table: &mut SymbolTable, name: &str, _: Span) {
         let current_scope_level = table.get_scope_level() as u32;
         match table.lookup(name).cloned() {
             Some(symbol) if symbol.scope_level < current_scope_level && self.is_in_lambda => {
@@ -572,7 +593,7 @@ mod tests {
 (fn main () (print ((add 123) 321) "\n"))
 "#;
         let ast = parser().parse(src).unwrap();
-        let symbol_table = SymbolTableBuilder::default().build(&ast);
+        let symbol_table = SymbolTableBuilder::default().build(&ast).unwrap();
         eprintln!("{:#?}", symbol_table);
         assert_eq!(
             symbol_table.lookup("add"),
@@ -647,7 +668,7 @@ mod tests {
 (fn main () (print (fib 42) "\n"))
 "#;
         let ast = parser().parse(src).unwrap();
-        let symbol_table = SymbolTableBuilder::default().build(&ast);
+        let symbol_table = SymbolTableBuilder::default().build(&ast).unwrap();
         eprintln!("{:#?}", symbol_table);
         assert_eq!(
             symbol_table.lookup("fib"),
