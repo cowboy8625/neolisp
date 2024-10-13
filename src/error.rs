@@ -20,7 +20,7 @@ pub enum ErrorType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
-    ExpectedFound(Span, Vec<Option<char>>, Option<char>),
+    ExpectedFound(Span, String, String, Option<String>),
     MissingClosingParenthesis(Span),
     MissingOpeningParenthesis(Span),
     NotCallable(Span, String),
@@ -42,8 +42,8 @@ impl Error {
 
     pub fn message(&self) -> String {
         match self {
-            Self::ExpectedFound(_, expected, found) => {
-                format!("expected {expected:?} found {found:?}")
+            Self::ExpectedFound(_, expected, found, _) => {
+                format!("expected {expected} found {found}")
             }
             Self::MissingClosingParenthesis(_) => "missing closing parenthesis".to_string(),
             Self::MissingOpeningParenthesis(_) => "missing opening parenthesis".to_string(),
@@ -55,7 +55,7 @@ impl Error {
 
     fn has_note(&self) -> bool {
         match self {
-            Error::ExpectedFound(..) => false,
+            Error::ExpectedFound(.., note) => note.is_some(),
             Error::MissingClosingParenthesis(..) => false,
             Error::MissingOpeningParenthesis(..) => false,
             Error::NotCallable(..) => false,
@@ -66,7 +66,11 @@ impl Error {
 
     fn note(&self) -> String {
         match self {
-            Error::ExpectedFound(..) => todo!(),
+            Error::ExpectedFound(.., note) => if let Some(note) = note {
+                note.to_string()
+            } else {
+                "".to_string()
+            }
             Error::MissingClosingParenthesis(..) => todo!(),
             Error::MissingOpeningParenthesis(..) => todo!(),
             Error::NotCallable(..) => todo!(),
@@ -128,11 +132,11 @@ impl chumsky::Error<char> for Error {
         expected: It,
         found: Option<char>,
     ) -> Self {
-        Self::ExpectedFound(span, expected.into_iter().collect(), found)
+        Self::ExpectedFound(span, expected.into_iter().filter_map(|c| c.map(|c| c.to_string())).collect(), found.map(|c| c.to_string()).unwrap_or_default(), None)
     }
 
     fn with_label(self, label: Self::Label) -> Self {
-        let Self::ExpectedFound(span, _, _) = self else {
+        let Self::ExpectedFound(span, _, _, _) = self else {
             return self;
         };
         match label {
@@ -142,10 +146,10 @@ impl chumsky::Error<char> for Error {
     }
 
     fn merge(mut self, mut other: Self) -> Self {
-        if let (Self::ExpectedFound(_, expected, _), Self::ExpectedFound(_, expected_other, _)) =
+        if let (Self::ExpectedFound(_, expected, _, _), Self::ExpectedFound(_, expected_other, _, _)) =
             (&mut self, &mut other)
         {
-            expected.append(expected_other);
+            expected.push_str(expected_other);
         }
         self
     }

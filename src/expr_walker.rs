@@ -272,18 +272,34 @@ pub trait AstWalker<T> {
         const NAME: usize = 1;
         const BODY: usize = 2;
 
+        let starting_span = elements[0].span.clone();
         let Some(name_spanned) = elements.get(NAME) else {
-            // TODO: REPORT ERROR
-            unreachable!();
+            self.error(Error::ExpectedFound(
+                starting_span,
+                "name after var".to_string(),
+                "nothing".to_string(),
+                Some("(var <name> <expression>)".to_string()),
+            ));
+            return;
         };
         let Expr::Symbol(_) = &name_spanned.expr else {
-            // TODO: REPORT ERROR
-            unreachable!();
+            self.error(Error::ExpectedFound(
+                name_spanned.span.clone(),
+                "Symbol".to_string(),
+                name_spanned.expr.type_of(),
+                Some("(var <name> <expression>)".to_string()),
+            ));
+            return;
         };
 
         let Some(body_spanned) = elements.get(BODY) else {
-            // TODO: REPORT ERROR
-            unreachable!();
+            self.error(Error::ExpectedFound(
+                name_spanned.span.clone(),
+                "expression after name".to_string(),
+                "nothing".to_string(),
+                Some("(var <name> <expression>)".to_string()),
+            ));
+            return;
         };
 
         let var = VarExpr {
@@ -300,14 +316,25 @@ pub trait AstWalker<T> {
     fn walk_loop(&mut self, t: &mut T, elements: &[Spanned<Expr>]) {
         const CONDTION: usize = 1;
         const BODY: usize = 2;
+        let starting_span = elements[0].span.clone();
         let Some(condtion_spanned) = elements.get(CONDTION) else {
-            // TODO: REPORT ERROR
-            unreachable!();
+            self.error(Error::ExpectedFound(
+                starting_span,
+                "condition after loop".to_string(),
+                "nothing".to_string(),
+                Some("(loop <condition> <expression>)".to_string()),
+            ));
+            return;
         };
 
         let Some(body_spanned) = elements.get(BODY) else {
-            // TODO: REPORT ERROR
-            unreachable!();
+            self.error(Error::ExpectedFound(
+                condtion_spanned.span.clone(),
+                "expression after condition".to_string(),
+                "nothing".to_string(),
+                Some("(loop <condition> <expression>)".to_string()),
+            ));
+            return;
         };
 
         let loop_expr = LoopExpr {
