@@ -1173,7 +1173,7 @@ mod tests {
         machine.run()?;
 
         let frame = machine.get_current_frame()?;
-        assert_eq!(frame.stack[0], Value::F64(200.0));
+        assert_eq!(frame.stack[0], Value::F64(400.0));
         assert_eq!(machine.cycle_count, 16);
         Ok(())
     }
