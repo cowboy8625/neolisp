@@ -52,7 +52,7 @@ enum ReplCommand {
     HelpDoc(String),
     Debugger,
     BuiltinId(usize),
-    Error,
+    Error(String),
 }
 
 #[derive(Completer, Helper, Highlighter, Hinter, Validator)]
@@ -132,8 +132,8 @@ pub fn run(args: Cli) -> Result<()> {
                     println!("{idx}: {}", &super::BUILTINS[idx]);
                     continue;
                 }
-                ReplCommand::Error => {
-                    println!("Invalid input {}", input.red());
+                ReplCommand::Error(message) => {
+                    println!("{message}");
                     continue;
                 }
             }
@@ -165,10 +165,14 @@ fn parse_input(input: &str) -> Option<ReplCommand> {
         ":help" => Some(ReplCommand::Help),
         ":clear" => Some(ReplCommand::Clear),
         ":help-doc" if command.len() == 2 => Some(ReplCommand::HelpDoc(command[1].to_string())),
+        ":help-doc" => Some(ReplCommand::Error(":help-doc <name>".to_string())),
         ":debugger" => Some(ReplCommand::Debugger),
         ":builtin-id" if command.len() == 2 => {
             Some(ReplCommand::BuiltinId(command[1].parse().ok()?))
         }
-        _ => Some(ReplCommand::Error),
+        _ => Some(ReplCommand::Error(format!(
+            "Invalid command: {}",
+            input.red()
+        ))),
     }
 }
