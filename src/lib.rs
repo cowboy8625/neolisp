@@ -37,10 +37,10 @@ pub mod debugger;
 pub mod docs;
 pub mod error;
 pub mod expr_walker;
+pub mod instruction;
 pub mod machine;
 pub mod parser;
 pub mod repl;
 pub mod symbol_table;
 #[cfg(test)]
 mod tests;
-pub mod vm;

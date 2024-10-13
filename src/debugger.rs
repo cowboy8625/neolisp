@@ -1,4 +1,5 @@
-use crate::machine::{Instruction, Machine};
+use crate::instruction::Instruction;
+use crate::machine::Machine;
 use anyhow::{anyhow, Ok, Result};
 use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent};
 use crossterm::style::Stylize;

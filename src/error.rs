@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 pub enum ErrorType {
     MissingClosingParenthesis,
     MissingOpeningParenthesis,
@@ -86,46 +85,5 @@ impl chumsky::Error<char> for Error {
             expected.append(expected_other);
         }
         self
-    }
-}
-
-pub fn print_error(src: &str, error: &Error) {
-    let span = match error {
-        Error::ExpectedFound(span, _, _) => span,
-        Error::MissingClosingParenthesis(span) => span,
-        Error::MissingOpeningParenthesis(span) => span,
-    };
-    let mut index = 0;
-    let mut row = 0;
-    for line in src.lines() {
-        let line_span = index..(index + line.len());
-        if line_span.contains(&span.start) {
-            break;
-        }
-        index += line.len();
-        row += 1;
-    }
-    let col = span.end - index;
-
-    let message = match error {
-        Error::ExpectedFound(_, expected, found) => {
-            format!("expected {expected:?} but found {found:?} at {span:?}")
-        }
-        Error::MissingClosingParenthesis(_) => format!("missing closing parenthesis: {span:?}"),
-        Error::MissingOpeningParenthesis(_) => format!("missing opening parenthesis: {span:?}"),
-    };
-    println!("\x1b[31m{row}:{col}:{span:?}Error: {message}\x1b[0m");
-    for (line_num, line) in src.lines().enumerate() {
-        let ln = format!("{line_num: >4} | ");
-        if row == line_num {
-            println!("{ln}{line}");
-            println!(
-                "{}\x1b[31m{:>col$}\x1b[0m {row}:{col} {message}",
-                (0..ln.len()).map(|_| ' ').collect::<String>(),
-                '^'
-            );
-        } else if (row.saturating_sub(3)..=row.saturating_add(3)).contains(&line_num) {
-            println!("{ln}{line}");
-        }
     }
 }

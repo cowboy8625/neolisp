@@ -6,6 +6,14 @@
       (cons (- n 1) (range (- n 1)))
       (list)))
 
+
+;; (fn range (n)
+;;   (var range-helper (lambda (n acc)
+;;     (if (> n 0)
+;;         (range-helper (- n 1) (cons (- n 1) acc))
+;;         acc)))
+;;   (range-helper n (list)))
+
 ; (assert-eq (list 3 2 1 0) (range 4) "range n: 4 return (3 2 1 0)")
 ; (assert-eq (list 0 1 2 3) (reverse (range 4)) "range n: 4 return (0 1 2 3)")
 
@@ -67,6 +75,8 @@
     (c (nth grid (get-cell grid (+ index 1)))))
     (is-alive (cal-rule a b c))))
 
+(fn main () (print (generation-of-cell (list 0 0 0 1) 0) "\n"))
+
 ; (assert-eq
 ;   0 ; expected
 ;   ;                         ↓
@@ -90,11 +100,11 @@
 ; ----------------------------------------------------
 
 ; Returns the next generation of the grid
-(fn next-generation (grid)
-  (map
-    (lambda (i) (generation-of-cell grid i))
-    (reverse (range (length grid)))
-))
+;;;; (fn next-generation (grid)
+;;;;   (map
+;;;;     (lambda (i) (generation-of-cell grid i))
+;;;;     (reverse (range (length grid)))
+;;;; ))
 
 ; (assert-eq
 ;   (list 0 0 1 1) ; expected
@@ -105,16 +115,16 @@
 ; ----------------------------------------------------
 
 ; Loop
-(fn main ()
-  (let
-    ((grid (append (map (lambda (x) 0) (range 100)) (list 1)))
-    (is-running true))
-    (loop is-running
-      (var grid (next-generation grid))
-      ; (print grid)
-      (let
-        ((line (to-string (map (lambda (x) (if (= x 1) "*" " ")) grid))))
-          (print line "\n")))))
+;;;; (fn main ()
+;;;;   (let
+;;;;     ((grid (append (map (lambda (x) 0) (range 100)) (list 1)))
+;;;;     (is-running true))
+;;;;     (loop is-running
+;;;;       (var grid (next-generation grid))
+;;;;       ; (print grid)
+;;;;       (let
+;;;;         ((line (to-string (map (lambda (x) (if (= x 1) "*" " ")) grid))))
+;;;;           (print line "\n")))))
 
 ; Testing the creation of the grid
 ; (assert-eq

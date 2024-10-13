@@ -1,8 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use neolisp::{
-    compiler::{compile, CompilerOptions},
-    vm::Machine,
-};
+use neolisp::machine::Machine;
 
 // TODO: Break this down
 pub fn criterion_benchmark(c: &mut Criterion) {
@@ -15,12 +12,10 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 (fn main () (fib 30))
 "#;
 
-    let options = CompilerOptions::default();
     c.bench_function("Machine::new", |b| {
         b.iter(|| {
-            let program = compile(&src, &options).unwrap();
-            let mut machine = Machine::new(black_box(program));
-            machine.run().unwrap();
+            let mut machine = Machine::default();
+            machine.run_from_string(black_box(src)).unwrap();
         })
     });
 }
