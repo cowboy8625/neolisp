@@ -7,7 +7,7 @@ const HISTORY_PATH: &str = "%TEMP%.history";
 const HISTORY_PATH: &str = "/tmp/.history";
 
 #[derive(Debug, Parser)]
-#[command(about = "A fictional versioning CLI", long_about = None, color = clap::ColorChoice::Always)]
+#[command(about = "neolisp - a simple Lisp interpreter", long_about = None, color = clap::ColorChoice::Always)]
 pub struct Cli {
     #[arg(short='H', long, default_value_t = String::from(HISTORY_PATH))]
     pub history_path: String,
