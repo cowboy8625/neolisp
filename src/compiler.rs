@@ -1,5 +1,6 @@
 use super::{
-    ast::{Expr, Spanned},
+    ast::{Expr, Span, Spanned},
+    error::Error,
     expr_walker::{
         AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr, LoopExpr,
         OperatorExpr, VarExpr,
@@ -10,15 +11,18 @@ use super::{
     BUILTINS,
 };
 
-use anyhow::Result;
 use chumsky::prelude::Parser;
 
-pub fn compile(src: &str, options: CompilerOptions) -> Result<Vec<Instruction>> {
-    let ast = parser()
-        .parse(src)
-        .map_err(|e| anyhow::anyhow!(e.iter().map(|e| e.to_string() + "\n").collect::<String>()))?;
+pub fn compile(
+    src: &str,
+    options: CompilerOptions,
+) -> std::result::Result<Vec<Instruction>, Vec<Error>> {
+    let ast = match parser().parse(src) {
+        Ok(ast) => ast,
+        Err(errors) => return Err(errors),
+    };
 
-    let mut symbol_table = SymbolTableBuilder::default().build(&ast);
+    let mut symbol_table = SymbolTableBuilder::default().build(&ast)?;
     Compiler::new(&mut symbol_table, options).compile(&ast)
 }
 
@@ -52,6 +56,7 @@ pub struct Compiler<'a> {
     options: CompilerOptions,
     offset: usize,
     unset_locations: Vec<UnsetLocation>,
+    errors: Vec<Error>,
 }
 
 impl<'a> Compiler<'a> {
@@ -62,6 +67,7 @@ impl<'a> Compiler<'a> {
             options,
             offset: 0,
             unset_locations: Vec::new(),
+            errors: Vec::new(),
         }
     }
 
@@ -70,7 +76,10 @@ impl<'a> Compiler<'a> {
         self
     }
 
-    pub fn compile(&mut self, ast: &[Spanned<Expr>]) -> Result<Vec<Instruction>> {
+    pub fn compile(
+        mut self,
+        ast: &[Spanned<Expr>],
+    ) -> std::result::Result<Vec<Instruction>, Vec<Error>> {
         let mut program = Vec::new();
         self.walk(&mut program, ast);
         if !self.options.no_main {
@@ -83,6 +92,10 @@ impl<'a> Compiler<'a> {
                 panic!("Main function location is unknown");
             };
             program.push(Instruction::Jump(location as usize));
+        }
+
+        if !self.errors.is_empty() {
+            return Err(self.errors);
         }
 
         for UnsetLocation { index, name } in self.unset_locations.iter() {
@@ -190,6 +203,10 @@ impl<'a> Compiler<'a> {
 }
 
 impl AstWalker<Program> for Compiler<'_> {
+    fn error(&mut self, error: Error) {
+        self.errors.push(error);
+    }
+
     fn get_lambda_name(&mut self) -> String {
         let name = format!("lambda_{}", self.lambda_counter);
         self.lambda_counter += 1;
@@ -390,8 +407,7 @@ impl AstWalker<Program> for Compiler<'_> {
         self.walk_expr(program, call.callee);
         if let Expr::Symbol(name) = &call.callee.expr {
             let Some(symbol) = self.symbol_table.lookup(name) else {
-                // TODO: REPORT ERROR
-                panic!("unknown symbol: {}", name);
+                return;
             };
 
             let has_same_scope_name = matches!(
@@ -482,10 +498,10 @@ impl AstWalker<Program> for Compiler<'_> {
         program.push(Instruction::Push(Box::new(Value::F64(value))));
     }
 
-    fn handle_symbol(&mut self, program: &mut Program, name: &str) {
+    fn handle_symbol(&mut self, program: &mut Program, name: &str, span: Span) {
         let Some(symbol) = self.symbol_table.lookup(name).cloned() else {
-            // TODO: REPORT ERROR
-            panic!("Variable `{}` is not defined", name,);
+            self.error(Error::SymbolNotDefined(span, name.to_string()));
+            return;
         };
         self.emit_get_instruction(program, symbol);
     }

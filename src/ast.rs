@@ -102,6 +102,16 @@ impl Expr {
             .map(|spanned| f(&spanned.expr))
             .unwrap_or(false)
     }
+
+    pub fn type_of(&self) -> String {
+        match self {
+            Self::Bool(_) => "Bool".to_string(),
+            Self::String(_) => "String".to_string(),
+            Self::Symbol(_) => "Symbol".to_string(),
+            Self::Number(_) => "Number".to_string(),
+            Self::List(_) => "List".to_string(),
+        }
+    }
 }
 
 impl std::fmt::Display for Expr {

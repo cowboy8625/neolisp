@@ -1,5 +1,8 @@
-use super::{BUILTINS, KEYWORDS, OPERATORS};
-use crate::ast::{Expr, Spanned};
+use super::{
+    ast::{Expr, Span, Spanned},
+    error::Error,
+    BUILTINS, KEYWORDS, OPERATORS,
+};
 
 #[derive(Debug)]
 pub struct OperatorExpr<'a> {
@@ -55,6 +58,7 @@ pub struct LetBindingExpr<'a> {
 }
 
 pub trait AstWalker<T> {
+    fn error(&mut self, _: Error);
     fn get_lambda_name(&mut self) -> String;
     fn handle_operator(&mut self, _: &mut T, _: &str, _: &OperatorExpr);
     fn handle_builtin(&mut self, _: &mut T, _: &str, _: &[Spanned<Expr>]);
@@ -68,7 +72,7 @@ pub trait AstWalker<T> {
     fn handle_bool(&mut self, _: &mut T, _: bool);
     fn handle_string(&mut self, _: &mut T, _: &str);
     fn handle_number(&mut self, _: &mut T, _: f64);
-    fn handle_symbol(&mut self, _: &mut T, _: &str);
+    fn handle_symbol(&mut self, _: &mut T, _: &str, _: Span);
 
     fn walk_list(&mut self, t: &mut T, exprs: &[Spanned<Expr>]) {
         let Some(first) = exprs.first() else {
@@ -86,12 +90,9 @@ pub trait AstWalker<T> {
             Expr::Symbol(symbol) if BUILTINS.contains(&symbol.as_str()) => {
                 self.handle_builtin(t, symbol, exprs)
             }
-            // TODO: REPORT ERROR
-            Expr::Bool(_) => panic!("bool are not callable"),
-            // TODO: REPORT ERROR
-            Expr::String(_) => panic!("strings are not callable"),
-            // TODO: REPORT ERROR
-            Expr::Number(_) => panic!("numbers are not callable"),
+            Expr::Bool(_) | Expr::String(_) | Expr::Number(_) => {
+                self.error(Error::NotCallable(first.span.clone(), first.expr.type_of()))
+            }
             _ => self.walk_callable(t, exprs),
         }
     }
@@ -320,7 +321,7 @@ pub trait AstWalker<T> {
         match &spanned.expr {
             Expr::Bool(value) => self.handle_bool(t, *value),
             Expr::String(string) => self.handle_string(t, string),
-            Expr::Symbol(symbol) => self.handle_symbol(t, symbol),
+            Expr::Symbol(symbol) => self.handle_symbol(t, symbol, spanned.span.clone()),
             Expr::Number(number) => self.handle_number(t, *number),
             Expr::List(vec) => self.walk_list(t, vec),
         }

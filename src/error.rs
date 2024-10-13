@@ -1,3 +1,5 @@
+use anyhow::Result;
+use ariadne::{Color, Label, Report, ReportKind, Source};
 pub enum ErrorType {
     MissingClosingParenthesis,
     MissingOpeningParenthesis,
@@ -10,6 +12,8 @@ pub enum Error {
     ExpectedFound(Span, Vec<Option<char>>, Option<char>),
     MissingClosingParenthesis(Span),
     MissingOpeningParenthesis(Span),
+    NotCallable(Span, String),
+    SymbolNotDefined(Span, String),
 }
 
 impl Error {
@@ -18,6 +22,8 @@ impl Error {
             Self::ExpectedFound(span, ..) => span,
             Self::MissingClosingParenthesis(span) => span,
             Self::MissingOpeningParenthesis(span) => span,
+            Self::NotCallable(span, _) => span,
+            Self::SymbolNotDefined(span, _) => span,
         }
     }
 
@@ -28,33 +34,88 @@ impl Error {
             }
             Self::MissingClosingParenthesis(_) => "missing closing parenthesis".to_string(),
             Self::MissingOpeningParenthesis(_) => "missing opening parenthesis".to_string(),
+            Self::NotCallable(_, expr) => format!("{expr}'s are not callable"),
+            Self::SymbolNotDefined(_, symbol) => format!("'{symbol}' is not defined"),
         }
     }
-}
 
-impl std::fmt::Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::ExpectedFound(span, expected, found) => {
-                write!(f, "expected ")?;
-                for (i, e) in expected.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", {e:?}")?;
-                    } else {
-                        write!(f, "{e:?} ")?;
-                    }
-                }
-                write!(f, "found {found:?} at {span:?}")
-            }
-            Self::MissingClosingParenthesis(span) => {
-                write!(f, "{}:{} missing closing parenthesis", span.start, span.end)
-            }
-            Self::MissingOpeningParenthesis(span) => {
-                write!(f, "{}:{} missing opening parenthesis", span.start, span.end)
-            }
-        }
+    pub fn report(&self, filename: &str, src: &str) -> Result<()> {
+        Report::build(ReportKind::Error, filename, self.span().start)
+            .with_code(1)
+            .with_message(self.message())
+            .with_label(
+                Label::new((filename, self.span().clone()))
+                    .with_message(self.message())
+                    .with_color(Color::Red),
+            )
+            // .with_label(
+            //     Label::new(("main.nl", error.span().clone()))
+            //         .with_message(format!("This is of type {}", "Str".fg(b)))
+            //         .with_color(b),
+            // )
+            // .with_label(
+            //     Label::new(("main.nl", error.span().clone()))
+            //         .with_message(format!(
+            //             "The values are outputs of this {} expression",
+            //             "match".fg(out),
+            //         ))
+            //         .with_color(out),
+            // )
+            // .with_note(format!(
+            //     "Outputs of {} expressions must coerce to the same type",
+            //     "match".fg(Color::Green)
+            // ))
+            .finish()
+            .print((filename, Source::from(src)))?;
+        Ok(())
     }
 }
+// use chumsky::prelude::*;
+// use neolisp::parser::parser;
+// fn main() {
+//     let src = include_str!("../main.nl");
+//     let (ast, errors) = match parser().parse(src) {
+//         Ok(ast) => (ast, vec![]),
+//         Err(errors) => (vec![], errors),
+//     };
+//     println!("{ast:#?}");
+//     println!("{errors:#?}");
+//
+//     let mut colors = ColorGenerator::new();
+//
+//     // Generate & choose some colours for each of our elements
+//
+//     for error in errors {
+//         Report::build(ReportKind::Error, "main.nl", error.span().start)
+//             .with_code(1)
+//             .with_message(error.message())
+//             .with_label(
+//                 Label::new(("main.nl", error.span().clone()))
+//                     .with_message(format!("This is of type {}", "Nat".fg(Color::Cyan)))
+//                     .with_color(Color::Red),
+//             )
+//             // .with_label(
+//             //     Label::new(("main.nl", error.span().clone()))
+//             //         .with_message(format!("This is of type {}", "Str".fg(b)))
+//             //         .with_color(b),
+//             // )
+//             // .with_label(
+//             //     Label::new(("main.nl", error.span().clone()))
+//             //         .with_message(format!(
+//             //             "The values are outputs of this {} expression",
+//             //             "match".fg(out),
+//             //         ))
+//             //         .with_color(out),
+//             // )
+//             .with_note(format!(
+//                 "Outputs of {} expressions must coerce to the same type",
+//                 "match".fg(Color::Green)
+//             ))
+//             .finish()
+//             .print(("main.nl", Source::from(src)))
+//             .unwrap();
+//     }
+// }
 
 impl chumsky::Error<char> for Error {
     type Span = std::ops::Range<usize>;
