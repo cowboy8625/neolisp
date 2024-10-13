@@ -17,6 +17,9 @@ pub fn compile(
     src: &str,
     options: CompilerOptions,
 ) -> std::result::Result<Vec<Instruction>, Vec<Error>> {
+    if src.is_empty() {
+        return Err(vec![Error::EmptyFile]);
+    }
     let ast = match parser().parse(src) {
         Ok(ast) => ast,
         Err(errors) => return Err(errors),
