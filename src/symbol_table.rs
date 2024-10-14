@@ -502,7 +502,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
                 });
                 continue;
             };
-            self.walk_expr(table, &binding_expression);
+            self.walk_expr(table, binding_expression);
 
             let Expr::Symbol(binding_name) = &list[0].expr else {
                 unreachable!("This should never fail as we already checked this in AstWalker");
