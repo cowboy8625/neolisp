@@ -1,3 +1,4 @@
+use crate::instruction::Instruction;
 use crate::machine::{Frame as MachineFrame, Machine};
 use anyhow::{anyhow, Ok, Result};
 use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent};
