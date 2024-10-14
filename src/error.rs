@@ -10,8 +10,20 @@ fn empty_file_example() -> String {
     let id_print = "print".fg(Color::Blue);
     let string = r#"Hello, World!""#.fg(Color::Green);
     let newline = r#""\n""#.fg(Color::Green);
-    format!("{}{} {} {}{} {}{} {} {}{}{}", open_pran, keyword, id_main, open_pran, close_pran, open_pran, id_print, string, newline, close_pran, close_pran)
-    
+    format!(
+        "{}{} {} {}{} {}{} {} {}{}{}",
+        open_pran,
+        keyword,
+        id_main,
+        open_pran,
+        close_pran,
+        open_pran,
+        id_print,
+        string,
+        newline,
+        close_pran,
+        close_pran
+    )
 }
 pub enum ErrorType {
     MissingClosingParenthesis,
@@ -20,7 +32,13 @@ pub enum ErrorType {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Error {
-    ExpectedFound(Span, String, String, Option<String>),
+    ExpectedFound {
+        span: Span,
+        expected: String,
+        found: String,
+        note: Option<String>,
+        help: Option<String>,
+    },
     MissingClosingParenthesis(Span),
     MissingOpeningParenthesis(Span),
     NotCallable(Span, String),
@@ -31,7 +49,7 @@ pub enum Error {
 impl Error {
     pub fn span(&self) -> &Span {
         match self {
-            Self::ExpectedFound(span, ..) => span,
+            Self::ExpectedFound { span, .. } => span,
             Self::MissingClosingParenthesis(span) => span,
             Self::MissingOpeningParenthesis(span) => span,
             Self::NotCallable(span, _) => span,
@@ -42,7 +60,9 @@ impl Error {
 
     pub fn message(&self) -> String {
         match self {
-            Self::ExpectedFound(_, expected, found, _) => {
+            Self::ExpectedFound {
+                expected, found, ..
+            } => {
                 format!("expected {expected} found {found}")
             }
             Self::MissingClosingParenthesis(_) => "missing closing parenthesis".to_string(),
@@ -53,33 +73,28 @@ impl Error {
         }
     }
 
-    fn has_note(&self) -> bool {
+    fn note(&self) -> Option<String> {
         match self {
-            Error::ExpectedFound(.., note) => note.is_some(),
-            Error::MissingClosingParenthesis(..) => false,
-            Error::MissingOpeningParenthesis(..) => false,
-            Error::NotCallable(..) => false,
-            Error::SymbolNotDefined(..) => false,
-            Error::EmptyFile => true,
+            Error::ExpectedFound { note, .. } => note.clone(),
+            Error::MissingClosingParenthesis(..) => todo!(),
+            Error::MissingOpeningParenthesis(..) => None,
+            Error::NotCallable(..) => None,
+            Error::SymbolNotDefined(..) => None,
+            Error::EmptyFile => None,
         }
     }
-
-    fn note(&self) -> String {
+    fn help(&self) -> Option<String> {
         match self {
-            Error::ExpectedFound(.., note) => if let Some(note) = note {
-                note.to_string()
-            } else {
-                "".to_string()
-            }
-            Error::MissingClosingParenthesis(..) => todo!(),
-            Error::MissingOpeningParenthesis(..) => todo!(),
-            Error::NotCallable(..) => todo!(),
-            Error::SymbolNotDefined(..) => todo!(),
-            Error::EmptyFile => 
+            Error::ExpectedFound{help, ..} => help.clone(),
+            Error::MissingClosingParenthesis(..) => None,
+            Error::MissingOpeningParenthesis(..) => None,
+            Error::NotCallable(..) => None,
+            Error::SymbolNotDefined(..) => None,
+            Error::EmptyFile => Some(
                 format!("Hey, you have an empty file!
  If your unsure how to get started with the language, take a look at the docs but here is a quick start tip.
  Put this 👇 in your file and try again.
- {}", empty_file_example()
+ {}", empty_file_example())
            ),
         }
     }
@@ -98,8 +113,12 @@ impl Error {
                     .with_message(self.message())
                     .with_color(Color::Red),
             );
-        if self.has_note() {
-            report = report.with_note(self.note());
+        if let Some(note) = self.note() {
+            report = report.with_note(note);
+        }
+
+        if let Some(help) = self.help() {
+            report = report.with_help(help);
         }
         // .with_label(
         //     Label::new(("main.nl", error.span().clone()))
@@ -132,11 +151,20 @@ impl chumsky::Error<char> for Error {
         expected: It,
         found: Option<char>,
     ) -> Self {
-        Self::ExpectedFound(span, expected.into_iter().filter_map(|c| c.map(|c| c.to_string())).collect(), found.map(|c| c.to_string()).unwrap_or_default(), None)
+        Self::ExpectedFound {
+            span,
+            expected: expected
+                .into_iter()
+                .filter_map(|c| c.map(|c| c.to_string()))
+                .collect(),
+            found: found.map(|c| c.to_string()).unwrap_or_default(),
+            note: None,
+            help: None,
+        }
     }
 
     fn with_label(self, label: Self::Label) -> Self {
-        let Self::ExpectedFound(span, _, _, _) = self else {
+        let Self::ExpectedFound { span, .. } = self else {
             return self;
         };
         match label {
@@ -146,8 +174,13 @@ impl chumsky::Error<char> for Error {
     }
 
     fn merge(mut self, mut other: Self) -> Self {
-        if let (Self::ExpectedFound(_, expected, _, _), Self::ExpectedFound(_, expected_other, _, _)) =
-            (&mut self, &mut other)
+        if let (
+            Self::ExpectedFound { expected, .. },
+            Self::ExpectedFound {
+                expected: expected_other,
+                ..
+            },
+        ) = (&mut self, &mut other)
         {
             expected.push_str(expected_other);
         }

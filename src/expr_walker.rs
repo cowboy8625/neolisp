@@ -102,8 +102,7 @@ pub trait AstWalker<T> {
         const ARGS: usize = 1;
 
         let Some(operator) = exprs.get(OPERATOR) else {
-            // TODO: REPORT ERROR
-            panic!("expected operator");
+            unreachable!("checked before walk_operator was called");
         };
 
         let args = exprs.iter().skip(ARGS).collect::<Vec<_>>();
@@ -151,14 +150,27 @@ pub trait AstWalker<T> {
         const THEN: usize = 2;
         const OTHERWISE: usize = 3;
 
+        let starting_span = elements[0].span.clone();
         let Some(condition_spanned) = &elements.get(CONDITION) else {
-            // TODO: REPORT ERROR
-            panic!("expected expr for condition");
+            self.error(Error::ExpectedFound {
+                span: starting_span,
+                expected: "condition after if but".to_string(),
+                found: "nothing".to_string(),
+                note: None,
+                help: Some("(if <condition> <then-branch> <otherwise-branch>)".to_string()),
+            });
+            return;
         };
 
         let Some(then_spanned) = &elements.get(THEN) else {
-            // TODO: REPORT ERROR
-            panic!("expected expr for then");
+            self.error(Error::ExpectedFound {
+                span: condition_spanned.span.clone(),
+                expected: "then branch after condition but".to_string(),
+                found: "nothing".to_string(),
+                note: None,
+                help: Some("(if <condition> <then-branch> <otherwise-branch>)".to_string()),
+            });
+            return;
         };
 
         let if_else = IfElseExpr {
@@ -174,14 +186,27 @@ pub trait AstWalker<T> {
         const BINDINGS: usize = 1;
         const BODY: usize = 2;
 
+        let starting_span = elements[0].span.clone();
         let Some(bindings_spanned) = elements.get(BINDINGS) else {
-            // TODO: REPORT ERROR
-            panic!("expected list for bindings");
+            self.error(Error::ExpectedFound {
+                span: starting_span,
+                expected: "bindings after let but".to_string(),
+                found: "nothing".to_string(),
+                note: Some("bindings can be a single list or a list of list. Example (x 1) or ((x 1) (y 2))".to_string()),
+                help: Some("(let <bindings> <body>)".to_string()),
+            });
+            return;
         };
 
         let Expr::List(mabindings) = &bindings_spanned.expr else {
-            // TODO: REPORT ERROR
-            panic!("expected list for bindings");
+            self.error(Error::ExpectedFound {
+                span: bindings_spanned.span.clone(),
+                expected: "List".to_string(),
+                found: bindings_spanned.expr.type_of(),
+                note: None,
+                help: None,
+            });
+            return;
         };
         let is_single_binding = bindings_spanned
             .expr
@@ -196,8 +221,14 @@ pub trait AstWalker<T> {
         };
 
         let Some(body_spanned) = &elements.get(BODY) else {
-            // TODO: REPORT ERROR
-            panic!("expected list for body");
+            self.error(Error::ExpectedFound {
+                span: bindings_spanned.span.clone(),
+                expected: "body after bindings but".to_string(),
+                found: "nothing".to_string(),
+                note: Some("body can be a list or a single expression".to_string()),
+                help: Some("(let <bindings> <body>)".to_string()),
+            });
+            return;
         };
 
         let let_binding_expr = LetBindingExpr {
@@ -274,31 +305,34 @@ pub trait AstWalker<T> {
 
         let starting_span = elements[0].span.clone();
         let Some(name_spanned) = elements.get(NAME) else {
-            self.error(Error::ExpectedFound(
-                starting_span,
-                "name after var".to_string(),
-                "nothing".to_string(),
-                Some("(var <name> <expression>)".to_string()),
-            ));
+            self.error(Error::ExpectedFound {
+                span: starting_span,
+                expected: "name after var".to_string(),
+                found: "nothing".to_string(),
+                note: None,
+                help: Some("(var <name> <expression>)".to_string()),
+            });
             return;
         };
         let Expr::Symbol(_) = &name_spanned.expr else {
-            self.error(Error::ExpectedFound(
-                name_spanned.span.clone(),
-                "Symbol".to_string(),
-                name_spanned.expr.type_of(),
-                Some("(var <name> <expression>)".to_string()),
-            ));
+            self.error(Error::ExpectedFound {
+                span: name_spanned.span.clone(),
+                expected: "Symbol".to_string(),
+                found: name_spanned.expr.type_of(),
+                note: None,
+                help: Some("(var <name> <expression>)".to_string()),
+            });
             return;
         };
 
         let Some(body_spanned) = elements.get(BODY) else {
-            self.error(Error::ExpectedFound(
-                name_spanned.span.clone(),
-                "expression after name".to_string(),
-                "nothing".to_string(),
-                Some("(var <name> <expression>)".to_string()),
-            ));
+            self.error(Error::ExpectedFound {
+                span: name_spanned.span.clone(),
+                expected: "expression after name".to_string(),
+                found: "nothing".to_string(),
+                note: None,
+                help: Some("(var <name> <expression>)".to_string()),
+            });
             return;
         };
 
@@ -318,22 +352,24 @@ pub trait AstWalker<T> {
         const BODY: usize = 2;
         let starting_span = elements[0].span.clone();
         let Some(condtion_spanned) = elements.get(CONDTION) else {
-            self.error(Error::ExpectedFound(
-                starting_span,
-                "condition after loop".to_string(),
-                "nothing".to_string(),
-                Some("(loop <condition> <expression>)".to_string()),
-            ));
+            self.error(Error::ExpectedFound {
+                span: starting_span,
+                expected: "condition after loop".to_string(),
+                found: "nothing".to_string(),
+                note: None,
+                help: Some("(loop <condition> <expression>)".to_string()),
+            });
             return;
         };
 
         let Some(body_spanned) = elements.get(BODY) else {
-            self.error(Error::ExpectedFound(
-                condtion_spanned.span.clone(),
-                "expression after condition".to_string(),
-                "nothing".to_string(),
-                Some("(loop <condition> <expression>)".to_string()),
-            ));
+            self.error(Error::ExpectedFound {
+                span: condtion_spanned.span.clone(),
+                expected: "expression after condition".to_string(),
+                found: "nothing".to_string(),
+                note: None,
+                help: Some("(loop <condition> <expression>)".to_string()),
+            });
             return;
         };
 
