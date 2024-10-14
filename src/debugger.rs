@@ -26,7 +26,8 @@ s|step              - step
 c|continue          - continue
 b|breakpoint <addr> - add breakpoint
 r|run [file]        - run
-
+ |reset             - reset stacks and set ip to 0
+j|jump <addr>       - jump to address
 "#;
 
 #[derive(Debug)]
@@ -38,6 +39,7 @@ pub enum Command {
     AddBreakPoint(usize),
     Run(Option<String>),
     Reset,
+    Jump(usize),
 }
 
 #[derive(Debug, Default)]
@@ -292,6 +294,9 @@ impl<'a> Debugger<'a> {
                                 stack: Vec::with_capacity(1024),
                             });
                         }
+                        Command::Jump(address) => {
+                            self.machine.ip = address;
+                        }
                     },
                     Result::Err(err) => self.output.push_str(&format!("error: {}\n", err)),
                 }
@@ -417,6 +422,7 @@ fn parse_input(input: &str) -> Result<Command> {
         "run" | "r" if command.len() == 2 => Ok(Command::Run(Some(command[1].to_string()))),
         "run" | "r" => Ok(Command::Run(None)),
         "reset" => Ok(Command::Reset),
+        "jump" | "j" if command.len() == 2 => Ok(Command::Jump(command[1].parse()?)),
         _ => Err(anyhow!(format!("Unknown command `{}`", input.red()))),
     }
 }
