@@ -45,9 +45,37 @@ pub enum Error {
     SymbolNotDefined(Span, String),
     EmptyFile,
     MainNotDefined,
+    RunTimeError {
+        span: Span,
+        name: String,
+        message: String,
+        code: String,
+        note: Option<String>,
+        help: Option<String>,
+    },
 }
 
 impl Error {
+    fn code(&self) -> String {
+        match self {
+            Error::ExpectedFound { .. } => String::from("E000"),
+            Error::MissingClosingParenthesis(..) => String::from("E001"),
+            Error::MissingOpeningParenthesis(..) => String::from("E001"),
+            Error::NotCallable(..) => String::from("E002"),
+            Error::SymbolNotDefined(..) => String::from("E003"),
+            Error::EmptyFile => todo!(),
+            Error::MainNotDefined => String::from("E004"),
+            Error::RunTimeError { code, .. } => code.clone(),
+        }
+    }
+
+    fn error_kind(&self) -> ReportKind {
+        match self {
+            Self::RunTimeError { .. } => ReportKind::Custom("RunTimeError", Color::Red),
+            _ => ReportKind::Error,
+        }
+    }
+
     pub fn span(&self) -> &Span {
         match self {
             Self::ExpectedFound { span, .. } => span,
@@ -57,6 +85,7 @@ impl Error {
             Self::SymbolNotDefined(span, _) => span,
             Self::EmptyFile => &(0..0),
             Self::MainNotDefined => &(0..0),
+            Self::RunTimeError { span, .. } => span,
         }
     }
 
@@ -73,6 +102,7 @@ impl Error {
             Self::SymbolNotDefined(_, symbol) => format!("'{symbol}' is not defined"),
             Self::EmptyFile => "empty file".to_string(),
             Self::MainNotDefined => "main is not defined".to_string(),
+            Self::RunTimeError { message, .. } => message.to_string(),
         }
     }
 
@@ -85,6 +115,7 @@ impl Error {
             Error::SymbolNotDefined(..) => None,
             Error::EmptyFile => None,
             Error::MainNotDefined => None,
+            Error::RunTimeError { note, .. } => note.clone(),
         }
     }
     fn help(&self) -> Option<String> {
@@ -101,6 +132,7 @@ impl Error {
  {}", empty_file_example())
            ),
             Error::MainNotDefined => Some("If this is intentinal you may want to add the `--no-main` flag.".to_string()),
+            Error::RunTimeError { help, .. } => help.clone(),
         }
     }
 
@@ -110,8 +142,8 @@ impl Error {
         } else {
             src.to_string()
         };
-        let mut report = Report::build(ReportKind::Error, filename, self.span().start)
-            .with_code(1)
+        let mut report = Report::build(self.error_kind(), filename, self.span().start)
+            .with_code(self.code())
             .with_message(self.message())
             .with_label(
                 Label::new((filename, self.span().clone()))
@@ -125,23 +157,6 @@ impl Error {
         if let Some(help) = self.help() {
             report = report.with_help(help);
         }
-        // .with_label(
-        //     Label::new(("main.nl", error.span().clone()))
-        //         .with_message(format!("This is of type {}", "Str".fg(b)))
-        //         .with_color(b),
-        // )
-        // .with_label(
-        //     Label::new(("main.nl", error.span().clone()))
-        //         .with_message(format!(
-        //             "The values are outputs of this {} expression",
-        //             "match".fg(out),
-        //         ))
-        //         .with_color(out),
-        // )
-        // .with_note(format!(
-        //     "Outputs of {} expressions must coerce to the same type",
-        //     "match".fg(Color::Green)
-        // ))
         report.finish().print((filename, Source::from(src)))?;
         Ok(())
     }
