@@ -242,17 +242,27 @@ pub trait AstWalker<T> {
         const PARAMS: usize = 1;
         const BODY: usize = 2;
 
+        let starting_span = elements[0].span.clone();
         let Some(params_spanned) = &elements.get(PARAMS) else {
-            // TODO: REPORT ERROR
-            panic!("expected list for params");
+            self.error(Error::ExpectedFound {
+                span: starting_span,
+                expected: "params after lambda but".to_string(),
+                found: "nothing".to_string(),
+                note: None,
+                help: Some("(lambda (<symbol>) <body>)".to_string()),
+            });
+            return;
         };
 
         if !params_spanned.expr.is_list() {
-            // TODO: REPORT ERROR
-            panic!(
-                "expected list for params but found {:?}",
-                params_spanned.expr
-            );
+            self.error(Error::ExpectedFound {
+                span: params_spanned.span.clone(),
+                expected: "List".to_string(),
+                found: params_spanned.expr.type_of(),
+                note: None,
+                help: Some("(lambda (<symbol>) <body>)".to_string()),
+            });
+            return;
         };
 
         let body_list = &elements.iter().skip(BODY).collect::<Vec<_>>();
@@ -270,22 +280,38 @@ pub trait AstWalker<T> {
         const PARAMS: usize = 2;
         const BODY: usize = 3;
 
+        let starting_span = elements[0].span.clone();
         let Some(name_spanned) = elements.get(NAME) else {
-            // TODO: REPORT ERROR: This should call a self.report_error(FunctionMissingName(span))
-            unreachable!();
+            self.error(Error::ExpectedFound {
+                span: starting_span,
+                expected: "name after fn but".to_string(),
+                found: "nothing".to_string(),
+                note: None,
+                help: Some("(fn <symbol> (<symbol>) <body>)".to_string()),
+            });
+            return;
         };
 
         let Some(params_spanned) = &elements.get(PARAMS) else {
-            // TODO: REPORT ERROR
-            panic!("expected list for params");
+            self.error(Error::ExpectedFound {
+                span: name_spanned.span.clone(),
+                expected: "params after function name but".to_string(),
+                found: "nothing".to_string(),
+                note: None,
+                help: Some("(fn <symbol> (<symbol>) <body>)".to_string()),
+            });
+            return;
         };
 
         if !params_spanned.expr.is_list() {
-            // TODO: REPORT ERROR
-            panic!(
-                "expected list for params but found {:?}",
-                params_spanned.expr
-            );
+            self.error(Error::ExpectedFound {
+                span: params_spanned.span.clone(),
+                expected: "List".to_string(),
+                found: params_spanned.expr.type_of(),
+                note: None,
+                help: Some("(fn <symbol> (<symbol>) <body>)".to_string()),
+            });
+            return;
         }
 
         let body_list = &elements.iter().skip(BODY).collect::<Vec<_>>();
