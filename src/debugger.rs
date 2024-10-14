@@ -1,5 +1,4 @@
-use crate::instruction::Instruction;
-use crate::machine::Machine;
+use crate::machine::{Frame as MachineFrame, Machine};
 use anyhow::{anyhow, Ok, Result};
 use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent};
 use crossterm::style::Stylize;
@@ -37,6 +36,7 @@ pub enum Command {
     Continue,
     AddBreakPoint(usize),
     Run(Option<String>),
+    Reset,
 }
 
 #[derive(Debug, Default)]
@@ -139,7 +139,14 @@ impl<'a> Debugger<'a> {
 
         let frame_data_block = Layout::default()
             .direction(Direction::Vertical)
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+            .constraints(
+                [
+                    Constraint::Percentage(50),
+                    Constraint::Percentage(25),
+                    Constraint::Percentage(25),
+                ]
+                .as_ref(),
+            )
             .split(data[1]);
 
         // Render user input box
@@ -171,8 +178,17 @@ impl<'a> Debugger<'a> {
         let frame_data = Paragraph::new(vm_frame_data)
             .block(Block::default().borders(Borders::ALL).title("VM Frame"));
 
-        // LEFT OFF AT: Not sure why the instructions are not rendering correctly.  Seems like only
-        // one instruction is rendered at a time.
+        let globals = self
+            .machine
+            .global
+            .iter()
+            .rev()
+            .enumerate()
+            .map(|(i, v)| format!("global[{}]: {}", i, v))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let global_data =
+            Paragraph::new(globals).block(Block::default().borders(Borders::ALL).title("Globals"));
 
         // Render dummy VM state
         // 🤮
@@ -185,13 +201,10 @@ impl<'a> Debugger<'a> {
         }
         let text = self.debug();
 
-        // let output = self.output.clone();
-        // let text = output
-        //     .lines()
-        //     .map(|line| Line::from(line))
-        //     .collect::<Vec<_>>();
-        let vm_box =
-            Paragraph::new(text).block(Block::default().borders(Borders::ALL).title("VM State"));
+        let scroll_index = self.get_current_instruction_index().saturating_sub(20);
+        let vm_box = Paragraph::new(text)
+            .block(Block::default().borders(Borders::ALL).title("VM State"))
+            .scroll((scroll_index as u16, 0));
 
         // TEMP
         let mut temp_output = String::new();
@@ -207,7 +220,8 @@ impl<'a> Debugger<'a> {
         // Render both input and VM state
         f.render_widget(vm_box, data[0]);
         f.render_widget(frame_data, frame_data_block[0]);
-        f.render_widget(temp, frame_data_block[1]);
+        f.render_widget(global_data, frame_data_block[1]);
+        f.render_widget(temp, frame_data_block[2]);
         f.render_widget(input_box, chunks[1]);
     }
 
@@ -266,6 +280,17 @@ impl<'a> Debugger<'a> {
                         Command::Run(None) => {
                             self.machine.ip = 0x0000;
                         }
+                        Command::Reset => {
+                            self.machine.global.clear();
+                            self.machine.free.clear();
+                            self.machine.stack.clear();
+                            self.machine.ip = 0x0000;
+                            self.machine.stack.push(MachineFrame {
+                                return_address: None,
+                                args: Vec::with_capacity(256),
+                                stack: Vec::with_capacity(1024),
+                            });
+                        }
                     },
                     Result::Err(err) => self.output.push_str(&format!("error: {}\n", err)),
                 }
@@ -307,14 +332,24 @@ impl<'a> Debugger<'a> {
         eprintln!("resizing to {w}x{h}");
     }
 
+    fn get_current_instruction_index(&self) -> usize {
+        let current_ip = self.machine.ip;
+        let mut ip = 0;
+        for (i, instruction) in self.instructions.iter().enumerate() {
+            if ip == current_ip {
+                return i;
+            }
+            ip += instruction.size();
+        }
+        0
+    }
+
     fn debug(&self) -> Text {
         let mut offset = 0;
 
-        // Create a collection to hold all the lines of output
         let mut result = Vec::new();
 
         for int in self.instructions.iter() {
-            // Style for selected instruction
             let selected = if self.machine.ip == offset {
                 Span::styled(
                     format!("0x{offset:02X} {offset:>3} "),
@@ -326,69 +361,32 @@ impl<'a> Debugger<'a> {
                 Span::raw(format!("0x{offset:02X} {offset:>3} "))
             };
 
-            // Style for breakpoint marker
             let breakpoint = if self.breakpoints.contains(&offset) {
                 Span::raw("🔴".to_string())
             } else {
                 Span::raw("  ".to_string())
             };
 
-            // Bytecode representation
             let bytecode = int
                 .to_bytecode()
                 .into_iter()
                 .fold(String::new(), |acc, i| format!("{acc}{i:02X} "));
 
-            // Instruction debug representation
             let debug_int = format!("{int:?}");
 
-            // Build the full line as a `Line` object
             let line = Line::from(vec![
                 breakpoint,
                 selected,
                 Span::raw(format!("{debug_int:<20} ")),
-                Span::raw(bytecode.trim().to_string()), // bytecode doesn't need any styling
+                Span::raw(bytecode.trim().to_string()),
             ]);
 
-            // Add the line to the result
             result.push(line);
-
-            // Increment the offset by the instruction size
             offset += int.size();
         }
 
-        // Convert the Vec<Line> into a Text object that ratatui can render
         Text::from(result)
     }
-
-    // fn debug(&mut self) -> String {
-    //     let mut offset = 0;
-
-    //     let mut result = String::new();
-    //     for int in self.instructions.iter() {
-    //         let selected = if self.machine.ip == offset {
-    //             format!("{GREEN}{UNDERLINE}0x{offset:02X} {offset:>3} ")
-    //         } else {
-    //             format!("0x{offset:02X} {offset:>3} ")
-    //         };
-    //         let breakpoint = if self.breakpoints.contains(&offset) {
-    //             "🔴".to_string()
-    //         } else {
-    //             "  ".to_string()
-    //         };
-    //         let bytecode = int
-    //             .to_bytecode()
-    //             .into_iter()
-    //             .fold(String::new(), |acc, i| format!("{acc}{i:02X} "));
-    //         let debug_int = format!("{int:?}");
-    //         result += &format!(
-    //             "{breakpoint}{selected} {debug_int:<20} {}{RESET}\n",
-    //             bytecode.trim()
-    //         );
-    //         offset += int.size();
-    //     }
-    //     result
-    // }
 }
 
 impl Drop for Debugger<'_> {
@@ -417,6 +415,7 @@ fn parse_input(input: &str) -> Result<Command> {
         "breakpoint" | "b" if command.len() == 2 => Ok(Command::AddBreakPoint(command[1].parse()?)),
         "run" | "r" if command.len() == 2 => Ok(Command::Run(Some(command[1].to_string()))),
         "run" | "r" => Ok(Command::Run(None)),
+        "reset" => Ok(Command::Reset),
         _ => Err(anyhow!(format!("Unknown command `{}`", input.red()))),
     }
 }
