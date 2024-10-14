@@ -44,6 +44,7 @@ pub enum Error {
     NotCallable(Span, String),
     SymbolNotDefined(Span, String),
     EmptyFile,
+    MainNotDefined,
 }
 
 impl Error {
@@ -55,6 +56,7 @@ impl Error {
             Self::NotCallable(span, _) => span,
             Self::SymbolNotDefined(span, _) => span,
             Self::EmptyFile => &(0..0),
+            Self::MainNotDefined => &(0..0),
         }
     }
 
@@ -70,6 +72,7 @@ impl Error {
             Self::NotCallable(_, expr) => format!("{expr}'s are not callable"),
             Self::SymbolNotDefined(_, symbol) => format!("'{symbol}' is not defined"),
             Self::EmptyFile => "empty file".to_string(),
+            Self::MainNotDefined => "main is not defined".to_string(),
         }
     }
 
@@ -81,6 +84,7 @@ impl Error {
             Error::NotCallable(..) => None,
             Error::SymbolNotDefined(..) => None,
             Error::EmptyFile => None,
+            Error::MainNotDefined => None,
         }
     }
     fn help(&self) -> Option<String> {
@@ -96,6 +100,7 @@ impl Error {
  Put this 👇 in your file and try again.
  {}", empty_file_example())
            ),
+            Error::MainNotDefined => Some("If this is intentinal you may want to add the `--no-main` flag.".to_string()),
         }
     }
 

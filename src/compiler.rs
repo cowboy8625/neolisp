@@ -87,12 +87,11 @@ impl<'a> Compiler<'a> {
         self.walk(&mut program, ast);
         if !self.options.no_main {
             let Some(symbol) = self.symbol_table.lookup("main") else {
-                // TODO: REPORT ERROR
-                panic!("Main function is not defined");
+                self.error(Error::MainNotDefined);
+                return Err(self.errors);
             };
             let Some(location) = symbol.location else {
-                // TODO: REPORT ERROR
-                panic!("Main function location is unknown");
+                unreachable!("Main function location should always be set at this point");
             };
             program.push(Instruction::Jump(location as usize));
         }
@@ -103,24 +102,25 @@ impl<'a> Compiler<'a> {
 
         for UnsetLocation { index, name } in self.unset_locations.iter() {
             let Some(symbol) = self.symbol_table.lookup(name) else {
-                // TODO: REPORT ERROR
-                panic!("Variable `{}` is not defined", name,);
+                unreachable!("Variable `{}` should be known at this point", name,);
             };
             let Some(location) = symbol.location else {
-                // TODO: REPORT ERROR
-                panic!("Variable `{}` location is unknown", name,);
+                unreachable!(
+                    "{} {:?} location should always be set at this point",
+                    name, symbol.kind
+                );
             };
             let instruction = &mut program[*index];
             match instruction {
                 Instruction::Push(value) => match value.as_mut() {
                     Value::Callable(i) => *i = location as usize,
                     _ => {
-                        // TODO: REPORT ERROR
+                        // NOTE: INTENTIONAL_PANIC
                         panic!("expected push but found {instruction:?}");
                     }
                 },
                 _ => {
-                    // TODO: REPORT ERROR
+                    // NOTE: INTENTIONAL_PANIC
                     panic!("expected push but found {instruction:?}");
                 }
             }
@@ -160,6 +160,7 @@ impl<'a> Compiler<'a> {
                 SymbolScope::Let => program.push(Instruction::SetLocal),
             },
             SymbolKind::Parameter => program.push(Instruction::SetLocal),
+            // NOTE: Unsure if this will ever be hit.
             SymbolKind::Function => todo!("Function"),
             SymbolKind::Lambda => todo!("Lambda"),
             SymbolKind::Let => todo!("Let"),
@@ -195,6 +196,7 @@ impl<'a> Compiler<'a> {
                     name: symbol.name.clone(),
                 });
             }
+            // NOTE: Unsure if this will ever be hit.
             SymbolKind::Lambda => todo!("Lambda"),
             SymbolKind::Let => todo!("Let"),
         }
@@ -227,7 +229,7 @@ impl AstWalker<Program> for Compiler<'_> {
         }
         let Some(instruction) = Self::get_operator_opcode(operator_name, oper_expr.args.len())
         else {
-            // TODO: ERROR REPORTING
+            // NOTE: INTENTIONAL_PANIC
             panic!("Unknown operator: {operator_name}");
         };
 
@@ -240,7 +242,7 @@ impl AstWalker<Program> for Compiler<'_> {
             self.walk_expr(program, arg);
         }
         let Some(id) = BUILTINS.iter().position(|b| b == &name) else {
-            // TODO: ERROR REPORTING
+            // NOTE: INTENTIONAL_PANIC
             panic!("Unknown builtin: {name}");
         };
         program.push(Instruction::Push(Box::new(Value::Builtin(id))));
@@ -252,11 +254,7 @@ impl AstWalker<Program> for Compiler<'_> {
         let index = program.len() - 1;
         let start = self.get_program_size(program);
         let Expr::Symbol(name) = &function.name.expr else {
-            // TODO: REPORT ERROR
-            panic!(
-                "expected symbol for function name but found {:?}",
-                function.name.expr
-            );
+            unreachable!("This should never fail as we already checked this in AstWalker");
         };
 
         self.symbol_table
@@ -265,11 +263,7 @@ impl AstWalker<Program> for Compiler<'_> {
         self.symbol_table.enter_scope(name);
 
         if !function.params.expr.is_list() {
-            // TODO: REPORT ERROR
-            panic!(
-                "expected list for params but found {:?}",
-                &function.params.expr
-            );
+            unreachable!("This should never fail as we already checked this in AstWalker");
         };
 
         for spanned in function.body.iter() {
@@ -302,11 +296,7 @@ impl AstWalker<Program> for Compiler<'_> {
         self.symbol_table.enter_scope(&name);
 
         if !lambda.params.expr.is_list() {
-            // TODO: REPORT ERROR
-            panic!(
-                "expected list for params but found {:?}",
-                &lambda.params.expr
-            );
+            unreachable!("This should never fail as we already checked this in AstWalker");
         };
 
         for spanned in lambda.body.iter() {
@@ -317,8 +307,7 @@ impl AstWalker<Program> for Compiler<'_> {
         self.symbol_table.exit_scope();
 
         let Some(local_scope) = self.symbol_table.get_function_scope(&name) else {
-            // TODO: REPORT ERROR
-            panic!("no scope for {name:?}");
+            unreachable!("This should never fail as we already checked this in AstWalker");
         };
 
         let body_size = self.get_program_size(program) - start;
@@ -355,8 +344,8 @@ impl AstWalker<Program> for Compiler<'_> {
             .collect::<Vec<_>>();
         let name = format!("let_{}|{}", id, names.join("|"));
         let Some(local_scope) = self.symbol_table.get_function_scope(&name) else {
-            // TODO: REPORT ERROR
-            panic!("no scope for {name:?}");
+            // NOTE: INTENTIONAL_PANIC
+            panic!("no scope for let binding {name:?}");
         };
 
         for (_, symbol) in local_scope.iter() {
@@ -374,25 +363,22 @@ impl AstWalker<Program> for Compiler<'_> {
         self.symbol_table.enter_scope(&name);
 
         for spanned in let_binding.bindings.iter() {
-            match &spanned.expr {
-                Expr::List(list) => {
-                    self.walk_expr(program, &list[1]);
+            let Expr::List(list) = &spanned.expr else {
+                unreachable!("This should never fail as we already checked this in AstWalker");
+            };
+            let Some(binding_expression) = list.get(1) else {
+                unreachable!("This should never fail as we already checked this in AstWalker");
+            };
+            self.walk_expr(program, binding_expression);
 
-                    let Expr::Symbol(binding_name) = &list[0].expr else {
-                        // TODO: REPORT ERROR
-                        panic!("expected symbol in let binding, got: {list:?}");
-                    };
-                    let Some(symbol) = self.symbol_table.lookup(binding_name).cloned() else {
-                        // TODO: REPORT ERROR
-                        panic!("expected symbol in let binding, got: {list:?}");
-                    };
-                    self.emit_set_instruction(program, &symbol);
-                }
-                _ => {
-                    // TODO: REPORT ERROR
-                    panic!("expected list for let binding but found {:?}", spanned.expr);
-                }
-            }
+            let Expr::Symbol(binding_name) = &list[0].expr else {
+                unreachable!("This should never fail as we already checked this in AstWalker");
+            };
+            let Some(symbol) = self.symbol_table.lookup(binding_name).cloned() else {
+                // NOTE: INTENTIONAL_PANIC
+                panic!("expected symbol in let binding, got: {list:?}");
+            };
+            self.emit_set_instruction(program, &symbol);
         }
 
         self.walk_expr(program, let_binding.body);
@@ -431,14 +417,13 @@ impl AstWalker<Program> for Compiler<'_> {
 
     fn handle_var(&mut self, program: &mut Program, var: &VarExpr) {
         let Expr::Symbol(name) = &var.name.expr else {
-            // TODO: REPORT ERROR
-            panic!("var name must be a symbol but found {:?}", var.name.expr);
+            unreachable!("This should never fail as we already checked this in AstWalker");
         };
 
         self.walk_expr(program, var.body);
 
         let Some(symbol) = self.symbol_table.lookup(name) else {
-            // TODO: REPORT ERROR
+            // NOTE: INTENTIONAL_PANIC
             panic!("unknown symbol: {}", name);
         };
 
