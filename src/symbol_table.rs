@@ -39,12 +39,14 @@ impl SymbolTable {
         self.scope_stack.push(scope);
     }
 
-    // TODO: get ride of the need to pass the name as we are storing the name already.
-
     /// Exit the current scope (pops the top scope off the stac)
     pub fn exit_new_scope(&mut self, current_function: Option<&str>) {
         let Some(scope) = self.scope_stack.pop() else {
-            // TODO: REPORT ERROR
+            // NOTE: I think this its ok to panic here.
+            // This is an internal error.  Im unsure how to report it or if ajust a panic is ok.
+            // We would want to never get to this point in the code before a crash.
+            // Going to make this with
+            // NOTE: INTENTIONAL_PANIC
             panic!("No current scope for {}", current_function.unwrap_or("N/A"));
         };
         // If exiting a function, store the scope in `function_scopes`
@@ -57,7 +59,7 @@ impl SymbolTable {
 
     pub fn enter_scope(&mut self, name: &str) {
         let Some(scope) = self.function_scopes.get(name) else {
-            // TODO: REPORT ERROR
+            // NOTE: INTENTIONAL_PANIC
             panic!("Can not enter scope {name} as it does not exist");
         };
         self.scope_name.push(name.to_string());
@@ -93,7 +95,7 @@ impl SymbolTable {
 
         // Fall back to global scope
         let Some(symbol) = self.global_scope.get_mut(name) else {
-            // TODO: REPORT ERROR
+            // NOTE: INTENTIONAL_PANIC
             panic!("location of `{name}` has not initialized {:#?}", self);
         };
 
@@ -332,8 +334,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         self.current_scope = SymbolScope::Function;
 
         let Expr::Symbol(name) = &function.name.expr else {
-            // TODO: REPORT ERROR
-            return;
+            unreachable!("This should never fail as we already checked this in AstWalker");
         };
 
         let old_local_counter = self.local_counter;
@@ -342,8 +343,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
 
         // Parameters of the function
         let Expr::List(params) = &function.params.expr else {
-            // NOTE: This is unreachable code as we already checked this in AstWalker
-            unreachable!();
+            unreachable!("This should never fail as we already checked this in AstWalker");
         };
 
         // Handle the params
@@ -351,8 +351,14 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         for param in params.iter() {
             let expr = &param.expr;
             let Expr::Symbol(param_name) = expr else {
-                // TODO: REPORT ERROR
-                return;
+                self.error(Error::ExpectedFound {
+                    span: param.span.clone(),
+                    expected: "Symbol".to_string(),
+                    found: expr.type_of(),
+                    note: None,
+                    help: Some("(fn <symbol> (<symbol>) <expression>)".to_string()),
+                });
+                continue;
             };
             params_symbol_types.push(SymbolType::Dynamic);
             let symbol = Symbol {
@@ -399,8 +405,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
 
         // Parameters of the function
         let Expr::List(params) = &lambda.params.expr else {
-            // NOTE: This is unreachable code as we already checked this in AstWalker
-            unreachable!();
+            unreachable!("This should never fail as we already checked this in AstWalker");
         };
 
         // Handle the params
@@ -408,8 +413,14 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         for param in params.iter() {
             let expr = &param.expr;
             let Expr::Symbol(param_name) = expr else {
-                // TODO: REPORT ERROR
-                panic!("expected symbol in lambda params, got: {expr:?}");
+                self.error(Error::ExpectedFound {
+                    span: param.span.clone(),
+                    expected: "Symbol".to_string(),
+                    found: expr.type_of(),
+                    note: None,
+                    help: Some("(lambda (<symbol>) <expression>)".to_string()),
+                });
+                continue;
             };
             params_symbol_types.push(SymbolType::Dynamic);
             let symbol = Symbol {
@@ -464,30 +475,48 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         table.enter_new_scope(&scope_name, SymbolKind::Let);
 
         for spanned in let_binding.bindings.iter() {
-            match &spanned.expr {
-                Expr::List(list) => {
-                    self.walk_expr(table, &list[1]);
+            let Expr::List(list) = &spanned.expr else {
+                self.error(Error::ExpectedFound {
+                    span: spanned.span.clone(),
+                    expected: "List or Symbol".to_string(),
+                    found: spanned.expr.type_of(),
+                    note: None,
+                    help: Some(
+                        "(let (<symbol> <expression> | (<symbol <expression>)) <expression>)"
+                            .to_string(),
+                    ),
+                });
+                continue;
+            };
 
-                    let Expr::Symbol(binding_name) = &list[0].expr else {
-                        // TODO: REPORT ERROR
-                        panic!("expected symbol in let binding, got: {list:?}");
-                    };
-                    let symbol = Symbol {
-                        id: table.get_id(),
-                        name: binding_name.clone(),
-                        symbol_type: SymbolType::Dynamic,
-                        kind: SymbolKind::Parameter,
-                        scope: self.current_scope,
-                        scope_level: table.get_scope_level() as u32,
-                        location: None,
-                    };
-                    table.insert(binding_name.clone(), symbol);
-                }
-                _ => {
-                    // TODO: REPORT ERROR
-                    panic!("expected list for let binding but found {:?}", spanned.expr);
-                }
-            }
+            let Some(binding_expression) = list.get(1) else {
+                self.error(Error::ExpectedFound {
+                    span: spanned.span.clone(),
+                    expected: "expression after binding name".to_string(),
+                    found: "nothing".to_string(),
+                    note: Some(
+                        "(let (<symbol> <expression> | (<symbol <expression>)) <expression>)"
+                            .to_string(),
+                    ),
+                    help: Some(format!("maybe try something like ({} 10), your just missing an expression after the name.", list[0].expr)),
+                });
+                continue;
+            };
+            self.walk_expr(table, &binding_expression);
+
+            let Expr::Symbol(binding_name) = &list[0].expr else {
+                unreachable!("This should never fail as we already checked this in AstWalker");
+            };
+            let symbol = Symbol {
+                id: table.get_id(),
+                name: binding_name.clone(),
+                symbol_type: SymbolType::Dynamic,
+                kind: SymbolKind::Parameter,
+                scope: self.current_scope,
+                scope_level: table.get_scope_level() as u32,
+                location: None,
+            };
+            table.insert(binding_name.clone(), symbol);
         }
 
         self.walk_expr(table, let_binding.body);
@@ -514,8 +543,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
 
     fn handle_var(&mut self, table: &mut SymbolTable, var: &VarExpr) {
         let Expr::Symbol(name) = &var.name.expr else {
-            // TODO: REPORT ERROR
-            panic!("var name must be a symbol");
+            unreachable!("This should never fail as we already checked this in AstWalker");
         };
 
         self.walk_expr(table, var.body);
@@ -552,8 +580,6 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
                 table.insert(
                     name.to_string(),
                     Symbol {
-                        // TODO: I think table.get_id() needs to be on SymbolTableBuilder like
-                        // self.get_free_id()
                         id: self.get_free_id(),
                         name: name.to_string(),
                         symbol_type: symbol.symbol_type.clone(),
