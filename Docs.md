@@ -55,6 +55,18 @@
    (+ x y)) ; -> 444
 ```
 
+### if
+- returns the first argument if the condition is true
+- arguments
+   1. `Bool`: condition
+   2. `Any`: true
+   3. `Any`: false
+- example:
+```lisp
+(if true 10 20) ; -> 10
+(if false 10 20) ; -> 20
+```
+
 ### +
 - returns a sum of the arguments
 - arguments type: `Number`
