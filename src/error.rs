@@ -138,7 +138,7 @@ impl Error {
     fn note(&self) -> Option<String> {
         match self {
             Error::ExpectedFound { note, .. } => note.clone(),
-            Error::MissingClosingParenthesis(..) => todo!(),
+            Error::MissingClosingParenthesis(..) => None,
             Error::MissingOpeningParenthesis(..) => None,
             Error::NotCallable(..) => None,
             Error::SymbolNotDefined(..) => None,

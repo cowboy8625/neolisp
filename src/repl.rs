@@ -121,6 +121,7 @@ pub fn run(args: Cli) -> Result<()> {
                         continue;
                     };
                     println!("{docs}");
+                    continue;
                 }
                 ReplCommand::Debugger => {
                     machine.set_options(MachineOptions { quiet: true });
