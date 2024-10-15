@@ -53,6 +53,14 @@ pub enum Error {
         note: Option<String>,
         help: Option<String>,
     },
+    Redefined {
+        original_span: Span,
+        original_name: String,
+        new_span: Span,
+        new_name: String,
+        note: Option<String>,
+        help: Option<String>,
+    },
 }
 
 impl Error {
@@ -66,6 +74,7 @@ impl Error {
             Error::EmptyFile => todo!(),
             Error::MainNotDefined => String::from("E004"),
             Error::RunTimeError { code, .. } => code.clone(),
+            Error::Redefined { .. } => String::from("E005"),
         }
     }
 
@@ -86,6 +95,25 @@ impl Error {
             Self::EmptyFile => &(0..0),
             Self::MainNotDefined => &(0..0),
             Self::RunTimeError { span, .. } => span,
+            Self::Redefined { new_span, .. } => new_span,
+        }
+    }
+
+    pub fn second_label<'a>(&'a self, filename: &'a str) -> Option<Label<(&'a str, Span)>> {
+        match self {
+            Self::ExpectedFound { .. } => None,
+            Self::MissingClosingParenthesis(_) => None,
+            Self::MissingOpeningParenthesis(_) => None,
+            Self::NotCallable(..) => None,
+            Self::SymbolNotDefined(..) => None,
+            Self::EmptyFile => None,
+            Self::MainNotDefined => None,
+            Self::RunTimeError { .. } => None,
+            Self::Redefined { original_span, .. } => Some(
+                Label::new((filename, original_span.clone()))
+                    .with_message("this definition was shadowed by the previous one")
+                    .with_color(Color::Blue),
+            ),
         }
     }
 
@@ -103,6 +131,7 @@ impl Error {
             Self::EmptyFile => "empty file".to_string(),
             Self::MainNotDefined => "main is not defined".to_string(),
             Self::RunTimeError { message, .. } => message.to_string(),
+            Self::Redefined { .. } => "redefined".to_string(),
         }
     }
 
@@ -116,6 +145,7 @@ impl Error {
             Error::EmptyFile => None,
             Error::MainNotDefined => None,
             Error::RunTimeError { note, .. } => note.clone(),
+            Error::Redefined { note, .. } => note.clone(),
         }
     }
     fn help(&self) -> Option<String> {
@@ -133,6 +163,7 @@ impl Error {
            ),
             Error::MainNotDefined => Some("If this is intentinal you may want to add the `--no-main` flag.".to_string()),
             Error::RunTimeError { help, .. } => help.clone(),
+            Error::Redefined { help, .. } => help.clone(),
         }
     }
 
@@ -150,6 +181,9 @@ impl Error {
                     .with_message(self.message())
                     .with_color(Color::Red),
             );
+        if let Some(label) = self.second_label(filename) {
+            report = report.with_label(label);
+        }
         if let Some(note) = self.note() {
             report = report.with_note(note);
         }

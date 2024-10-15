@@ -455,21 +455,15 @@ impl AstWalker<Program> for Compiler<'_> {
     }
 
     fn handle_loop(&mut self, program: &mut Program, r#loop: &LoopExpr) {
-        let mut chunk_condition = Vec::new();
-        self.walk_expr(&mut chunk_condition, r#loop.condition);
+        let start = self.get_program_size(program);
+        self.walk_expr(program, r#loop.condition);
+        let jump_instruction_index = program.len();
+        program.push(Instruction::JumpIf(usize::MAX));
 
-        let mut chunk_body = Vec::new();
-        self.walk_expr(&mut chunk_body, r#loop.body);
+        self.walk_expr(program, r#loop.body);
+        program.push(Instruction::Jump(start));
 
-        let body_offset = chunk_body.program_size();
-        let start_offset = body_offset
-            + chunk_condition.program_size()
-            + Instruction::JumpIf(0).size()
-            + Instruction::JumpBackward(0).size();
-        program.extend(chunk_condition);
-        program.push(Instruction::JumpIf(body_offset));
-        program.extend(chunk_body);
-        program.push(Instruction::JumpBackward(start_offset));
+        program[jump_instruction_index] = Instruction::JumpIf(self.get_program_size(program));
     }
 
     fn handle_bool(&mut self, program: &mut Program, b: bool) {

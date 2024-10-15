@@ -162,6 +162,7 @@ impl<'a> Debugger<'a> {
 
         // Render vm frame data
         let vm_frame_data = 'block: {
+            let ip = self.machine.ip;
             let Result::Ok(frame) = self.machine.get_current_frame() else {
                 break 'block "Empty VM frame".to_string();
             };
@@ -171,11 +172,19 @@ impl<'a> Debugger<'a> {
                 String::from("return address: None")
             };
 
-            let mut vm_frame_data = format!("ip: {}\n", self.machine.ip);
-            for (i, value) in frame.stack.iter().enumerate() {
-                vm_frame_data = format!("{}stack[{}]: {}\n", vm_frame_data, i, value);
+            let mut free = String::from("Free:\n");
+            for (i, value) in self.machine.free.iter().enumerate() {
+                free += &format!("[{}]: {}\n", i, value);
             }
-            format!("{return_address}\n{vm_frame_data}")
+            let mut vm_frame_data = String::from("STACK:\n");
+            for (i, value) in frame.stack.iter().enumerate() {
+                vm_frame_data += &format!("[{}]: {}\n", i, value);
+            }
+            let mut locals = String::from("LOCALS:\n");
+            for (i, value) in frame.args.iter().enumerate() {
+                locals += &format!("[{}]: {}\n", i, value);
+            }
+            format!("{return_address}\nip: {ip}\n{free}\n{locals}\n{vm_frame_data}")
         };
 
         let frame_data = Paragraph::new(vm_frame_data)

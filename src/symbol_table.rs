@@ -33,6 +33,7 @@ impl SymbolTable {
                 scope: SymbolScope::Global,
                 scope_level: self.get_scope_level() as u32,
                 location: None,
+                span: None,
             },
         )]);
         self.scope_name.push(name.to_string());
@@ -220,6 +221,7 @@ pub struct Symbol {
     pub scope: SymbolScope,
     pub scope_level: u32,
     pub location: Option<u32>,
+    pub span: Option<Span>,
 }
 
 impl Symbol {
@@ -369,6 +371,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
                 scope: self.current_scope,
                 scope_level: table.get_scope_level() as u32,
                 location: None,
+                span: Some(param.span.clone()),
             };
             table.insert(param_name.clone(), symbol);
         }
@@ -431,6 +434,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
                 scope: self.current_scope,
                 scope_level: table.get_scope_level() as u32,
                 location: None,
+                span: Some(param.span.clone()),
             };
             table.insert(param_name.clone(), symbol);
         }
@@ -515,6 +519,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
                 scope: self.current_scope,
                 scope_level: table.get_scope_level() as u32,
                 location: None,
+                span: Some(spanned.span.clone()),
             };
             table.insert(binding_name.clone(), symbol);
         }
@@ -556,7 +561,24 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
             scope: self.current_scope,
             scope_level: table.get_scope_level() as u32,
             location: None,
+            span: Some(var.name.span.clone()),
         };
+
+        if let Some(def) = table.lookup(name) {
+            self.error(Error::Redefined {
+                // HACK: some how we need to get the original span here
+                // We could put it in the symbol table but that would be too much effort.
+                // If we put it in the symbol table as a Option<Span> we could do it that way
+                // with little effort.
+                original_span: def.span.clone().unwrap(),
+                original_name: def.name.clone(),
+                new_span: var.name.span.clone(),
+                new_name: name.clone(),
+                note: None,
+                help: None,
+            });
+            return;
+        }
 
         table.insert(name.clone(), symbol);
     }
@@ -566,7 +588,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         self.walk_expr(table, loop_expr.body);
     }
 
-    fn handle_symbol(&mut self, table: &mut SymbolTable, name: &str, _: Span) {
+    fn handle_symbol(&mut self, table: &mut SymbolTable, name: &str, span: Span) {
         let current_scope_level = table.get_scope_level() as u32;
         match table.lookup(name).cloned() {
             Some(symbol) if symbol.scope_level < current_scope_level && self.is_in_lambda => {
@@ -587,6 +609,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
                         scope: SymbolScope::Free,
                         scope_level: current_scope_level,
                         location: None,
+                        span: Some(span),
                     },
                 );
             }
@@ -631,6 +654,7 @@ mod tests {
                 scope: SymbolScope::Global,
                 scope_level: 0,
                 location: None,
+                span: Some(6..10)
             })
         );
         assert_eq!(
@@ -647,6 +671,7 @@ mod tests {
                 scope: SymbolScope::Global,
                 scope_level: 0,
                 location: None,
+                span: None
             })
         );
         assert_eq!(
@@ -663,6 +688,7 @@ mod tests {
                 scope: SymbolScope::Global,
                 scope_level: 0,
                 location: None,
+                span: None
             })
         );
         assert_eq!(
@@ -679,6 +705,7 @@ mod tests {
                 scope: SymbolScope::Global,
                 scope_level: 1,
                 location: None,
+                span: None
             })
         );
     }
@@ -710,6 +737,7 @@ mod tests {
                 scope: SymbolScope::Global,
                 scope_level: 0,
                 location: None,
+                span: None
             })
         );
     }

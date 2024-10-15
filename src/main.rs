@@ -1,6 +1,7 @@
 use neolisp::{
     cli::{Cli, Command},
     compiler::{compile, CompilerOptions},
+    debugger::Debugger,
     machine::Machine,
     repl,
 };
@@ -18,6 +19,32 @@ fn main() -> anyhow::Result<()> {
         Command::Build { .. } => todo!("Not build implemented yet"),
         Command::Run { repl, .. } if repl => {
             repl::run(args)?;
+            Ok(())
+        }
+        Command::Run {
+            file,
+            breakpoints,
+            no_main,
+            ..
+        } if !breakpoints.is_empty() => {
+            let filename = file.unwrap_or("main.nl".to_string());
+            let src = std::fs::read_to_string(&filename)?;
+            let options = CompilerOptions { no_main };
+            let instructions = match compile(&src, options) {
+                Ok(program) => program,
+                Err(errors) => {
+                    for error in errors {
+                        error.report(&filename, &src)?;
+                    }
+                    return Ok(());
+                }
+            };
+            let program: Vec<u8> = instructions.iter().flat_map(|i| i.to_bytecode()).collect();
+            let mut machine = Machine::new(program);
+
+            let mut debugger = Debugger::new(&mut machine)?.with_breakpoints(breakpoints.clone());
+            debugger.run()?;
+
             Ok(())
         }
         Command::Run {
