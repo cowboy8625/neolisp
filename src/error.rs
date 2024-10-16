@@ -30,7 +30,7 @@ pub enum ErrorType {
     MissingOpeningParenthesis,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
     ExpectedFound {
         span: Span,

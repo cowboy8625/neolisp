@@ -488,3 +488,96 @@ impl AstWalker<Program> for Compiler<'_> {
         self.emit_get_instruction(program, symbol);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::instruction::{Instruction::*, Value::*};
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn test_let_binding() {
+        let src = r#"
+(let (x 1)
+(let (y 2)
+(let (z 3)
+(print x y z "\n"))))"#;
+        let options = CompilerOptions { no_main: true };
+        let instructions = compile(src, options).unwrap();
+
+        // HACK: This is the problem child
+        assert_eq!(
+            instructions,
+            vec![
+                Push(Box::new(F64(1.0))),
+                SetLocal,
+                Push(Box::new(F64(2.0))),
+                SetLocal,
+                GetLocal(0),
+                SetFree,
+                GetLocal(1),
+                SetFree,
+                Push(Box::new(F64(3.0))),
+                SetLocal,
+                GetFree(0),
+                GetFree(1),
+                GetLocal(0),
+                Push(Box::new(String(Box::new("\n".to_string())))),
+                Push(Box::new(Builtin(17))),
+                Call(4),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_if_else() {
+        let src = r#"
+(if true "then\n" "else\n")
+"#;
+        let options = CompilerOptions { no_main: true };
+        let instructions = compile(src, options).unwrap();
+
+        assert_eq!(
+            instructions,
+            vec![
+                Push(Box::new(Bool(true))),
+                JumpIf(16),
+                Push(Box::new(String(Box::new("then\n".to_string())))),
+                JumpForward(11),
+                Push(Box::new(String(Box::new("else\n".to_string()))))
+            ]
+        );
+    }
+
+    #[test]
+    fn test_applying_function() {
+        let src = r#"
+(fn apply (f x) (f x))
+(apply (lambda (x) (+ x 321)) 123)
+"#;
+        let options = CompilerOptions { no_main: true };
+        let instructions = compile(src, options).unwrap();
+
+        assert_eq!(
+            instructions,
+            vec![
+                Jump(18),
+                GetLocal(1),
+                GetLocal(0),
+                Call(1),
+                Return,
+                Push(Box::new(Callable(5))),
+                SetGlobal,
+                Push(Box::new(F64(123.0))),
+                Jump(58),
+                GetLocal(0),
+                Push(Box::new(F64(321.0))),
+                Add(2),
+                Return,
+                Push(Box::new(Callable(40))),
+                Push(Box::new(Callable(5))),
+                Call(2)
+            ]
+        );
+    }
+}

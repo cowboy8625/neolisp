@@ -742,3 +742,593 @@ mod tests {
         );
     }
 }
+
+// +---------------------------------------------------------------+
+// |                       New Symbol Table                        |
+// +---------------------------------------------------------------+
+
+pub mod new_symbol_table {
+    // REMOVE THIS FOR RELEASE
+    #![allow(dead_code)]
+
+    use crate::ast::{Ast, Expr, Span, Spanned};
+    use crate::error::Error;
+    use crate::expr_walker::{
+        AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr, LoopExpr,
+        OperatorExpr, VarExpr,
+    };
+    use std::collections::HashMap;
+
+    #[derive(Debug, Clone, Eq, PartialEq)]
+    pub enum Type {
+        Int,
+    }
+
+    #[derive(Debug, Eq, PartialEq)]
+    pub struct UnboundVariable {
+        pub id: usize,
+        pub name: String,
+        pub span: Span,
+        pub typeis: Option<Type>,
+    }
+
+    #[derive(Debug, Eq, PartialEq)]
+    pub struct Variable {
+        pub name: String,
+        pub span: Span,
+        pub typeis: Option<Type>,
+    }
+
+    #[derive(Debug, Clone, Eq, PartialEq)]
+    pub struct Parameter {
+        pub name: String,
+        pub span: Span,
+        pub typeis: Option<Type>,
+        pub is_unbound: bool,
+    }
+
+    #[derive(Debug, Eq, PartialEq)]
+    pub struct Function {
+        pub name: String,
+        pub span: Span,
+        pub return_type: Option<Type>,
+        pub parameters: Vec<Parameter>,
+    }
+
+    #[derive(Debug, Eq, PartialEq)]
+    pub struct Lambda {
+        pub id: usize,
+        pub span: Span,
+        pub return_type: Option<Type>,
+        pub parameters: Vec<Parameter>,
+    }
+
+    impl Lambda {
+        pub fn name(&self) -> String {
+            format!("lambda_{}", self.id)
+        }
+    }
+
+    #[derive(Debug, Eq, PartialEq)]
+    pub struct Let {
+        pub id: usize,
+        pub span: Span,
+        pub bindings: Vec<Parameter>,
+        pub return_type: Option<Type>,
+    }
+
+    impl Let {
+        pub fn name(&self) -> String {
+            let names = self
+                .bindings
+                .iter()
+                .map(|p| p.name.clone())
+                .collect::<Vec<_>>()
+                .join("|");
+            let id = self.id;
+            format!("let_{id}|{names}")
+        }
+    }
+
+    #[derive(Debug, Eq, PartialEq)]
+    pub enum Symbol {
+        UnboundVariable(UnboundVariable),
+        Variable(Variable),
+        Parameter(Parameter),
+        Function(Function),
+        Lambda(Lambda),
+        Let(Let),
+    }
+
+    impl Symbol {
+        pub fn span(&self) -> Span {
+            match self {
+                Symbol::UnboundVariable(v) => v.span.clone(),
+                Symbol::Variable(v) => v.span.clone(),
+                Symbol::Parameter(v) => v.span.clone(),
+                Symbol::Function(v) => v.span.clone(),
+                Symbol::Lambda(v) => v.span.clone(),
+                Symbol::Let(v) => v.span.clone(),
+            }
+        }
+
+        pub fn name(&self) -> String {
+            match self {
+                Symbol::UnboundVariable(v) => v.name.clone(),
+                Symbol::Variable(v) => v.name.clone(),
+                Symbol::Parameter(v) => v.name.clone(),
+                Symbol::Function(v) => v.name.clone(),
+                Symbol::Lambda(v) => v.name(),
+                Symbol::Let(v) => v.name(),
+            }
+        }
+
+        pub fn get_parameters(&self) -> &[Parameter] {
+            match self {
+                Symbol::Function(f) => &f.parameters,
+                Symbol::Lambda(l) => &l.parameters,
+                Symbol::Let(l) => &l.bindings,
+                _ => &[],
+            }
+        }
+    }
+
+    macro_rules! into_symbol {
+        ($($t:ident),* $(,)?) => {
+            $(
+                impl From<$t> for Symbol {
+                    fn from(value: $t) -> Self {
+                        Symbol::$t(value)
+                    }
+                }
+            )*
+        };
+    }
+
+    into_symbol!(UnboundVariable, Variable, Parameter, Function, Lambda, Let,);
+
+    #[derive(Debug, Default, PartialEq, Eq)]
+    pub struct Scope {
+        symbols: HashMap<String, Symbol>,
+    }
+
+    impl Scope {
+        pub fn insert(&mut self, symbol: impl Into<Symbol>) {
+            let symbol = symbol.into();
+            let name = match &symbol {
+                Symbol::UnboundVariable(v) => &v.name,
+                Symbol::Variable(v) => &v.name,
+                Symbol::Parameter(p) => &p.name,
+                Symbol::Function(f) => &f.name,
+                Symbol::Lambda(l) => &l.name(),
+                Symbol::Let(l) => &l.name(),
+            };
+            self.symbols.insert(name.clone(), symbol);
+        }
+
+        pub fn get_mut(&mut self, name: &str) -> Option<&mut Symbol> {
+            self.symbols.get_mut(name)
+        }
+
+        pub fn lookup(&self, name: &str) -> Option<&Symbol> {
+            self.symbols.get(name)
+        }
+    }
+
+    #[derive(Debug, Default, PartialEq, Eq)]
+    pub struct SymbolTable {
+        scopes: HashMap<String, Scope>,
+        scope_stack: Vec<String>,
+    }
+
+    impl SymbolTable {
+        const SEPARATOR: &'static str = "()";
+        fn new(scopes: HashMap<String, Scope>) -> Self {
+            Self {
+                scopes,
+                scope_stack: Vec::new(),
+            }
+        }
+
+        fn get_scope_name(&self) -> String {
+            self.scope_stack.last().cloned().unwrap_or_default()
+        }
+
+        fn get_full_scope_name(&self) -> String {
+            self.scope_stack.join(Self::SEPARATOR)
+        }
+
+        pub fn enter_scope(&mut self, name: &str) {
+            self.scope_stack.push(name.to_string());
+        }
+
+        pub fn exit_scope(&mut self) {
+            self.scope_stack.pop();
+        }
+
+        pub fn get(&self, name: &str) -> Option<&Symbol> {
+            for i in (0..=self.scope_stack.len()).rev() {
+                let scope_path = self.scope_stack[0..i].join(Self::SEPARATOR);
+
+                if let Some(scope) = self.scopes.get(&scope_path) {
+                    if let Some(symbol) = scope.lookup(name) {
+                        return Some(symbol);
+                    }
+                }
+            }
+
+            self.scopes
+                .get("global")
+                .and_then(|scope| scope.lookup(name))
+        }
+
+        pub fn get_mut(&mut self, name: &str, f: impl Fn(&mut Symbol)) {
+            for i in (0..self.scope_stack.len()).rev() {
+                let scope_path = self.scope_stack[0..=i].join(Self::SEPARATOR);
+
+                if let Some(scope) = self.scopes.get_mut(&scope_path) {
+                    if let Some(symbol) = scope.get_mut(name) {
+                        f(symbol);
+                    }
+                }
+            }
+
+            let Some(symbol) = self
+                .scopes
+                .get_mut("global")
+                .and_then(|scope| scope.get_mut(name))
+            else {
+                return;
+            };
+            f(symbol);
+        }
+
+        fn push(&mut self, symbol: impl Into<Symbol>) {
+            let symbol = symbol.into();
+
+            let name = match &symbol {
+                Symbol::Function(Function { name, .. })
+                | Symbol::Variable(Variable { name, .. })
+                | Symbol::Parameter(Parameter { name, .. })
+                | Symbol::UnboundVariable(UnboundVariable { name, .. }) => name.to_string(),
+                Symbol::Lambda(l) => l.name(),
+                Symbol::Let(l) => l.name(),
+            };
+
+            if matches!(self.scope_stack.last(), Some(sn) if &name == sn) {
+                self.scope_stack.pop();
+                let scope_name = self.get_full_scope_name();
+                self.scopes.entry(scope_name).or_default().insert(symbol);
+                self.scope_stack.push(name.to_string());
+            } else {
+                let scope_name = self.get_full_scope_name();
+                self.scopes.entry(scope_name).or_default().insert(symbol);
+            }
+        }
+    }
+
+    #[derive(Debug, Default, PartialEq, Eq)]
+    pub struct SymbolTableBuilder {
+        lambda_counter: usize,
+        unbound_counter: usize,
+        errors: Vec<Error>,
+    }
+
+    impl SymbolTableBuilder {
+        pub fn build(mut self, ast: Ast) -> std::result::Result<SymbolTable, Vec<Error>> {
+            let mut table = SymbolTable::default();
+            table.enter_scope("global");
+            self.walk(&mut table, &ast);
+            table.exit_scope();
+            if !self.errors.is_empty() {
+                return Err(self.errors);
+            }
+            Ok(table)
+        }
+    }
+
+    impl AstWalker<SymbolTable> for SymbolTableBuilder {
+        fn error(&mut self, error: Error) {
+            self.errors.push(error);
+        }
+
+        fn get_lambda_name(&mut self) -> String {
+            let name = format!("lambda_{}", self.lambda_counter);
+            self.lambda_counter += 1;
+            name
+        }
+
+        fn handle_operator(
+            &mut self,
+            table: &mut SymbolTable,
+            _: &str,
+            operator_expr: &OperatorExpr,
+        ) {
+            for spanned in operator_expr.args.iter() {
+                self.walk_expr(table, spanned);
+            }
+        }
+
+        fn handle_builtin(&mut self, table: &mut SymbolTable, _: &str, expr: &[Spanned<Expr>]) {
+            for spanned in expr.iter().skip(1) {
+                self.walk_expr(table, spanned);
+            }
+        }
+
+        fn handle_function(&mut self, table: &mut SymbolTable, function_expr: &FunctionExpr) {
+            let Expr::Symbol(name) = &function_expr.name.expr else {
+                self.error(Error::ExpectedFound {
+                    span: function_expr.name.span.clone(),
+                    expected: "Symbol".to_string(),
+                    found: function_expr.name.expr.type_of(),
+                    note: None,
+                    help: Some("(fn <symbol> (<symbol>) <expression>)".to_string()),
+                });
+                return;
+            };
+
+            table.enter_scope(name);
+
+            let Expr::List(params) = &function_expr.params.expr else {
+                unreachable!("This should never fail as we already checked this in AstWalker");
+            };
+
+            let mut parameters: Vec<Parameter> = Vec::new();
+            for spanned in params.iter() {
+                let Expr::Symbol(name) = &spanned.expr else {
+                    self.error(Error::ExpectedFound {
+                        span: spanned.span.clone(),
+                        expected: "Symbol".to_string(),
+                        found: spanned.expr.type_of(),
+                        note: None,
+                        help: Some("(fn <symbol> (<symbol>) <expression>)".to_string()),
+                    });
+                    return;
+                };
+                let parameter = Parameter {
+                    name: name.to_string(),
+                    span: spanned.span.clone(),
+                    typeis: None,
+                    is_unbound: false,
+                };
+                parameters.push(parameter.clone());
+                table.push(parameter);
+            }
+
+            let function = Function {
+                name: name.to_string(),
+                span: function_expr.name.span.clone(),
+                return_type: None,
+                parameters,
+            };
+            table.push(function);
+
+            for spanned in function_expr.body.iter() {
+                self.walk_expr(table, spanned);
+            }
+
+            table.exit_scope();
+        }
+
+        fn handle_lambda(&mut self, table: &mut SymbolTable, lambda_expr: &LambdaExpr) {
+            let id = self.lambda_counter;
+            let name = self.get_lambda_name();
+            table.enter_scope(&name);
+
+            let Expr::List(params) = &lambda_expr.params.expr else {
+                unreachable!("This should never fail as we already checked this in AstWalker");
+            };
+
+            let mut parameters: Vec<Parameter> = Vec::new();
+            for spanned in params.iter() {
+                let Expr::Symbol(name) = &spanned.expr else {
+                    self.error(Error::ExpectedFound {
+                        span: spanned.span.clone(),
+                        expected: "Symbol".to_string(),
+                        found: spanned.expr.type_of(),
+                        note: None,
+                        help: Some("(lambda (<symbol>) <expression>)".to_string()),
+                    });
+                    return;
+                };
+                let parameter = Parameter {
+                    name: name.to_string(),
+                    span: spanned.span.clone(),
+                    typeis: None,
+                    is_unbound: false,
+                };
+                parameters.push(parameter.clone());
+                table.push(parameter);
+            }
+
+            let lambda = Lambda {
+                id,
+                // TODO: probably need the hole span from ( to closing )
+                span: lambda_expr.params.span.clone(),
+                return_type: None,
+                parameters,
+            };
+            table.push(lambda);
+
+            for spanned in lambda_expr.body.iter().rev() {
+                self.walk_expr(table, spanned);
+            }
+
+            table.exit_scope();
+        }
+
+        fn handle_let_binding(&mut self, table: &mut SymbolTable, let_binding: &LetBindingExpr) {
+            let names = let_binding
+                .bindings
+                .iter()
+                .filter_map(|binding| binding.expr.first_list_item())
+                .map(|item| &item.expr)
+                .map(|expr| match expr {
+                    Expr::Symbol(name) => name.clone(),
+                    _ => panic!("expected symbol in let binding, got: {expr:?}"),
+                })
+                .collect::<Vec<_>>();
+            let id = self.lambda_counter;
+            self.lambda_counter += 1;
+            let scope_name = format!("let_{id}|{}", names.join("|"));
+            table.enter_scope(&scope_name);
+
+            let mut bindings = Vec::new();
+            for spanned in let_binding.bindings.iter() {
+                let Expr::List(list) = &spanned.expr else {
+                    self.error(Error::ExpectedFound {
+                        span: spanned.span.clone(),
+                        expected: "List or Symbol".to_string(),
+                        found: spanned.expr.type_of(),
+                        note: None,
+                        help: Some(
+                            "(let (<symbol> <expression> | (<symbol <expression>)) <expression>)"
+                                .to_string(),
+                        ),
+                    });
+                    continue;
+                };
+
+                let Some(binding_expression) = list.get(1) else {
+                    self.error(Error::ExpectedFound {
+                    span: spanned.span.clone(),
+                    expected: "expression after binding name".to_string(),
+                    found: "nothing".to_string(),
+                    note: Some(
+                        "(let (<symbol> <expression> | (<symbol <expression>)) <expression>)"
+                            .to_string(),
+                    ),
+                    help: Some(format!("maybe try something like ({} 10), your just missing an expression after the name.", list[0].expr)),
+                });
+                    continue;
+                };
+                self.walk_expr(table, binding_expression);
+
+                let Expr::Symbol(binding_name) = &list[0].expr else {
+                    unreachable!("This should never fail as we already checked this in AstWalker");
+                };
+                let parameter = Parameter {
+                    name: binding_name.clone(),
+                    span: spanned.span.clone(),
+                    typeis: None,
+                    is_unbound: false,
+                };
+                bindings.push(parameter.clone());
+                table.push(parameter);
+            }
+            let r#let = Let {
+                id,
+                span: let_binding.bindings[0].span.clone(),
+                bindings,
+                return_type: None,
+            };
+
+            table.push(r#let);
+
+            self.walk_expr(table, let_binding.body);
+            // for spanned in let_binding.body.iter() {
+            //     self.walk_expr(table, spanned);
+            // }
+
+            table.exit_scope();
+        }
+
+        fn handle_call(&mut self, _: &mut SymbolTable, _: &CallExpr) {
+            todo!()
+        }
+
+        fn handle_var(&mut self, table: &mut SymbolTable, var: &VarExpr) {
+            let Expr::Symbol(name) = &var.name.expr else {
+                unreachable!("This should never fail as we already checked this in AstWalker");
+            };
+
+            self.walk_expr(table, var.body);
+
+            let symbol = Variable {
+                name: name.to_string(),
+                span: var.name.span.clone(),
+                typeis: None,
+            };
+
+            if let Some(def) = table.get(name) {
+                self.error(Error::Redefined {
+                    original_span: def.span(),
+                    original_name: def.name(),
+                    new_span: var.name.span.clone(),
+                    new_name: name.clone(),
+                    note: None,
+                    help: None,
+                });
+                return;
+            }
+
+            table.push(symbol);
+        }
+
+        fn handle_if_else(&mut self, i: &mut SymbolTable, if_else: &IfElseExpr) {
+            self.walk_expr(i, if_else.condition);
+            self.walk_expr(i, if_else.then);
+            if let Some(else_body) = if_else.otherwise {
+                self.walk_expr(i, else_body);
+            }
+        }
+
+        fn handle_loop(&mut self, table: &mut SymbolTable, loop_expr: &LoopExpr) {
+            self.walk_expr(table, loop_expr.condition);
+            self.walk_expr(table, loop_expr.body);
+        }
+
+        fn handle_symbol(&mut self, table: &mut SymbolTable, name: &str, span: Span) {
+            let Some(scope) = table.get(&table.get_scope_name()) else {
+                panic!("scope not found {name}");
+            };
+            let params = scope.get_parameters();
+            let has_value_in_current_scope = params.iter().any(|p| p.name == name);
+            if has_value_in_current_scope {
+                return;
+            }
+            table.get_mut(name, |symbol| {
+                if let Symbol::Parameter(p) = symbol {
+                    p.is_unbound = true
+                }
+            });
+            let id = self.unbound_counter;
+            self.unbound_counter += 1;
+            table.push(UnboundVariable {
+                id,
+                name: name.to_string(),
+                span,
+                typeis: None,
+            });
+        }
+
+        // ----------- START NOT USED -----------
+        fn handle_bool(&mut self, _: &mut SymbolTable, _: bool) {}
+        fn handle_string(&mut self, _: &mut SymbolTable, _: &str) {}
+        fn handle_number(&mut self, _: &mut SymbolTable, _: f64) {}
+        // -----------  END NOT USED  -----------
+    }
+
+    #[test]
+    fn new_symbol_table() {
+        use crate::parser::parse_or_report;
+        use pretty_assertions::assert_eq;
+        let ast = parse_or_report(
+            "test_new_symbol_table",
+            r#"
+;; (lambda (x) (lambda (y) (+ x y)))
+
+;; (let (x 1) x)
+
+(let (x 1)
+(let (y 2)
+(let (z 3)
+(print x y z "\n"))))
+
+;; (fn add (x y) (+ x y))
+"#,
+        );
+        let symbol_table = SymbolTableBuilder::default().build(ast).unwrap();
+        assert_eq!(symbol_table, SymbolTable::default());
+    }
+}
