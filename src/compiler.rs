@@ -581,3 +581,195 @@ mod tests {
         );
     }
 }
+
+// +---------------------------------------------------------------+
+// |                       New Symbol Table                        |
+// +---------------------------------------------------------------+
+
+mod new_compiler_with_new_symbol_table {
+    use super::{
+        AstWalker, CompilerOptions, Error, Expr, Instruction, Program, ProgramSize, Spanned,
+        UnsetLocation, Value,
+    };
+    use crate::symbol_table::new_symbol_table::{
+        Function, Lambda, Parameter, Symbol, SymbolTable, SymbolTableBuilder, UnboundVariable,
+        Variable,
+    };
+
+    #[derive(Debug)]
+    pub struct Compiler<'a> {
+        symbol_table: &'a mut SymbolTable,
+        lambda_counter: usize,
+        options: CompilerOptions,
+        offset: usize,
+        unset_locations: Vec<UnsetLocation>,
+        errors: Vec<Error>,
+    }
+
+    impl<'a> Compiler<'a> {
+        pub fn new(symbol_table: &'a mut SymbolTable, options: CompilerOptions) -> Self {
+            Self {
+                symbol_table,
+                lambda_counter: 0,
+                options,
+                offset: 0,
+                unset_locations: Vec::new(),
+                errors: Vec::new(),
+            }
+        }
+
+        pub fn with_offset(mut self, offset: usize) -> Self {
+            self.offset = offset;
+            self
+        }
+
+        pub fn compile(
+            mut self,
+            ast: &[Spanned<Expr>],
+        ) -> std::result::Result<Vec<Instruction>, Vec<Error>> {
+            let mut program = Vec::new();
+            self.walk(&mut program, ast);
+            if !self.options.no_main {
+                let Some(symbol) = self.symbol_table.lookup("main") else {
+                    self.error(Error::MainNotDefined);
+                    return Err(self.errors);
+                };
+                let Some(location) = symbol.location else {
+                    unreachable!("Main function location should always be set at this point");
+                };
+                program.push(Instruction::Jump(location as usize));
+            }
+
+            if !self.errors.is_empty() {
+                return Err(self.errors);
+            }
+
+            for UnsetLocation { index, name } in self.unset_locations.iter() {
+                let Some(symbol) = self.symbol_table.lookup(name) else {
+                    unreachable!("Variable `{}` should be known at this point", name,);
+                };
+                let Some(location) = symbol.location else {
+                    unreachable!(
+                        "{} {:?} location should always be set at this point",
+                        name, symbol.kind
+                    );
+                };
+                let instruction = &mut program[*index];
+                match instruction {
+                    Instruction::Push(value) => match value.as_mut() {
+                        Value::Callable(i) => *i = location as usize,
+                        _ => {
+                            // NOTE: INTENTIONAL_PANIC
+                            panic!("expected push but found {instruction:?}");
+                        }
+                    },
+                    _ => {
+                        // NOTE: INTENTIONAL_PANIC
+                        panic!("expected push but found {instruction:?}");
+                    }
+                }
+            }
+            Ok(program)
+        }
+
+        fn get_operator_opcode(op: &str, count: usize) -> Option<Instruction> {
+            // NOTE: When implementing a new operator if this step is skipped the compiler will crash
+            // here reminding you to add the new operator to this list. ONLY if you added the operator
+            // to the OPERATORS list in lib.rs
+            match op {
+                "+" => Some(Instruction::Add(count)),
+                "-" => Some(Instruction::Sub(count)),
+                "*" => Some(Instruction::Mul(count)),
+                "/" => Some(Instruction::Div(count)),
+                "=" => Some(Instruction::Eq(count)),
+                ">" => Some(Instruction::GreaterThan(count)),
+                "<" => Some(Instruction::LessThan(count)),
+                ">=" => Some(Instruction::GreaterThanOrEqual(count)),
+                "<=" => Some(Instruction::LessThanOrEqual(count)),
+                "and" => Some(Instruction::And(count)),
+                "or" => Some(Instruction::Or(count)),
+                "not" => Some(Instruction::Not),
+                "mod" => Some(Instruction::Mod),
+                _ => None,
+            }
+        }
+
+        fn get_program_size(&self, program: &Program) -> usize {
+            self.offset + program.program_size()
+        }
+    }
+
+    impl AstWalker<Program> for Compiler<'_> {
+        fn error(&mut self, error: Error) {
+            self.errors.push(error);
+        }
+
+        fn get_lambda_name(&mut self) -> String {
+            let name = format!("lambda_{}", self.lambda_counter);
+            self.lambda_counter += 1;
+            name
+        }
+
+        fn handle_operator(
+            &mut self,
+            _: &mut Program,
+            _: &str,
+            _: &crate::expr_walker::OperatorExpr,
+        ) {
+            todo!()
+        }
+
+        fn handle_builtin(&mut self, _: &mut Program, _: &str, _: &[Spanned<Expr>]) {
+            todo!()
+        }
+
+        fn handle_function(&mut self, _: &mut Program, _: &crate::expr_walker::FunctionExpr) {
+            todo!()
+        }
+
+        fn handle_lambda(&mut self, _: &mut Program, _: &crate::expr_walker::LambdaExpr) {
+            todo!()
+        }
+
+        fn handle_let_binding(&mut self, _: &mut Program, _: &crate::expr_walker::LetBindingExpr) {
+            todo!()
+        }
+
+        fn handle_call(&mut self, _: &mut Program, _: &crate::expr_walker::CallExpr) {
+            todo!()
+        }
+
+        fn handle_var(&mut self, _: &mut Program, _: &crate::expr_walker::VarExpr) {
+            todo!()
+        }
+
+        fn handle_if_else(&mut self, _: &mut Program, _: &crate::expr_walker::IfElseExpr) {
+            todo!()
+        }
+
+        fn handle_loop(&mut self, _: &mut Program, _: &crate::expr_walker::LoopExpr) {
+            todo!()
+        }
+
+        fn handle_bool(&mut self, _: &mut Program, _: bool) {
+            todo!()
+        }
+
+        fn handle_string(&mut self, _: &mut Program, _: &str) {
+            todo!()
+        }
+
+        fn handle_number(&mut self, _: &mut Program, _: f64) {
+            todo!()
+        }
+
+        fn handle_symbol(&mut self, _: &mut Program, _: &str, _: crate::ast::Span) {
+            todo!()
+        }
+    }
+
+    #[test]
+    fn test_new_symbol_table_with_compiler() {
+        assert!(true);
+    }
+}
