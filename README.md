@@ -45,7 +45,11 @@ To get started with NeoLisp, follow these steps:
 
 (if (= 10 10) "10 is equal to 10" "10 is not equal to 10")
 
-;; Quoting
+;; Let bindings
+
+(let (x 10) (+ x 10))
+
+;; Quoting (worked in tree walker but still working on getting this in the new compiler)
 
 '(10 20 30) ;;  -> (10 20 30)
 ```
