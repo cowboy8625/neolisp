@@ -1,4 +1,6 @@
 pub type Span = std::ops::Range<usize>;
+pub type Ast = Vec<Spanned<Expr>>;
+
 #[derive(Debug, Clone)]
 pub struct Spanned<T>
 where

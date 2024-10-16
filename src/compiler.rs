@@ -587,6 +587,8 @@ mod tests {
 // +---------------------------------------------------------------+
 
 mod new_compiler_with_new_symbol_table {
+    #![allow(dead_code)]
+    #![allow(unused_imports)]
     use super::{
         AstWalker, CompilerOptions, Error, Expr, Instruction, Program, ProgramSize, Spanned,
         UnsetLocation, Value,
@@ -629,46 +631,46 @@ mod new_compiler_with_new_symbol_table {
         ) -> std::result::Result<Vec<Instruction>, Vec<Error>> {
             let mut program = Vec::new();
             self.walk(&mut program, ast);
-            if !self.options.no_main {
-                let Some(symbol) = self.symbol_table.lookup("main") else {
-                    self.error(Error::MainNotDefined);
-                    return Err(self.errors);
-                };
-                let Some(location) = symbol.location else {
-                    unreachable!("Main function location should always be set at this point");
-                };
-                program.push(Instruction::Jump(location as usize));
-            }
+            // if !self.options.no_main {
+            //     let Some(symbol) = self.symbol_table.get("main") else {
+            //         self.error(Error::MainNotDefined);
+            //         return Err(self.errors);
+            //     };
+            //     let Some(location) = symbol.location else {
+            //         unreachable!("Main function location should always be set at this point");
+            //     };
+            //     program.push(Instruction::Jump(location as usize));
+            // }
 
             if !self.errors.is_empty() {
                 return Err(self.errors);
             }
 
-            for UnsetLocation { index, name } in self.unset_locations.iter() {
-                let Some(symbol) = self.symbol_table.lookup(name) else {
-                    unreachable!("Variable `{}` should be known at this point", name,);
-                };
-                let Some(location) = symbol.location else {
-                    unreachable!(
-                        "{} {:?} location should always be set at this point",
-                        name, symbol.kind
-                    );
-                };
-                let instruction = &mut program[*index];
-                match instruction {
-                    Instruction::Push(value) => match value.as_mut() {
-                        Value::Callable(i) => *i = location as usize,
-                        _ => {
-                            // NOTE: INTENTIONAL_PANIC
-                            panic!("expected push but found {instruction:?}");
-                        }
-                    },
-                    _ => {
-                        // NOTE: INTENTIONAL_PANIC
-                        panic!("expected push but found {instruction:?}");
-                    }
-                }
-            }
+            // for UnsetLocation { index, name } in self.unset_locations.iter() {
+            //     let Some(symbol) = self.symbol_table.lookup(name) else {
+            //         unreachable!("Variable `{}` should be known at this point", name,);
+            //     };
+            //     let Some(location) = symbol.location else {
+            //         unreachable!(
+            //             "{} {:?} location should always be set at this point",
+            //             name, symbol.kind
+            //         );
+            //     };
+            //     let instruction = &mut program[*index];
+            //     match instruction {
+            //         Instruction::Push(value) => match value.as_mut() {
+            //             Value::Callable(i) => *i = location as usize,
+            //             _ => {
+            //                 // NOTE: INTENTIONAL_PANIC
+            //                 panic!("expected push but found {instruction:?}");
+            //             }
+            //         },
+            //         _ => {
+            //             // NOTE: INTENTIONAL_PANIC
+            //             panic!("expected push but found {instruction:?}");
+            //         }
+            //     }
+            // }
             Ok(program)
         }
 
