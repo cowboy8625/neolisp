@@ -1050,13 +1050,6 @@ pub struct SymbolTable {
 
 impl SymbolTable {
     pub const SEPARATOR: &'static str = "()";
-    fn new(scopes: HashMap<String, Scope>) -> Self {
-        Self {
-            scopes,
-            scope_stack: Vec::new(),
-        }
-    }
-
     pub fn set_location(&mut self, name: &str, location: usize) {
         self.get_mut(name, |symbol| symbol.set_location(location));
     }
