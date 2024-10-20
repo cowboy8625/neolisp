@@ -16,7 +16,7 @@ use super::{
 
 use chumsky::prelude::Parser;
 
-pub fn compile(
+pub fn emitter(
     src: &str,
     options: EmitterOptions,
 ) -> std::result::Result<Vec<Instruction>, Vec<Error>> {
@@ -484,7 +484,7 @@ mod tests {
     (let (z 3)
     (print x y z "\n"))))"#;
         let options = EmitterOptions { no_main: true };
-        let instructions = compile(src, options).unwrap();
+        let instructions = emitter(src, options).unwrap();
 
         // HACK: This is the problem child
         assert_eq!(
@@ -516,7 +516,7 @@ mod tests {
 (if true "then\n" "else\n")
 "#;
         let options = EmitterOptions { no_main: true };
-        let instructions = compile(src, options).unwrap();
+        let instructions = emitter(src, options).unwrap();
 
         assert_eq!(
             instructions,
@@ -538,7 +538,7 @@ mod tests {
  (apply (lambda (x) (+ x 321)) 123)
  "#;
         let options = EmitterOptions { no_main: true };
-        let instructions = compile(src, options).unwrap();
+        let instructions = emitter(src, options).unwrap();
 
         assert_eq!(
             instructions,
