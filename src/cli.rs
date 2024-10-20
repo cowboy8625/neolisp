@@ -7,6 +7,8 @@ const HISTORY_PATH: &str = "/tmp/.history";
 #[derive(Debug, Parser)]
 #[command(about = "neolisp - a simple Lisp interpreter", long_about = None, color = clap::ColorChoice::Always)]
 pub struct Cli {
+    #[arg(short, long, default_value_t = false)]
+    pub ast_debug: bool,
     #[arg(short='H', long, default_value_t = String::from(HISTORY_PATH))]
     pub history_path: String,
     #[arg(short, long, default_value_t = EditMode::Vi)]
@@ -14,6 +16,24 @@ pub struct Cli {
     #[command(subcommand)]
     pub command: Option<Command>,
 }
+
+#[derive(Debug, Clone, Parser)]
+pub struct Run {
+    #[arg(short, long, default_value_t = false)]
+    pub repl: bool,
+    #[arg(long, help = "IP address to break on", value_delimiter = ',', value_hint = ValueHint::Other)]
+    pub breakpoints: Vec<usize>,
+    #[arg(short = 'd', long, default_value_t = false)]
+    pub decompile: bool,
+    #[arg(
+        long,
+        help = "compile with no main function as entry point",
+        default_value_t = false
+    )]
+    pub no_main: bool,
+    pub file: Option<String>,
+}
+
 #[derive(Debug, Subcommand, Clone)]
 pub enum Command {
     Build {
@@ -21,21 +41,7 @@ pub enum Command {
         decompile: bool,
         file: Option<String>,
     },
-    Run {
-        #[arg(short, long, default_value_t = false)]
-        repl: bool,
-        #[arg(long, help = "IP address to break on", value_delimiter = ',', value_hint = ValueHint::Other)]
-        breakpoints: Vec<usize>,
-        #[arg(short = 'd', long, default_value_t = false)]
-        decompile: bool,
-        #[arg(
-            long,
-            help = "compile with no main function as entry point",
-            default_value_t = false
-        )]
-        no_main: bool,
-        file: Option<String>,
-    },
+    Run(Run),
     Test {
         file: Option<String>,
     },

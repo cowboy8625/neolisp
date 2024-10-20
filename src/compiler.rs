@@ -18,7 +18,7 @@ use chumsky::prelude::Parser;
 
 pub fn compile(
     src: &str,
-    options: CompilerOptions,
+    options: EmitterOptions,
 ) -> std::result::Result<Vec<Instruction>, Vec<Error>> {
     if src.is_empty() {
         return Err(vec![Error::EmptyFile]);
@@ -30,11 +30,11 @@ pub fn compile(
 
     let mut symbol_table = SymbolTableBuilder::default().build(&ast)?;
     // eprintln!("symbol_table: {symbol_table:#?}");
-    Compiler::new(&mut symbol_table, options).compile(&ast)
+    Emitter::new(&mut symbol_table, options).compile(&ast)
 }
 
 #[derive(Debug, Default)]
-pub struct CompilerOptions {
+pub struct EmitterOptions {
     pub no_main: bool,
 }
 
@@ -51,16 +51,16 @@ impl ProgramSize for Program {
 }
 
 #[derive(Debug)]
-pub struct Compiler<'a> {
+pub struct Emitter<'a> {
     symbol_table: &'a mut SymbolTable,
     lambda_counter: usize,
-    options: CompilerOptions,
+    options: EmitterOptions,
     offset: usize,
     errors: Vec<Error>,
 }
 
-impl<'a> Compiler<'a> {
-    pub fn new(symbol_table: &'a mut SymbolTable, options: CompilerOptions) -> Self {
+impl<'a> Emitter<'a> {
+    pub fn new(symbol_table: &'a mut SymbolTable, options: EmitterOptions) -> Self {
         symbol_table.enter_scope("global");
         Self {
             symbol_table,
@@ -147,7 +147,7 @@ impl<'a> Compiler<'a> {
     }
 }
 
-impl AstWalker<Program> for Compiler<'_> {
+impl AstWalker<Program> for Emitter<'_> {
     fn error(&mut self, error: Error) {
         self.errors.push(error);
     }
@@ -483,7 +483,7 @@ mod tests {
     (let (y 2)
     (let (z 3)
     (print x y z "\n"))))"#;
-        let options = CompilerOptions { no_main: true };
+        let options = EmitterOptions { no_main: true };
         let instructions = compile(src, options).unwrap();
 
         // HACK: This is the problem child
@@ -515,7 +515,7 @@ mod tests {
         let src = r#"
 (if true "then\n" "else\n")
 "#;
-        let options = CompilerOptions { no_main: true };
+        let options = EmitterOptions { no_main: true };
         let instructions = compile(src, options).unwrap();
 
         assert_eq!(
@@ -537,7 +537,7 @@ mod tests {
  (fn apply (f x) (f x))
  (apply (lambda (x) (+ x 321)) 123)
  "#;
-        let options = CompilerOptions { no_main: true };
+        let options = EmitterOptions { no_main: true };
         let instructions = compile(src, options).unwrap();
 
         assert_eq!(

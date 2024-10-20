@@ -1,5 +1,5 @@
 use super::{
-    compiler::{Compiler, CompilerOptions},
+    compiler::{Emitter, EmitterOptions},
     error::Error,
     instruction::{Instruction, OpCode, Value},
     parser::parse_or_report,
@@ -163,7 +163,7 @@ impl Machine {
             None => SymbolTableBuilder::default().build(&ast)?,
         };
 
-        let instructions = Compiler::new(&mut symbol_table, CompilerOptions { no_main: true })
+        let instructions = Emitter::new(&mut symbol_table, EmitterOptions { no_main: true })
             .with_offset(self.program.len())
             .compile(&ast)?;
         self.symbol_table = Some(symbol_table);
