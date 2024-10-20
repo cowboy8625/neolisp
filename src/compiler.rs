@@ -884,19 +884,26 @@ impl AstWalker<Program> for Compiler<'_> {
 
         if let Expr::Symbol(name) = &call.callee.expr {
             let Some(symbol) = self.symbol_table.get(name) else {
+                program.push(Instruction::Call(call.args.len()));
                 return;
             };
 
-            let has_same_scope_name = self.symbol_table.get_scope_name() == symbol.name();
-
-            let last_instruction_is_call = matches!(
-                program.last(),
-                Some(Instruction::Call(_)) | Some(Instruction::TailCall(_))
-            );
-            if symbol.is_recursive() && has_same_scope_name && last_instruction_is_call {
-                program.push(Instruction::TailCall(call.args.len()));
+            if self.symbol_table.get_scope_name() != *name {
+                program.push(Instruction::Call(call.args.len()));
                 return;
             }
+            if !symbol.is_recursive() {
+                program.push(Instruction::Call(call.args.len()));
+                return;
+            }
+            eprintln!(
+                "{} {} {}",
+                symbol.is_recursive(),
+                name,
+                self.symbol_table.get_scope_name()
+            );
+            program.push(Instruction::TailCall(call.args.len()));
+            return;
         }
         program.push(Instruction::Call(call.args.len()));
     }
