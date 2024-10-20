@@ -1,6 +1,4 @@
-#[cfg(debug_assertions)]
-use clap::ValueHint;
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand, ValueEnum, ValueHint};
 #[cfg(windows)]
 const HISTORY_PATH: &str = "%TEMP%.history";
 #[cfg(unix)]
@@ -26,7 +24,6 @@ pub enum Command {
     Run {
         #[arg(short, long, default_value_t = false)]
         repl: bool,
-        #[cfg(debug_assertions)]
         #[arg(long, help = "IP address to break on", value_delimiter = ',', value_hint = ValueHint::Other)]
         breakpoints: Vec<usize>,
         #[arg(short = 'd', long, default_value_t = false)]
