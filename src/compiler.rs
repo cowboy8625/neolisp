@@ -627,7 +627,7 @@ impl<'a> Compiler<'a> {
             let Some(location) = symbol.get_location() else {
                 unreachable!("Main function location should always be set at this point");
             };
-            program.push(Instruction::Jump(location as usize));
+            program.push(Instruction::Jump(location));
         }
 
         if !self.errors.is_empty() {
@@ -842,7 +842,7 @@ impl AstWalker<Program> for Compiler<'_> {
                 // NOTE: INTENTIONAL_PANIC
                 panic!("expected symbol in let binding, got: {list:?}");
             };
-            Self::emit_set_instruction(program, &symbol);
+            Self::emit_set_instruction(program, symbol);
         }
 
         let scope_name = self.symbol_table.get_scope_name();

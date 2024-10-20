@@ -947,12 +947,12 @@ impl Symbol {
 
     pub fn get_location(&self) -> Option<usize> {
         match self {
-            Symbol::UnboundVariable(v) => v.location.clone(),
-            Symbol::Variable(v) => v.location.clone(),
-            Symbol::Parameter(v) => v.location.clone(),
-            Symbol::Function(v) => v.location.clone(),
-            Symbol::Lambda(v) => v.location.clone(),
-            Symbol::Let(v) => v.location.clone(),
+            Symbol::UnboundVariable(v) => v.location,
+            Symbol::Variable(v) => v.location,
+            Symbol::Parameter(v) => v.location,
+            Symbol::Function(v) => v.location,
+            Symbol::Lambda(v) => v.location,
+            Symbol::Let(v) => v.location,
         }
     }
 
@@ -1448,15 +1448,12 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         table.get_mut(name, |symbol| match symbol {
             Symbol::UnboundVariable(_) => {
                 skip = true;
-                return;
             }
             Symbol::Variable(_) => todo!(),
             Symbol::Parameter(p) => p.is_unbound = true,
             Symbol::Function(f) => {
                 f.is_recursive = f.name == scope_name || f.is_recursive;
-                eprintln!("{} {}", f.name, f.is_recursive);
                 skip = true;
-                return;
             }
             Symbol::Lambda(_) => todo!(),
             Symbol::Let(_) => todo!(),
