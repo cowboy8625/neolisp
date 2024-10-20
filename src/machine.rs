@@ -1,5 +1,5 @@
 use super::{
-    compiler::{Emitter, EmitterOptions},
+    emitter::{Emitter, EmitterOptions},
     error::Error,
     instruction::{Instruction, OpCode, Value},
     parser::parse_or_report,

@@ -32,9 +32,9 @@ const KEYWORDS: &[&str] = &["var", "let", "fn", "if", "lambda", "loop"];
 
 pub mod ast;
 pub mod cli;
-pub mod compiler;
 pub mod debugger;
 pub mod docs;
+pub mod emitter;
 pub mod error;
 pub mod expr_walker;
 pub mod instruction;

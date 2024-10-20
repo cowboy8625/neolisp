@@ -1,7 +1,7 @@
 use neolisp::{
     cli::{Cli, Command},
-    compiler::{Emitter, EmitterOptions},
     debugger::Debugger,
+    emitter::{Emitter, EmitterOptions},
     error::Error,
     machine::Machine,
     parser::parser,
