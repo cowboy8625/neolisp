@@ -26,6 +26,7 @@ fn main() -> anyhow::Result<()> {
             let filename = r.file.unwrap_or("main.nl".to_string());
             let src = std::fs::read_to_string(&filename)?;
             let compiler = Compiler::default()
+                .no_main(r.no_main)
                 .debug_ast(args.ast_debug)
                 .decompile(r.decompile)
                 .compile(&src);

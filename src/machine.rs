@@ -315,6 +315,10 @@ impl Machine {
                 let index = self.get_u32()? as usize;
                 Ok(Value::Builtin(index))
             }
+            Value::CODE_SYMBOL => {
+                let value = self.get_string()?;
+                Ok(Value::Symbol(Box::new(value)))
+            }
             _ => Err(anyhow!("Unknown value `{}`", self.program[self.ip])),
         }
     }

@@ -3,7 +3,7 @@ use super::{
     error::Error,
     expr_walker::{
         AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr, LoopExpr,
-        OperatorExpr, VarExpr,
+        OperatorExpr, QuoteExpr, VarExpr,
     },
     instruction::{Instruction, Value},
     symbol_table::{
@@ -369,6 +369,20 @@ impl AstWalker<Program> for Emitter<'_> {
         };
 
         program.push(instruction);
+    }
+
+    fn handle_quote(&mut self, program: &mut Program, quote: &QuoteExpr) {
+        match &quote.expr.expr {
+            Expr::Bool(_) => todo!("bool"),
+            Expr::String(_) => todo!("string"),
+            Expr::Symbol(value) => {
+                program.push(Instruction::Push(Box::new(Value::Symbol(Box::new(
+                    value.clone(),
+                )))));
+            }
+            Expr::Number(_) => todo!("number"),
+            Expr::List(_) => todo!("list"),
+        }
     }
 
     fn handle_if_else(&mut self, program: &mut Program, if_else: &IfElseExpr) {

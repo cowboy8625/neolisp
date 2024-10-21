@@ -33,9 +33,25 @@ pub struct LambdaExpr<'a> {
 
 #[derive(Debug)]
 pub struct FunctionExpr<'a> {
+    pub fn_symbol: &'a Spanned<Expr>,
     pub name: &'a Spanned<Expr>,
     pub params: &'a Spanned<Expr>,
     pub body: &'a [&'a Spanned<Expr>],
+    pub span: Span,
+}
+
+impl FunctionExpr<'_> {
+    pub fn as_expr(&self) -> Spanned<Expr> {
+        let mut list = vec![
+            self.fn_symbol.clone(),
+            self.name.clone(),
+            self.params.clone(),
+        ];
+
+        list.extend(self.body.iter().map(|&expr| expr.clone()));
+
+        Spanned::from((Expr::List(list), self.span.clone()))
+    }
 }
 
 #[derive(Debug)]
@@ -57,6 +73,13 @@ pub struct LetBindingExpr<'a> {
     pub body: &'a Spanned<Expr>,
 }
 
+#[derive(Debug)]
+pub struct QuoteExpr<'a> {
+    pub quoted: &'a Spanned<Expr>,
+    pub expr: &'a Spanned<Expr>,
+    pub span: Span,
+}
+
 pub trait AstWalker<T> {
     fn error(&mut self, _: Error);
     fn get_lambda_name(&mut self) -> String;
@@ -73,8 +96,9 @@ pub trait AstWalker<T> {
     fn handle_string(&mut self, _: &mut T, _: &str);
     fn handle_number(&mut self, _: &mut T, _: f64);
     fn handle_symbol(&mut self, _: &mut T, _: &str, _: Span);
+    fn handle_quote(&mut self, _: &mut T, _: &QuoteExpr);
 
-    fn walk_list(&mut self, t: &mut T, exprs: &[Spanned<Expr>]) {
+    fn walk_list(&mut self, t: &mut T, exprs: &[Spanned<Expr>], span: Span) {
         let Some(first) = exprs.first() else {
             // TODO: Should this be an error?
             return;
@@ -85,7 +109,7 @@ pub trait AstWalker<T> {
                 self.walk_operator(t, symbol, exprs)
             }
             Expr::Symbol(symbol) if KEYWORDS.contains(&symbol.as_str()) => {
-                self.walk_keyword(t, symbol, exprs)
+                self.walk_keyword(t, symbol, exprs, span)
             }
             Expr::Symbol(symbol) if BUILTINS.contains(&symbol.as_str()) => {
                 self.handle_builtin(t, symbol, exprs)
@@ -132,17 +156,53 @@ pub trait AstWalker<T> {
         )
     }
 
-    fn walk_keyword(&mut self, t: &mut T, name: &str, exprs: &[Spanned<Expr>]) {
+    fn walk_keyword(&mut self, t: &mut T, name: &str, exprs: &[Spanned<Expr>], span: Span) {
         match name {
             "var" => self.walk_var(t, exprs),
             "test" => self.walk_test(t, exprs),
             "loop" => self.walk_loop(t, exprs),
             "lambda" => self.walk_lambda(t, exprs),
-            "fn" => self.walk_fn(t, exprs),
+            "fn" => self.walk_fn(t, exprs, span),
             "if" => self.walk_if(t, exprs),
             "let" => self.walk_let_binding(t, exprs),
+            "quote" => self.walk_quote(t, exprs, span),
             _ => panic!("Unknown keyword: {name}"),
         }
+    }
+
+    fn walk_quote(&mut self, t: &mut T, elements: &[Spanned<Expr>], span: Span) {
+        const QUOTED: usize = 0;
+        const BODY: usize = 1;
+
+        let Some(quoted) = elements.get(QUOTED) else {
+            self.error(Error::ExpectedFound {
+                span: span.clone(),
+                expected: "quoted expression".to_string(),
+                found: "nothing".to_string(),
+                note: None,
+                help: Some("(quote <expression>)".to_string()),
+            });
+            return;
+        };
+
+        let Some(body) = elements.get(BODY) else {
+            self.error(Error::ExpectedFound {
+                span: span.clone(),
+                expected: "body after quote but".to_string(),
+                found: "nothing".to_string(),
+                note: None,
+                help: Some("(quote <expression>)".to_string()),
+            });
+            return;
+        };
+
+        let quote = QuoteExpr {
+            quoted,
+            expr: body,
+            span,
+        };
+
+        self.handle_quote(t, &quote);
     }
 
     fn walk_if(&mut self, t: &mut T, elements: &[Spanned<Expr>]) {
@@ -275,7 +335,7 @@ pub trait AstWalker<T> {
         self.handle_lambda(t, &function);
     }
 
-    fn walk_fn(&mut self, t: &mut T, elements: &[Spanned<Expr>]) {
+    fn walk_fn(&mut self, t: &mut T, elements: &[Spanned<Expr>], span: Span) {
         const NAME: usize = 1;
         const PARAMS: usize = 2;
         const BODY: usize = 3;
@@ -317,9 +377,11 @@ pub trait AstWalker<T> {
         let body_list = &elements.iter().skip(BODY).collect::<Vec<_>>();
 
         let function = FunctionExpr {
+            fn_symbol: elements.get(0).unwrap(),
             name: name_spanned,
             params: params_spanned,
             body: body_list,
+            span,
         };
 
         self.handle_function(t, &function);
@@ -412,7 +474,7 @@ pub trait AstWalker<T> {
             Expr::String(string) => self.handle_string(t, string),
             Expr::Symbol(symbol) => self.handle_symbol(t, symbol, spanned.span.clone()),
             Expr::Number(number) => self.handle_number(t, *number),
-            Expr::List(vec) => self.walk_list(t, vec),
+            Expr::List(vec) => self.walk_list(t, vec, spanned.span.clone()),
         }
     }
     fn walk(&mut self, t: &mut T, exprs: &[Spanned<Expr>]) {

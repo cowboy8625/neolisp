@@ -3,7 +3,7 @@ use super::{
     error::Error,
     expr_walker::{
         AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr, LoopExpr,
-        OperatorExpr, VarExpr,
+        OperatorExpr, QuoteExpr, VarExpr,
     },
 };
 use std::collections::HashMap;
@@ -730,5 +730,6 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
     fn handle_bool(&mut self, _: &mut SymbolTable, _: bool) {}
     fn handle_string(&mut self, _: &mut SymbolTable, _: &str) {}
     fn handle_number(&mut self, _: &mut SymbolTable, _: f64) {}
+    fn handle_quote(&mut self, _: &mut SymbolTable, _: &QuoteExpr) {}
     // -----------  END NOT USED  -----------
 }
