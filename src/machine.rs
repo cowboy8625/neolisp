@@ -1,9 +1,8 @@
 use super::{
-    emitter::{Emitter, EmitterOptions},
+    compiler::Compiler,
     error::Error,
     instruction::{Instruction, OpCode, Value},
-    parser::parse_or_report,
-    symbol_table::{SymbolTable, SymbolTableBuilder},
+    symbol_table::SymbolTable,
 };
 use anyhow::{anyhow, Result};
 use intrinsic::Intrinsic;
@@ -154,19 +153,22 @@ impl Machine {
 
     pub fn load_from_string(&mut self, src: &str) -> std::result::Result<(), Vec<Error>> {
         self.is_running = true;
-        let ast = parse_or_report("repl", src);
-        let mut symbol_table = match self.symbol_table.take() {
-            Some(mut table) => {
-                SymbolTableBuilder::default().build_from_scope(&ast, &mut table)?;
-                table
-            }
-            None => SymbolTableBuilder::default().build(&ast)?,
-        };
-
-        let instructions = Emitter::new(&mut symbol_table, EmitterOptions { no_main: true })
+        let compiler = Compiler::default()
+            .with_maybe_a_symbol_table(self.symbol_table.take())
             .with_offset(self.program.len())
-            .compile(&ast)?;
-        self.symbol_table = Some(symbol_table);
+            .no_main(true)
+            .compile(src);
+        let (st, instructions) = match compiler {
+            Ok(Some((symbol_table, instructions))) => (symbol_table, instructions),
+            Ok(None) => return Ok(()),
+            Err(errors) => {
+                for error in errors {
+                    error.report("repl", &src).expect("unable to report error");
+                }
+                return Ok(());
+            }
+        };
+        self.symbol_table = Some(st);
 
         let program: Vec<u8> = instructions.iter().flat_map(|i| i.to_bytecode()).collect();
         self.program.extend(program);
