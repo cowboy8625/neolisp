@@ -372,16 +372,37 @@ impl AstWalker<Program> for Emitter<'_> {
     }
 
     fn handle_quote(&mut self, program: &mut Program, quote: &QuoteExpr) {
-        match &quote.expr.expr {
-            Expr::Bool(_) => todo!("bool"),
-            Expr::String(_) => todo!("string"),
-            Expr::Symbol(value) => {
-                program.push(Instruction::Push(Box::new(Value::Symbol(Box::new(
-                    value.clone(),
-                )))));
+        fn emit_values(values: &mut Vec<Value>, spanned: &Spanned<Expr>) {
+            match &spanned.expr {
+                Expr::Bool(b) => {
+                    values.push(Value::Bool(*b));
+                }
+                Expr::String(string) => {
+                    values.push(Value::String(Box::new(string.clone())));
+                }
+                Expr::Symbol(value) if value.starts_with(':') => {
+                    values.push(Value::Keyword(Box::new(value.clone())));
+                }
+                Expr::Symbol(value) => {
+                    values.push(Value::Symbol(Box::new(value.clone())));
+                }
+                Expr::Number(number) => {
+                    values.push(Value::F64(*number));
+                }
+                Expr::List(vec) => {
+                    let mut list = Vec::new();
+                    for spanned in vec.iter() {
+                        emit_values(&mut list, spanned);
+                    }
+                    values.push(Value::List(Box::new(list)));
+                }
             }
-            Expr::Number(_) => todo!("number"),
-            Expr::List(_) => todo!("list"),
+        }
+        let mut values = Vec::new();
+        emit_values(&mut values, quote.expr);
+
+        for value in values.into_iter() {
+            program.push(Instruction::Push(Box::new(value)));
         }
     }
 

@@ -378,7 +378,9 @@ pub trait AstWalker<T> {
         let body_list = &elements.iter().skip(BODY).collect::<Vec<_>>();
 
         let function = FunctionExpr {
-            fn_symbol: elements.get(0).unwrap(),
+            // NOTE: INTENTIONAL UNWRAP
+            // this is safe as we already checked that the name is a symbol
+            fn_symbol: elements.first().unwrap(),
             name: name_spanned,
             params: params_spanned,
             body: body_list,

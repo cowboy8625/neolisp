@@ -163,7 +163,7 @@ impl Machine {
             Ok(None) => return Ok(()),
             Err(errors) => {
                 for error in errors {
-                    error.report("repl", &src).expect("unable to report error");
+                    error.report("repl", src).expect("unable to report error");
                 }
                 return Ok(());
             }
