@@ -6,32 +6,11 @@ use super::{
         OperatorExpr, VarExpr,
     },
     instruction::{Instruction, Value},
-    parser::parser,
     symbol_table::{
-        Function, Lambda, Let, Parameter, Symbol, SymbolTable, SymbolTableBuilder, UnboundVariable,
-        Variable,
+        Function, Lambda, Let, Parameter, Symbol, SymbolTable, UnboundVariable, Variable,
     },
     BUILTINS,
 };
-
-use chumsky::prelude::Parser;
-
-pub fn emitter(
-    src: &str,
-    options: EmitterOptions,
-) -> std::result::Result<Vec<Instruction>, Vec<Error>> {
-    if src.is_empty() {
-        return Err(vec![Error::EmptyFile]);
-    }
-    let ast = match parser().parse(src) {
-        Ok(ast) => ast,
-        Err(errors) => return Err(errors),
-    };
-
-    let mut symbol_table = SymbolTableBuilder::default().build(&ast)?;
-    // eprintln!("symbol_table: {symbol_table:#?}");
-    Emitter::new(&mut symbol_table, options).compile(&ast)
-}
 
 #[derive(Debug, Default)]
 pub struct EmitterOptions {
@@ -471,7 +450,7 @@ impl AstWalker<Program> for Emitter<'_> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use crate::compiler::Compiler;
     use crate::instruction::{Instruction::*, Value::*};
     use pretty_assertions::assert_eq;
 
@@ -483,8 +462,12 @@ mod tests {
     (let (y 2)
     (let (z 3)
     (print x y z "\n"))))"#;
-        let options = EmitterOptions { no_main: true };
-        let instructions = emitter(src, options).unwrap();
+        let (_, instructions) = Compiler::default()
+            .no_main(true)
+            .compile(src)
+            .ok()
+            .flatten()
+            .unwrap();
 
         // HACK: This is the problem child
         assert_eq!(
@@ -515,8 +498,12 @@ mod tests {
         let src = r#"
 (if true "then\n" "else\n")
 "#;
-        let options = EmitterOptions { no_main: true };
-        let instructions = emitter(src, options).unwrap();
+        let (_, instructions) = Compiler::default()
+            .no_main(true)
+            .compile(src)
+            .ok()
+            .flatten()
+            .unwrap();
 
         assert_eq!(
             instructions,
@@ -537,8 +524,12 @@ mod tests {
  (fn apply (f x) (f x))
  (apply (lambda (x) (+ x 321)) 123)
  "#;
-        let options = EmitterOptions { no_main: true };
-        let instructions = emitter(src, options).unwrap();
+        let (_, instructions) = Compiler::default()
+            .no_main(true)
+            .compile(src)
+            .ok()
+            .flatten()
+            .unwrap();
 
         assert_eq!(
             instructions,
