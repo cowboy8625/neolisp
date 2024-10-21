@@ -460,6 +460,12 @@ impl AstWalker<Program> for Emitter<'_> {
             Symbol::Let(Let { .. }) => todo!(),
         }
     }
+
+    fn handle_keyword(&mut self, program: &mut Program, name: &str, _: Span) {
+        program.push(Instruction::Push(Box::new(Value::Keyword(Box::new(
+            name.to_string(),
+        )))));
+    }
 }
 
 #[cfg(test)]

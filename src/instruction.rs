@@ -198,6 +198,7 @@ pub enum Value {
     Callable(usize),
     Builtin(usize),
     Symbol(Box<String>),
+    Keyword(Box<String>),
 }
 
 impl Value {
@@ -212,6 +213,7 @@ impl Value {
     pub const CODE_CALLABLE: u8 = 0x08;
     pub const CODE_BUILTIN: u8 = 0x09;
     pub const CODE_SYMBOL: u8 = 0x0A;
+    pub const CODE_KEYWORD: u8 = 0x0B;
 
     pub fn to_bytecode(&self) -> Vec<u8> {
         match self {
@@ -267,6 +269,12 @@ impl Value {
                 bytes.extend_from_slice(v.as_bytes());
                 bytes
             }
+            Value::Keyword(v) => {
+                let mut bytes = vec![Self::CODE_KEYWORD];
+                bytes.extend_from_slice(&(v.len() as u32).to_le_bytes());
+                bytes.extend_from_slice(v.as_bytes());
+                bytes
+            }
         }
     }
 
@@ -285,6 +293,7 @@ impl Value {
             Value::Callable(_) => 4,
             Value::Builtin(_) => 4,
             Value::Symbol(v) => 4 + v.len(),
+            Value::Keyword(v) => 4 + v.len(),
         };
         // opcode + content
         1 + conent_size
@@ -303,6 +312,7 @@ impl Value {
             Self::Callable(_) => "Function".to_string(),
             Self::Builtin(_) => "Builtin".to_string(),
             Self::Symbol(_) => "Symbol".to_string(),
+            Self::Keyword(_) => "Keyword".to_string(),
         }
     }
 }
@@ -331,6 +341,7 @@ impl std::fmt::Display for Value {
             Self::Callable(index) => write!(f, "<function {index:?}>"),
             Self::Builtin(index) => write!(f, "<function {:?}>", BUILTINS[*index]),
             Self::Symbol(value) => write!(f, "{value}"),
+            Self::Keyword(value) => write!(f, "{value}"),
         }
     }
 }

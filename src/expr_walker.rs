@@ -97,6 +97,7 @@ pub trait AstWalker<T> {
     fn handle_number(&mut self, _: &mut T, _: f64);
     fn handle_symbol(&mut self, _: &mut T, _: &str, _: Span);
     fn handle_quote(&mut self, _: &mut T, _: &QuoteExpr);
+    fn handle_keyword(&mut self, _: &mut T, _: &str, _: Span);
 
     fn walk_list(&mut self, t: &mut T, exprs: &[Spanned<Expr>], span: Span) {
         let Some(first) = exprs.first() else {
@@ -472,6 +473,9 @@ pub trait AstWalker<T> {
         match &spanned.expr {
             Expr::Bool(value) => self.handle_bool(t, *value),
             Expr::String(string) => self.handle_string(t, string),
+            Expr::Symbol(symbol) if symbol.starts_with(':') => {
+                self.handle_keyword(t, symbol, spanned.span.clone())
+            }
             Expr::Symbol(symbol) => self.handle_symbol(t, symbol, spanned.span.clone()),
             Expr::Number(number) => self.handle_number(t, *number),
             Expr::List(vec) => self.walk_list(t, vec, spanned.span.clone()),

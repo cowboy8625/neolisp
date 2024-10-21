@@ -319,6 +319,10 @@ impl Machine {
                 let value = self.get_string()?;
                 Ok(Value::Symbol(Box::new(value)))
             }
+            Value::CODE_KEYWORD => {
+                let value = self.get_string()?;
+                Ok(Value::Keyword(Box::new(value)))
+            }
             _ => Err(anyhow!("Unknown value `{}`", self.program[self.ip])),
         }
     }

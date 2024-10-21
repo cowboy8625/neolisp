@@ -731,5 +731,6 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
     fn handle_string(&mut self, _: &mut SymbolTable, _: &str) {}
     fn handle_number(&mut self, _: &mut SymbolTable, _: f64) {}
     fn handle_quote(&mut self, _: &mut SymbolTable, _: &QuoteExpr) {}
+    fn handle_keyword(&mut self, _: &mut SymbolTable, _: &str, _: Span) {}
     // -----------  END NOT USED  -----------
 }
