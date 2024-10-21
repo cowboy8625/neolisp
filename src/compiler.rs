@@ -64,8 +64,14 @@ impl Compiler {
             None => SymbolTableBuilder::default().build(&ast)?,
         };
 
+        let offset = if self.symbol_table.is_some() {
+            self.emitter_offset
+        } else {
+            0
+        };
+
         let instructions = Emitter::new(&mut symbol_table, options)
-            .with_offset(self.emitter_offset)
+            .with_offset(offset)
             .compile(&ast)?;
 
         if self.decompile {

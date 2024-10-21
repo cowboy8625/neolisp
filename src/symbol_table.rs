@@ -187,6 +187,17 @@ pub enum Symbol {
 }
 
 impl Symbol {
+    pub fn id(&self) -> usize {
+        match self {
+            Symbol::UnboundVariable(v) => v.id,
+            Symbol::Variable(v) => v.id,
+            Symbol::Parameter(v) => v.id,
+            Symbol::Function(v) => v.id,
+            Symbol::Lambda(v) => v.id,
+            Symbol::Let(v) => v.id,
+        }
+    }
+
     pub fn is_recursive(&self) -> bool {
         match self {
             Symbol::Function(f) => f.is_recursive,

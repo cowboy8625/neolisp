@@ -124,6 +124,35 @@ impl<'a> Emitter<'a> {
             Symbol::Let(Let { .. }) => todo!(),
         }
     }
+
+    fn tail_call_optimization(&self, program: &mut Program, name: &str) {
+        use Instruction::*;
+        let Some(symbol) = self.symbol_table.get(name) else {
+            return;
+        };
+
+        if self.symbol_table.get_scope_name() != *name {
+            return;
+        }
+
+        if !symbol.is_recursive() {
+            return;
+        }
+
+        let end = program.len();
+
+        let [GetGlobal(value) | GetLocal(value), Call(count), Return] = &program[end - 3..end]
+        else {
+            return;
+        };
+
+        if *value != symbol.id() {
+            return;
+        }
+
+        program[end - 2] = Instruction::TailCall(*count);
+        return;
+    }
 }
 
 impl AstWalker<Program> for Emitter<'_> {
@@ -193,6 +222,8 @@ impl AstWalker<Program> for Emitter<'_> {
         } else {
             program.push(Instruction::Return);
         }
+
+        self.tail_call_optimization(program, name);
 
         self.symbol_table.exit_scope();
 
@@ -323,30 +354,6 @@ impl AstWalker<Program> for Emitter<'_> {
         }
 
         self.walk_expr(program, call.callee);
-
-        if let Expr::Symbol(name) = &call.callee.expr {
-            let Some(symbol) = self.symbol_table.get(name) else {
-                program.push(Instruction::Call(call.args.len()));
-                return;
-            };
-
-            if self.symbol_table.get_scope_name() != *name {
-                program.push(Instruction::Call(call.args.len()));
-                return;
-            }
-            if !symbol.is_recursive() {
-                program.push(Instruction::Call(call.args.len()));
-                return;
-            }
-            eprintln!(
-                "{} {} {}",
-                symbol.is_recursive(),
-                name,
-                self.symbol_table.get_scope_name()
-            );
-            program.push(Instruction::TailCall(call.args.len()));
-            return;
-        }
         program.push(Instruction::Call(call.args.len()));
     }
 
@@ -495,7 +502,6 @@ mod tests {
     use crate::instruction::{Instruction::*, Value::*};
     use pretty_assertions::assert_eq;
 
-    // HACK: Going to try this test once the new symbol table is in place
     #[test]
     fn test_let_binding() {
         let src = r#"
@@ -510,7 +516,6 @@ mod tests {
             .flatten()
             .unwrap();
 
-        // HACK: This is the problem child
         assert_eq!(
             instructions,
             vec![
@@ -591,6 +596,47 @@ mod tests {
                 Push(Box::new(Callable(40))),
                 GetGlobal(0),
                 Call(2)
+            ]
+        );
+    }
+
+    #[test]
+    fn test_tail_call_optimization() {
+        let src = r#"
+(fn fib (n a b)
+  (if (= n 0)
+      a
+      (fib (- n 1) b (+ a b))))
+ "#;
+        let (_, instructions) = Compiler::default()
+            .no_main(true)
+            .compile(src)
+            .ok()
+            .flatten()
+            .unwrap();
+
+        assert_eq!(
+            instructions,
+            vec![
+                Jump(79),
+                GetLocal(0),
+                Push(Box::new(F64(0.0))),
+                Eq(2),
+                JumpIf(10),
+                GetLocal(1),
+                JumpForward(41),
+                GetLocal(1),
+                GetLocal(2),
+                Add(2),
+                GetLocal(2),
+                GetLocal(0),
+                Push(Box::new(F64(1.0))),
+                Sub(2),
+                GetGlobal(0),
+                TailCall(3),
+                Return,
+                Push(Box::new(Callable(5))),
+                SetGlobal,
             ]
         );
     }
