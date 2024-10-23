@@ -16,8 +16,27 @@ pub struct VarExpr<'a> {
     pub body: &'a Spanned<Expr>,
 }
 
-// #[derive(Debug)]
-// pub struct TestExpr;
+#[derive(Debug)]
+pub struct TestExpr<'a> {
+    pub keyword: &'a Spanned<Expr>,
+    pub name: &'a Spanned<Expr>,
+    pub body: &'a [&'a Spanned<Expr>],
+    pub span: Span,
+}
+
+impl TestExpr<'_> {
+    pub fn name(&self) -> String {
+        format!("test_{}", self.name)
+    }
+
+    pub fn as_expr(&self) -> Spanned<Expr> {
+        let mut list = vec![self.keyword.clone(), self.name.clone()];
+
+        list.extend(self.body.iter().map(|&expr| expr.clone()));
+
+        Spanned::from((Expr::List(list), self.span.clone()))
+    }
+}
 
 #[derive(Debug)]
 pub struct LoopExpr<'a> {
@@ -85,6 +104,7 @@ pub trait AstWalker<T> {
     fn get_lambda_name(&mut self) -> String;
     fn handle_operator(&mut self, _: &mut T, _: &str, _: &OperatorExpr);
     fn handle_builtin(&mut self, _: &mut T, _: &str, _: &[Spanned<Expr>]);
+    fn handle_test(&mut self, _: &mut T, _: &TestExpr);
     fn handle_function(&mut self, _: &mut T, _: &FunctionExpr);
     fn handle_lambda(&mut self, _: &mut T, _: &LambdaExpr);
     fn handle_let_binding(&mut self, _: &mut T, _: &LetBindingExpr);
@@ -160,7 +180,7 @@ pub trait AstWalker<T> {
     fn walk_keyword(&mut self, t: &mut T, name: &str, exprs: &[Spanned<Expr>], span: Span) {
         match name {
             "var" => self.walk_var(t, exprs),
-            "test" => self.walk_test(t, exprs),
+            "test" => self.walk_test(t, exprs, span),
             "loop" => self.walk_loop(t, exprs),
             "lambda" => self.walk_lambda(t, exprs),
             "fn" => self.walk_fn(t, exprs, span),
@@ -434,8 +454,43 @@ pub trait AstWalker<T> {
         self.handle_var(t, &var);
     }
 
-    fn walk_test(&mut self, _: &mut T, _: &[Spanned<Expr>]) {
-        todo!()
+    fn walk_test(&mut self, t: &mut T, elements: &[Spanned<Expr>], span: Span) {
+        const NAME: usize = 1;
+        const BODY: usize = 2;
+
+        let Some(name_spanned) = elements.get(NAME) else {
+            self.error(Error::ExpectedFound {
+                span: elements[0].span.clone(),
+                expected: "name after test".to_string(),
+                found: "nothing".to_string(),
+                note: None,
+                help: Some("(test <name> <expression>)".to_string()),
+            });
+            return;
+        };
+
+        let Expr::Symbol(_) = &name_spanned.expr else {
+            self.error(Error::ExpectedFound {
+                span: name_spanned.span.clone(),
+                expected: "Symbol".to_string(),
+                found: name_spanned.expr.type_of(),
+                note: None,
+                help: Some("(test <name> <expression>)".to_string()),
+            });
+            return;
+        };
+
+        let body = &elements.iter().skip(BODY).collect::<Vec<_>>();
+
+        let test = TestExpr {
+            // NOTE: INTENTIONAL UNWRAP
+            // this is safe as we already checked that the name is a symbol
+            keyword: elements.first().unwrap(),
+            name: name_spanned,
+            body: &body,
+            span,
+        };
+        self.handle_test(t, &test);
     }
 
     fn walk_loop(&mut self, t: &mut T, elements: &[Spanned<Expr>]) {

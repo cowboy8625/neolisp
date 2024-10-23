@@ -1661,29 +1661,34 @@ mod intrinsic {
 
             let frame = machine.get_current_frame_mut()?;
 
-            let Some(result) = frame.stack.pop() else {
-                anyhow::bail!("expected a value on stack for assert-eq");
-            };
+            let index = frame.stack.len() - count as usize;
+            let args = frame.stack.split_off(index);
+            let result: Vec<_> = args
+                .split(|v| *v == Value::Keyword(Box::new(":description".to_string())))
+                .collect();
 
+            let values: Vec<_> = result.first().cloned().unwrap_or_default().to_vec();
+            let message: Vec<_> = result.get(1).cloned().unwrap_or_default().to_vec();
+            let left = &values[0];
             let mut failed = false;
-            let mut message = String::new();
-            for _ in 0..count - 1 {
-                let Some(value) = frame.stack.pop() else {
-                    anyhow::bail!("expected a value on stack for assert-eq");
-                };
-                failed = result != value;
+            for (i, value) in values.iter().skip(1).enumerate() {
+                failed = left != value;
                 if failed {
-                    message = format!("assert-eq failed expected {} got {}", result, value);
-                    break;
+                    eprintln!("{i}: expected {left} but got {value}");
                 }
-            }
-            if failed {
-                if let Some(Value::String(result)) = frame.stack.pop() {
-                    eprintln!("TEST: {}", result);
-                }
-                anyhow::bail!(message);
             }
 
+            if !failed {
+                frame.stack.push(Value::Bool(true));
+                return Ok(());
+            }
+
+            let Some(Value::String(message)) = message.first() else {
+                return Ok(());
+            };
+            eprintln!("{message}");
+
+            frame.stack.push(Value::Bool(false));
             Ok(())
         }
 

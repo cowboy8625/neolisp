@@ -3,11 +3,11 @@ use super::{
     error::Error,
     expr_walker::{
         AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr, LoopExpr,
-        OperatorExpr, QuoteExpr, VarExpr,
+        OperatorExpr, QuoteExpr, TestExpr, VarExpr,
     },
     instruction::{Instruction, Value},
     symbol_table::{
-        Function, Lambda, Let, Parameter, Symbol, SymbolTable, UnboundVariable, Variable,
+        Function, Lambda, Let, Parameter, Symbol, SymbolTable, Test, UnboundVariable, Variable,
     },
     BUILTINS,
 };
@@ -15,6 +15,19 @@ use super::{
 #[derive(Debug, Default)]
 pub struct EmitterOptions {
     pub no_main: bool,
+    pub test: bool,
+}
+
+impl EmitterOptions {
+    pub fn with_no_main(mut self, no_main: bool) -> Self {
+        self.no_main = no_main;
+        self
+    }
+
+    pub fn with_test(mut self, test: bool) -> Self {
+        self.test = test;
+        self
+    }
 }
 
 type Program = Vec<Instruction>;
@@ -35,6 +48,7 @@ pub struct Emitter<'a> {
     lambda_counter: usize,
     options: EmitterOptions,
     offset: usize,
+    tests: Vec<usize>,
     errors: Vec<Error>,
 }
 
@@ -46,6 +60,7 @@ impl<'a> Emitter<'a> {
             lambda_counter: 0,
             options,
             offset: 0,
+            tests: Vec::new(),
             errors: Vec::new(),
         }
     }
@@ -77,6 +92,11 @@ impl<'a> Emitter<'a> {
         }
 
         self.symbol_table.exit_scope();
+
+        for index in self.tests {
+            program.push(Instruction::Push(Box::new(Value::Callable(index))));
+            program.push(Instruction::Call(0));
+        }
         Ok(program)
     }
 
@@ -119,9 +139,14 @@ impl<'a> Emitter<'a> {
                 }
             }
             Symbol::Parameter(Parameter { .. }) => program.push(Instruction::SetLocal),
-            Symbol::Function(Function { .. }) => todo!(),
-            Symbol::Lambda(Lambda { .. }) => todo!(),
-            Symbol::Let(Let { .. }) => todo!(),
+            Symbol::Function(Function { .. }) => {
+                todo!("Function not implemented in emit_set_instruction")
+            }
+            Symbol::Lambda(Lambda { .. }) => {
+                todo!("Lambda not implemented in emit_set_instruction")
+            }
+            Symbol::Let(Let { .. }) => todo!("Let not implemented in emit_set_instruction"),
+            Symbol::Test(Test { .. }) => todo!("Test not implemented in emit_set_instruction"),
         }
     }
 
@@ -182,6 +207,30 @@ impl AstWalker<Program> for Emitter<'_> {
         };
 
         program.push(instruction);
+    }
+
+    fn handle_test(&mut self, program: &mut Program, test_expr: &TestExpr) {
+        if !self.options.test {
+            return;
+        }
+
+        program.push(Instruction::Jump(usize::MAX));
+        let index = program.len() - 1;
+        let start = self.get_program_size(program);
+
+        let name = format!("test_{}", test_expr.name);
+        self.symbol_table.enter_scope(&name);
+
+        for spanned in test_expr.body.iter() {
+            self.walk_expr(program, spanned);
+        }
+
+        program.push(Instruction::Return);
+
+        self.symbol_table.exit_scope();
+        let body_size = self.get_program_size(program) - start;
+        program[index] = Instruction::Jump(start + body_size);
+        self.tests.push(start);
     }
 
     fn handle_builtin(&mut self, program: &mut Program, name: &str, args: &[Spanned<Expr>]) {
@@ -469,9 +518,6 @@ impl AstWalker<Program> for Emitter<'_> {
                 program.push(Instruction::GetFree(*id));
             }
             Symbol::Variable(Variable { id, .. }) => {
-                // OK This is where you left off.
-                // You need some kind of id or index of how many variables are in scope so we
-                // know where to index.
                 if symbol.is_global() {
                     program.push(Instruction::GetGlobal(*id));
                 } else {
@@ -484,8 +530,9 @@ impl AstWalker<Program> for Emitter<'_> {
             Symbol::Function(Function { id, .. }) => {
                 program.push(Instruction::GetGlobal(*id));
             }
-            Symbol::Lambda(Lambda { .. }) => todo!(),
-            Symbol::Let(Let { .. }) => todo!(),
+            Symbol::Lambda(Lambda { .. }) => todo!("Lambdas are not supported yet in symbol"),
+            Symbol::Let(Let { .. }) => todo!("Lets are not supported yet in symbol"),
+            Symbol::Test(Test { .. }) => todo!("Tests are not supported yet in symbol"),
         }
     }
 

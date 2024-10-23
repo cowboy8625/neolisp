@@ -34,6 +34,15 @@ pub struct Run {
     pub file: Option<String>,
 }
 
+#[derive(Debug, Clone, Parser)]
+pub struct Test {
+    #[arg(long, help = "IP address to break on", value_delimiter = ',', value_hint = ValueHint::Other)]
+    pub breakpoints: Vec<usize>,
+    #[arg(short = 'd', long, default_value_t = false)]
+    pub decompile: bool,
+    pub file: Option<String>,
+}
+
 #[derive(Debug, Subcommand, Clone)]
 pub enum Command {
     Build {
@@ -42,9 +51,7 @@ pub enum Command {
         file: Option<String>,
     },
     Run(Run),
-    Test {
-        file: Option<String>,
-    },
+    Test(Test),
 }
 
 #[derive(Debug, ValueEnum, Clone, Copy)]

@@ -3,7 +3,7 @@ use super::{
     error::Error,
     expr_walker::{
         AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr, LoopExpr,
-        OperatorExpr, QuoteExpr, VarExpr,
+        OperatorExpr, QuoteExpr, TestExpr, VarExpr,
     },
 };
 use std::collections::HashMap;
@@ -11,6 +11,31 @@ use std::collections::HashMap;
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Type {
     Int,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+pub struct Test {
+    pub id: usize,
+    pub span: Span,
+    pub name: String,
+    pub scope_level: usize,
+    pub location: Option<usize>,
+}
+
+impl Test {
+    pub fn new(id: usize, name: impl Into<String>, span: Span, scope_level: usize) -> Self {
+        Self {
+            id,
+            name: name.into(),
+            span,
+            scope_level,
+            location: None,
+        }
+    }
+
+    pub fn name(&self) -> String {
+        format!("test_{}", self.name)
+    }
 }
 
 #[derive(Debug, Eq, PartialEq)]
@@ -184,6 +209,7 @@ pub enum Symbol {
     Function(Function),
     Lambda(Lambda),
     Let(Let),
+    Test(Test),
 }
 
 impl Symbol {
@@ -195,6 +221,7 @@ impl Symbol {
             Symbol::Function(v) => v.id,
             Symbol::Lambda(v) => v.id,
             Symbol::Let(v) => v.id,
+            Symbol::Test(v) => v.id,
         }
     }
 
@@ -213,6 +240,7 @@ impl Symbol {
             Symbol::Function(v) => v.location = Some(location),
             Symbol::Lambda(v) => v.location = Some(location),
             Symbol::Let(v) => v.location = Some(location),
+            Symbol::Test(v) => v.location = Some(location),
         }
     }
 
@@ -224,6 +252,7 @@ impl Symbol {
             Symbol::Function(v) => v.location,
             Symbol::Lambda(v) => v.location,
             Symbol::Let(v) => v.location,
+            Symbol::Test(v) => v.location,
         }
     }
 
@@ -235,6 +264,7 @@ impl Symbol {
             Symbol::Function(v) => v.scope_level,
             Symbol::Lambda(v) => v.scope_level,
             Symbol::Let(v) => v.scope_level,
+            Symbol::Test(v) => v.scope_level,
         };
         level == 1
     }
@@ -247,6 +277,7 @@ impl Symbol {
             Symbol::Function(v) => v.span.clone(),
             Symbol::Lambda(v) => v.span.clone(),
             Symbol::Let(v) => v.span.clone(),
+            Symbol::Test(v) => v.span.clone(),
         }
     }
 
@@ -258,6 +289,7 @@ impl Symbol {
             Symbol::Function(v) => v.name.clone(),
             Symbol::Lambda(v) => v.name(),
             Symbol::Let(v) => v.name(),
+            Symbol::Test(v) => v.name(),
         }
     }
 
@@ -283,7 +315,15 @@ macro_rules! into_symbol {
         };
     }
 
-into_symbol!(UnboundVariable, Variable, Parameter, Function, Lambda, Let,);
+into_symbol!(
+    UnboundVariable,
+    Variable,
+    Parameter,
+    Function,
+    Lambda,
+    Let,
+    Test
+);
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Scope {
@@ -293,14 +333,7 @@ pub struct Scope {
 impl Scope {
     pub fn insert(&mut self, symbol: impl Into<Symbol>) {
         let symbol = symbol.into();
-        let name = match &symbol {
-            Symbol::UnboundVariable(v) => &v.name,
-            Symbol::Variable(v) => &v.name,
-            Symbol::Parameter(p) => &p.name,
-            Symbol::Function(f) => &f.name,
-            Symbol::Lambda(l) => &l.name(),
-            Symbol::Let(l) => &l.name(),
-        };
+        let name = symbol.name();
         self.symbols.insert(name.clone(), symbol);
     }
 
@@ -392,6 +425,7 @@ impl SymbolTable {
             | Symbol::UnboundVariable(UnboundVariable { name, .. }) => name.to_string(),
             Symbol::Lambda(l) => l.name(),
             Symbol::Let(l) => l.name(),
+            Symbol::Test(t) => t.name(),
         };
 
         if matches!(self.scope_stack.last(), Some(sn) if &name == sn) {
@@ -466,6 +500,24 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         for spanned in expr.iter().skip(1) {
             self.walk_expr(table, spanned);
         }
+    }
+
+    fn handle_test(&mut self, table: &mut SymbolTable, test_expr: &TestExpr) {
+        let id = self.variable_id();
+        let name = format!("test_{}", test_expr.name);
+        let old_variable_counter = self.variable_counter;
+        self.variable_counter = 0;
+        table.enter_scope(&name);
+
+        for spanned in test_expr.body.iter() {
+            self.walk_expr(table, spanned);
+        }
+
+        table.exit_scope();
+        self.variable_counter = old_variable_counter;
+
+        let test = Test::new(id, name, test_expr.span.clone(), table.scope_level());
+        table.push(test);
     }
 
     fn handle_function(&mut self, table: &mut SymbolTable, function_expr: &FunctionExpr) {
@@ -720,14 +772,15 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
             Symbol::UnboundVariable(_) => {
                 skip = true;
             }
-            Symbol::Variable(_) => todo!(),
+            Symbol::Variable(_) => todo!("Variables are not supported yet"),
             Symbol::Parameter(p) => p.is_unbound = true,
             Symbol::Function(f) => {
                 f.is_recursive = f.name == scope_name || f.is_recursive;
                 skip = true;
             }
-            Symbol::Lambda(_) => todo!(),
-            Symbol::Let(_) => todo!(),
+            Symbol::Lambda(_) => todo!("Lambdas are not supported yet"),
+            Symbol::Let(_) => todo!("Lets are not supported yet"),
+            Symbol::Test(_) => todo!("Tests are not supported yet"),
         });
         if skip {
             return;
