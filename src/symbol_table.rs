@@ -69,10 +69,17 @@ pub struct Variable {
     pub typeis: Option<Type>,
     pub scope_level: usize,
     pub location: Option<usize>,
+    pub is_recursive: bool,
 }
 
 impl Variable {
-    pub fn new(id: usize, name: impl Into<String>, span: Span, scope_level: usize) -> Self {
+    pub fn new(
+        id: usize,
+        name: impl Into<String>,
+        span: Span,
+        scope_level: usize,
+        is_recursive: bool,
+    ) -> Self {
         Self {
             id,
             name: name.into(),
@@ -80,6 +87,7 @@ impl Variable {
             typeis: None,
             scope_level,
             location: None,
+            is_recursive,
         }
     }
 }
@@ -228,6 +236,7 @@ impl Symbol {
     pub fn is_recursive(&self) -> bool {
         match self {
             Symbol::Function(f) => f.is_recursive,
+            Symbol::Variable(v) => v.is_recursive,
             _ => false,
         }
     }
@@ -720,6 +729,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
             unreachable!("This should never fail as we already checked this in AstWalker");
         };
 
+        let is_recursive = is_recursive(name, var.body);
         self.walk_expr(table, var.body);
 
         let symbol = Variable::new(
@@ -727,6 +737,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
             name,
             var.name.span.clone(),
             table.scope_level(),
+            is_recursive,
         );
 
         if let Some(def) = table.get(name) {
@@ -772,7 +783,9 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
             Symbol::UnboundVariable(_) => {
                 skip = true;
             }
-            Symbol::Variable(_) => todo!("Variables are not supported yet"),
+            Symbol::Variable(var) => {
+                skip = true;
+            }
             Symbol::Parameter(p) => p.is_unbound = true,
             Symbol::Function(f) => {
                 f.is_recursive = f.name == scope_name || f.is_recursive;
@@ -797,4 +810,14 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
     fn handle_quote(&mut self, _: &mut SymbolTable, _: &QuoteExpr) {}
     fn handle_keyword(&mut self, _: &mut SymbolTable, _: &str, _: Span) {}
     // -----------  END NOT USED  -----------
+}
+
+fn is_recursive(lambda_name: &str, body: &Spanned<Expr>) -> bool {
+    match &body.expr {
+        Expr::Symbol(name) => name == lambda_name,
+        Expr::List(list) => list
+            .iter()
+            .any(|sub_expr| is_recursive(lambda_name, sub_expr)),
+        _ => false,
+    }
 }

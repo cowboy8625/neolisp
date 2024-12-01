@@ -363,7 +363,10 @@
    3. `String` optional error message in last argument
 - example:
 ```lisp
-(assert-eq 1 2 "1 is not equal than 2")
+(assert-eq
+   :expected 1
+   :actual 2
+   :description "1 is not equal than 2")
 ```
 
 ### sleep

@@ -418,13 +418,25 @@ impl AstWalker<Program> for Emitter<'_> {
             panic!("unknown symbol: {}", name);
         };
 
-        let instruction = if symbol.is_global() {
+        let set_instruction = if symbol.is_global() {
             Instruction::SetGlobal
         } else {
             Instruction::SetLocal
         };
 
-        program.push(instruction);
+        program.push(set_instruction);
+
+        if !symbol.is_recursive() {
+            return;
+        }
+
+        let get_instruction = if symbol.is_global() {
+            Instruction::GetGlobal(symbol.id())
+        } else {
+            Instruction::GetLocal(symbol.id())
+        };
+        program.push(get_instruction);
+        program.push(Instruction::SetFree);
     }
 
     fn handle_quote(&mut self, program: &mut Program, quote: &QuoteExpr) {
@@ -684,6 +696,36 @@ mod tests {
                 Return,
                 Push(Box::new(Callable(5))),
                 SetGlobal,
+            ]
+        );
+    }
+    #[test]
+    fn test_testing() {
+        let src = r#"
+ (test test-testing (assert (= (+ 1 2) 3)))
+ "#;
+        let (_, instructions) = Compiler::default()
+            .no_main(true)
+            .with_test(true)
+            .compile(src)
+            .ok()
+            .flatten()
+            .unwrap();
+
+        assert_eq!(
+            instructions,
+            vec![
+                Jump(48),
+                Push(Box::new(F64(1.0))),
+                Push(Box::new(F64(2.0))),
+                Add(2),
+                Push(Box::new(F64(3.0))),
+                Eq(2),
+                Push(Box::new(Builtin(21))),
+                Call(1),
+                Return,
+                Push(Box::new(Callable(5))),
+                Call(0),
             ]
         );
     }

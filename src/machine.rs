@@ -1225,7 +1225,7 @@ mod tests {
 mod intrinsic {
     use super::{Machine, Value};
     use anyhow::Result;
-    use std::io::Write;
+    use std::collections::HashMap;
 
     pub(crate) struct Intrinsic;
     impl Intrinsic {
@@ -1663,32 +1663,45 @@ mod intrinsic {
 
             let index = frame.stack.len() - count as usize;
             let args = frame.stack.split_off(index);
-            let result: Vec<_> = args
-                .split(|v| *v == Value::Keyword(Box::new(":description".to_string())))
-                .collect();
 
-            let values: Vec<_> = result.first().cloned().unwrap_or_default().to_vec();
-            let message: Vec<_> = result.get(1).cloned().unwrap_or_default().to_vec();
-            let left = &values[0];
-            let mut failed = false;
-            for (i, value) in values.iter().skip(1).enumerate() {
-                failed = left != value;
-                if failed {
-                    eprintln!("{i}: expected {left} but got {value}");
-                }
+            let mut keys: HashMap<String, Value> = HashMap::new();
+            let mut iter = args.into_iter();
+            while let Some(key) = iter.next() {
+                let Some(value) = iter.next() else {
+                    // TODO: RUNTIME ERROR
+                    panic!("expected value to key: {key:?}")
+                };
+                keys.insert(key.to_string(), value);
             }
 
-            if !failed {
-                frame.stack.push(Value::Bool(true));
-                return Ok(());
+            let expected = keys.get(":expected");
+            let actual = keys.get(":actual");
+            let failed = expected != actual;
+
+            if let (Some(message), true) = (keys.get(":description"), failed) {
+                eprintln!("description: {message}");
             }
 
-            let Some(Value::String(message)) = message.first() else {
-                return Ok(());
-            };
-            eprintln!("{message}");
+            // let result: Vec<_> = args
+            //     .split(|v| *v == Value::Keyword(Box::new(":description".to_string())))
+            //     .collect();
+            //
+            // let values: Vec<_> = result.first().cloned().unwrap_or_default().to_vec();
+            // let message: Vec<_> = result.get(1).cloned().unwrap_or_default().to_vec();
+            // let left = &values[0];
+            // let mut failed = false;
+            // for (i, value) in values.iter().skip(1).enumerate() {
+            //     failed = left != value;
+            //     if failed {
+            //         eprintln!("{i}: expected '{left}' but got '{value}'");
+            //     }
+            // }
+            //
+            // if let (Some(Value::String(message)), true) = (message.first(), failed) {
+            //     eprintln!("{message}");
+            // };
 
-            frame.stack.push(Value::Bool(false));
+            frame.stack.push(Value::Bool(failed));
             Ok(())
         }
 
@@ -1707,9 +1720,10 @@ mod intrinsic {
                 anyhow::bail!("expected boolean on stack for assert")
             };
             if !value {
-                let _ = writeln!(std::io::stderr(), "{message}");
-                std::process::exit(1);
+                eprintln!("assertion failed: {message}");
             }
+
+            frame.stack.push(Value::Bool(value));
 
             Ok(())
         }
