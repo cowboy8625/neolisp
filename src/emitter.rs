@@ -176,7 +176,6 @@ impl<'a> Emitter<'a> {
         }
 
         program[end - 2] = Instruction::TailCall(*count);
-        return;
     }
 }
 

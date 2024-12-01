@@ -487,7 +487,7 @@ pub trait AstWalker<T> {
             // this is safe as we already checked that the name is a symbol
             keyword: elements.first().unwrap(),
             name: name_spanned,
-            body: &body,
+            body,
             span,
         };
         self.handle_test(t, &test);

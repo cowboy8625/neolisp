@@ -783,7 +783,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
             Symbol::UnboundVariable(_) => {
                 skip = true;
             }
-            Symbol::Variable(var) => {
+            Symbol::Variable(_) => {
                 skip = true;
             }
             Symbol::Parameter(p) => p.is_unbound = true,
