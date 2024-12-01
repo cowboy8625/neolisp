@@ -1,25 +1,28 @@
 ; create a list of numbers from 0 to n
 ; recursively create a list of numbers from 0 to n
 ; this returns a reverse list
-(fn range (n)
-    (if (> n 0)
-      (cons (- n 1) (range (- n 1)))
-      (list)))
-
-
 ;; (fn range (n)
-;;   (var range-helper (lambda (n acc)
 ;;     (if (> n 0)
-;;         (range-helper (- n 1) (cons (- n 1) acc))
-;;         acc)))
-;;   (range-helper n (list)))
+;;       (cons (- n 1) (range (- n 1)))
+;;       (list)))
 
+
+(fn range (n)
+  (var range-helper (lambda (n acc)
+    (if (> n 0)
+        (range-helper (- n 1) (cons (- n 1) acc))
+        acc)))
+  (range-helper n (list)))
+
+(test test-range
+  (assert-eq :expected (list 3 2 1 0) :actual (range 4) :description "range n: 4 return (3 2 1 0)")
+  ;; (assert-eq (list 0 1 2 3) (reverse (range 4)) "range n: 4 return (0 1 2 3)")
+)
 ; (assert-eq (list 3 2 1 0) (range 4) "range n: 4 return (3 2 1 0)")
 ; (assert-eq (list 0 1 2 3) (reverse (range 4)) "range n: 4 return (0 1 2 3)")
 
 ; Current pattern           111 110 101 100 011 010 001 000
-; New state for center cell  0   1   1   0   1   1   1   0
-; returns 0..7 for all the possibile states the three cells can be in
+; New state for center cell  0   1   1   0   1   1   1   0 ; returns 0..7 for all the possibile states the three cells can be in
 (fn cal-rule (a b c) (+ (* a 4) (* b 2) (* c 1)))
 
 ; (assert-eq 0 (cal-rule 0 0 0) "cal-rule 0 0 0") ; 0
