@@ -34,7 +34,7 @@ impl Test {
     }
 
     pub fn name(&self) -> String {
-        format!("test_{}", self.name)
+        self.name.to_string()
     }
 }
 
@@ -513,7 +513,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
 
     fn handle_test(&mut self, table: &mut SymbolTable, test_expr: &TestExpr) {
         let id = self.variable_id();
-        let name = format!("test_{}", test_expr.name);
+        let name = format!("test(){}", test_expr.name);
         let old_variable_counter = self.variable_counter;
         self.variable_counter = 0;
         table.enter_scope(&name);
