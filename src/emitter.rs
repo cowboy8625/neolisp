@@ -48,7 +48,7 @@ pub struct Emitter<'a> {
     lambda_counter: usize,
     options: EmitterOptions,
     offset: usize,
-    tests: Vec<(String, usize)>,
+    tests: Vec<(String, Span)>,
     errors: Vec<Error>,
 }
 
@@ -175,14 +175,20 @@ impl<'a> Emitter<'a> {
         program[end - 2] = Instruction::TailCall(*count);
     }
 
-    fn compile_tests(self, program: &mut Vec<Instruction>) -> std::result::Result<(), Vec<Error>> {
+    fn compile_tests(
+        &mut self,
+        program: &mut Vec<Instruction>,
+    ) -> std::result::Result<(), Vec<Error>> {
         if !self.options.test {
             return Ok(());
         }
-        for (name, index) in self.tests {
-            let callable = Callable::new(index, name);
-            let value = Value::Callable(Box::new(callable));
-            program.push(Instruction::Push(Box::new(value)));
+        for (name, span) in self.tests.clone().into_iter() {
+            let Some(symbol) = self.symbol_table.get(&name) else {
+                // NOTE: This probably will never happen.
+                self.error(Error::TestNotDefined { name, span });
+                continue;
+            };
+            program.push(Instruction::GetGlobal(symbol.id()));
             program.push(Instruction::CallTest);
         }
         Ok(())
@@ -244,7 +250,7 @@ impl AstWalker<Program> for Emitter<'_> {
         program.push(Instruction::Push(Box::new(value)));
         program.push(Instruction::SetGlobal);
 
-        self.tests.push((name, address));
+        self.tests.push((name, test_expr.span.clone()));
     }
 
     fn handle_builtin(&mut self, program: &mut Program, name: &str, args: &[Spanned<Expr>]) {
@@ -743,11 +749,13 @@ mod tests {
                 Eq(2),
                 Push(Box::new(Builtin(21))),
                 Call(1),
-                Return,
+                ReturnFromTest,
                 Push(Box::new(Callable(Box::new(CallableData::new(
                     5,
-                    "test-testing"
+                    "test()test-testing"
                 ))))),
+                SetGlobal,
+                GetGlobal(0),
                 CallTest,
             ]
         );
