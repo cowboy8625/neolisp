@@ -58,8 +58,8 @@ To get started with NeoLisp, follow these steps:
 ```
 
 ## Examples
-[Fibonacci](./samples/fib.nl)
-[Rule110](./samples/rule110.nl)
+- [Fibonacci](./samples/fib.nl)
+- [Rule110](./samples/rule110.nl)
 
 ## Installation
 
