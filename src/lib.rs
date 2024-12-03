@@ -39,6 +39,7 @@ pub mod emitter;
 pub mod error;
 pub mod expr_walker;
 pub mod instruction;
+pub mod intrinsic;
 pub mod machine;
 pub mod parser;
 pub mod repl;
