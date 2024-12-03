@@ -54,7 +54,7 @@ To get started with NeoLisp, follow these steps:
 '(10 20 30) ;;  -> (10 20 30)
 
 ;; Builtin testing run with `neolisp test`
-(test add (assert-eq :expected 4 :actual (add 1 2) :description "1 + 2 = 3"))
+(test add (assert-eq :expected 3 :actual (add 1 2) :description "1 + 2 = 3"))
 ```
 
 ## Examples
