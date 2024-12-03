@@ -28,7 +28,7 @@ const BUILTINS: &[&str] = &[
     "cons",
     "car",
 ];
-const KEYWORDS: &[&str] = &["var", "let", "fn", "if", "lambda", "loop", "quote"];
+const KEYWORDS: &[&str] = &["var", "let", "fn", "if", "lambda", "loop", "quote", "test"];
 
 pub mod ast;
 pub mod cli;

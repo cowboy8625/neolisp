@@ -3,11 +3,11 @@ use super::{
     error::Error,
     expr_walker::{
         AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr, LoopExpr,
-        OperatorExpr, QuoteExpr, VarExpr,
+        OperatorExpr, QuoteExpr, TestExpr, VarExpr,
     },
-    instruction::{Instruction, Value},
+    instruction::{Callable, Instruction, Value},
     symbol_table::{
-        Function, Lambda, Let, Parameter, Symbol, SymbolTable, UnboundVariable, Variable,
+        Function, Lambda, Let, Parameter, Symbol, SymbolTable, Test, UnboundVariable, Variable,
     },
     BUILTINS,
 };
@@ -15,6 +15,19 @@ use super::{
 #[derive(Debug, Default)]
 pub struct EmitterOptions {
     pub no_main: bool,
+    pub test: bool,
+}
+
+impl EmitterOptions {
+    pub fn with_no_main(mut self, no_main: bool) -> Self {
+        self.no_main = no_main;
+        self
+    }
+
+    pub fn with_test(mut self, test: bool) -> Self {
+        self.test = test;
+        self
+    }
 }
 
 type Program = Vec<Instruction>;
@@ -35,6 +48,7 @@ pub struct Emitter<'a> {
     lambda_counter: usize,
     options: EmitterOptions,
     offset: usize,
+    tests: Vec<(String, usize)>,
     errors: Vec<Error>,
 }
 
@@ -46,6 +60,7 @@ impl<'a> Emitter<'a> {
             lambda_counter: 0,
             options,
             offset: 0,
+            tests: Vec::new(),
             errors: Vec::new(),
         }
     }
@@ -77,6 +92,8 @@ impl<'a> Emitter<'a> {
         }
 
         self.symbol_table.exit_scope();
+
+        self.compile_tests(&mut program)?;
         Ok(program)
     }
 
@@ -119,9 +136,14 @@ impl<'a> Emitter<'a> {
                 }
             }
             Symbol::Parameter(Parameter { .. }) => program.push(Instruction::SetLocal),
-            Symbol::Function(Function { .. }) => todo!(),
-            Symbol::Lambda(Lambda { .. }) => todo!(),
-            Symbol::Let(Let { .. }) => todo!(),
+            Symbol::Function(Function { .. }) => {
+                todo!("Function not implemented in emit_set_instruction")
+            }
+            Symbol::Lambda(Lambda { .. }) => {
+                todo!("Lambda not implemented in emit_set_instruction")
+            }
+            Symbol::Let(Let { .. }) => todo!("Let not implemented in emit_set_instruction"),
+            Symbol::Test(Test { .. }) => todo!("Test not implemented in emit_set_instruction"),
         }
     }
 
@@ -151,7 +173,19 @@ impl<'a> Emitter<'a> {
         }
 
         program[end - 2] = Instruction::TailCall(*count);
-        return;
+    }
+
+    fn compile_tests(self, program: &mut Vec<Instruction>) -> std::result::Result<(), Vec<Error>> {
+        if !self.options.test {
+            return Ok(());
+        }
+        for (name, index) in self.tests {
+            let callable = Callable::new(index, name);
+            let value = Value::Callable(Box::new(callable));
+            program.push(Instruction::Push(Box::new(value)));
+            program.push(Instruction::CallTest);
+        }
+        Ok(())
     }
 }
 
@@ -182,6 +216,35 @@ impl AstWalker<Program> for Emitter<'_> {
         };
 
         program.push(instruction);
+    }
+
+    fn handle_test(&mut self, program: &mut Program, test_expr: &TestExpr) {
+        if !self.options.test {
+            return;
+        }
+
+        program.push(Instruction::Jump(usize::MAX));
+        let index = program.len() - 1;
+        let address = self.get_program_size(program);
+
+        let name = format!("test(){}", test_expr.name);
+        self.symbol_table.enter_scope(&name);
+
+        for spanned in test_expr.body.iter() {
+            self.walk_expr(program, spanned);
+        }
+
+        program.push(Instruction::ReturnFromTest);
+
+        self.symbol_table.exit_scope();
+        let body_size = self.get_program_size(program) - address;
+        program[index] = Instruction::Jump(address + body_size);
+        let callable = Callable::new(address, name.to_string());
+        let value = Value::Callable(Box::new(callable));
+        program.push(Instruction::Push(Box::new(value)));
+        program.push(Instruction::SetGlobal);
+
+        self.tests.push((name, address));
     }
 
     fn handle_builtin(&mut self, program: &mut Program, name: &str, args: &[Spanned<Expr>]) {
@@ -230,7 +293,9 @@ impl AstWalker<Program> for Emitter<'_> {
         let body_size = self.get_program_size(program) - start;
         program[index] = Instruction::Jump(start + body_size);
 
-        program.push(Instruction::Push(Box::new(Value::Callable(start))));
+        let callable = Callable::new(start, name.to_string());
+        let value = Value::Callable(Box::new(callable));
+        program.push(Instruction::Push(Box::new(value)));
         program.push(Instruction::SetGlobal);
     }
 
@@ -280,7 +345,9 @@ impl AstWalker<Program> for Emitter<'_> {
 
         program[index] = Instruction::Jump(start + body_size);
 
-        program.push(Instruction::Push(Box::new(Value::Callable(start))));
+        let callable = Callable::new(start, name);
+        let value = Value::Callable(Box::new(callable));
+        program.push(Instruction::Push(Box::new(value)));
     }
 
     fn handle_let_binding(&mut self, program: &mut Program, let_binding: &LetBindingExpr) {
@@ -369,13 +436,25 @@ impl AstWalker<Program> for Emitter<'_> {
             panic!("unknown symbol: {}", name);
         };
 
-        let instruction = if symbol.is_global() {
+        let set_instruction = if symbol.is_global() {
             Instruction::SetGlobal
         } else {
             Instruction::SetLocal
         };
 
-        program.push(instruction);
+        program.push(set_instruction);
+
+        if !symbol.is_recursive() {
+            return;
+        }
+
+        let get_instruction = if symbol.is_global() {
+            Instruction::GetGlobal(symbol.id())
+        } else {
+            Instruction::GetLocal(symbol.id())
+        };
+        program.push(get_instruction);
+        program.push(Instruction::SetFree);
     }
 
     fn handle_quote(&mut self, program: &mut Program, quote: &QuoteExpr) {
@@ -469,9 +548,6 @@ impl AstWalker<Program> for Emitter<'_> {
                 program.push(Instruction::GetFree(*id));
             }
             Symbol::Variable(Variable { id, .. }) => {
-                // OK This is where you left off.
-                // You need some kind of id or index of how many variables are in scope so we
-                // know where to index.
                 if symbol.is_global() {
                     program.push(Instruction::GetGlobal(*id));
                 } else {
@@ -484,8 +560,9 @@ impl AstWalker<Program> for Emitter<'_> {
             Symbol::Function(Function { id, .. }) => {
                 program.push(Instruction::GetGlobal(*id));
             }
-            Symbol::Lambda(Lambda { .. }) => todo!(),
-            Symbol::Let(Let { .. }) => todo!(),
+            Symbol::Lambda(Lambda { .. }) => todo!("Lambdas are not supported yet in symbol"),
+            Symbol::Let(Let { .. }) => todo!("Lets are not supported yet in symbol"),
+            Symbol::Test(Test { .. }) => todo!("Tests are not supported yet in symbol"),
         }
     }
 
@@ -499,7 +576,7 @@ impl AstWalker<Program> for Emitter<'_> {
 #[cfg(test)]
 mod tests {
     use crate::compiler::Compiler;
-    use crate::instruction::{Instruction::*, Value::*};
+    use crate::instruction::{Callable as CallableData, Instruction::*, Value::*};
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -585,15 +662,17 @@ mod tests {
                 GetLocal(0),
                 Call(1),
                 Return,
-                Push(Box::new(Callable(5))),
+                Push(Box::new(Callable(Box::new(CallableData::new(5, "apply"))))),
                 SetGlobal,
                 Push(Box::new(F64(123.0))),
-                Jump(58),
+                Jump(67),
                 GetLocal(0),
                 Push(Box::new(F64(321.0))),
                 Add(2),
                 Return,
-                Push(Box::new(Callable(40))),
+                Push(Box::new(Callable(Box::new(CallableData::new(
+                    49, "lambda_0"
+                ))))),
                 GetGlobal(0),
                 Call(2)
             ]
@@ -635,8 +714,41 @@ mod tests {
                 GetGlobal(0),
                 TailCall(3),
                 Return,
-                Push(Box::new(Callable(5))),
+                Push(Box::new(Callable(Box::new(CallableData::new(5, "fib"))))),
                 SetGlobal,
+            ]
+        );
+    }
+    #[test]
+    fn test_testing() {
+        let src = r#"
+ (test test-testing (assert (= (+ 1 2) 3)))
+ "#;
+        let (_, instructions) = Compiler::default()
+            .no_main(true)
+            .with_test(true)
+            .compile(src)
+            .ok()
+            .flatten()
+            .unwrap();
+
+        assert_eq!(
+            instructions,
+            vec![
+                Jump(48),
+                Push(Box::new(F64(1.0))),
+                Push(Box::new(F64(2.0))),
+                Add(2),
+                Push(Box::new(F64(3.0))),
+                Eq(2),
+                Push(Box::new(Builtin(21))),
+                Call(1),
+                Return,
+                Push(Box::new(Callable(Box::new(CallableData::new(
+                    5,
+                    "test-testing"
+                ))))),
+                CallTest,
             ]
         );
     }

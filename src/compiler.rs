@@ -13,6 +13,7 @@ pub struct Compiler {
     debug_ast: bool,
     decompile: bool,
     no_main: bool,
+    test: bool,
     symbol_table: Option<SymbolTable>,
     emitter_offset: usize,
 }
@@ -30,6 +31,11 @@ impl Compiler {
 
     pub fn no_main(mut self, value: bool) -> Self {
         self.no_main = value;
+        self
+    }
+
+    pub fn with_test(mut self, value: bool) -> Self {
+        self.test = value;
         self
     }
 
@@ -53,9 +59,9 @@ impl Compiler {
             return Ok(None);
         }
 
-        let options = EmitterOptions {
-            no_main: self.no_main,
-        };
+        let options = EmitterOptions::default()
+            .with_test(self.test)
+            .with_no_main(self.no_main);
         let mut symbol_table = match self.symbol_table.take() {
             Some(mut table) => {
                 SymbolTableBuilder::default().build_from_scope(&ast, &mut table)?;

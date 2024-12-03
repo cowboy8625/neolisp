@@ -21,7 +21,7 @@ use std::time::{Duration, Instant};
 const HELP: &str = r#"
 commands <required> [optional]
 q|quit              - quit
-help                - show this help message
+h|help              - show this help message
 s|step              - step
 c|continue          - continue
 b|breakpoint <addr> - add breakpoint
@@ -194,7 +194,6 @@ impl<'a> Debugger<'a> {
             .machine
             .global
             .iter()
-            .rev()
             .enumerate()
             .map(|(i, v)| format!("global[{}]: {}", i, v))
             .collect::<Vec<_>>()

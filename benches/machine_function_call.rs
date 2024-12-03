@@ -1,5 +1,5 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use neolisp::instruction::{Instruction, Value};
+use neolisp::instruction::{Callable, Instruction, Value};
 use neolisp::machine::Machine;
 
 pub fn benchmark_call(c: &mut Criterion) {
@@ -11,7 +11,9 @@ pub fn benchmark_call(c: &mut Criterion) {
         Instruction::GetLocal(1),                     // 0x1E  30   16 01 00 00 00
         Instruction::Add(2),                          // 0x23  35   03 02
         Instruction::Return,                          // 0x25  37   01
-        Instruction::Push(Box::new(Value::Callable(25))), // 0x26  38   02 08 19 00 00 00
+        Instruction::Push(Box::new(Value::Callable(Box::new(Callable::new(
+            25, "apply",
+        ))))), // 0x26  38   02 08 19 00 00 00
         Instruction::Call(2),                         // 0x2C  44   11 02
     ]
     .iter()

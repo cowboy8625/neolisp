@@ -2,34 +2,35 @@
 ; recursively create a list of numbers from 0 to n
 ; this returns a reverse list
 (fn range (n)
+  (var range-helper (lambda (n acc)
     (if (> n 0)
-      (cons (- n 1) (range (- n 1)))
-      (list)))
+        (range-helper (- n 1) (cons (- n 1) acc))
+        acc)))
+  (range-helper n (list)))
 
-
-;; (fn range (n)
-;;   (var range-helper (lambda (n acc)
-;;     (if (> n 0)
-;;         (range-helper (- n 1) (cons (- n 1) acc))
-;;         acc)))
-;;   (range-helper n (list)))
-
-; (assert-eq (list 3 2 1 0) (range 4) "range n: 4 return (3 2 1 0)")
-; (assert-eq (list 0 1 2 3) (reverse (range 4)) "range n: 4 return (0 1 2 3)")
+(test test-range
+  (assert-eq
+    :expected (list 0 1 2 3)
+    :actual (range 4)
+    :description "range n: 4 return (0 1 2 3)")
+)
+; ----------------------------------------------------
 
 ; Current pattern           111 110 101 100 011 010 001 000
 ; New state for center cell  0   1   1   0   1   1   1   0
 ; returns 0..7 for all the possibile states the three cells can be in
-(fn cal-rule (a b c) (+ (* a 4) (* b 2) (* c 1)))
+(fn cal-rule (a b c) (+ (* a 4) (* b 2) c))
 
-; (assert-eq 0 (cal-rule 0 0 0) "cal-rule 0 0 0") ; 0
-; (assert-eq 1 (cal-rule 0 0 1) "cal-rule 0 0 1") ; 1
-; (assert-eq 2 (cal-rule 0 1 0) "cal-rule 0 1 0") ; 1
-; (assert-eq 3 (cal-rule 0 1 1) "cal-rule 0 1 1") ; 1
-; (assert-eq 4 (cal-rule 1 0 0) "cal-rule 1 0 0") ; 0
-; (assert-eq 5 (cal-rule 1 0 1) "cal-rule 1 0 1") ; 1
-; (assert-eq 6 (cal-rule 1 1 0) "cal-rule 1 1 0") ; 1
-; (assert-eq 7 (cal-rule 1 1 1) "cal-rule 1 1 1") ; 0
+(test test-cal-rule
+  ; (assert-eq :expected 0 :actual (cal-rule 0 0 0) :description "cal-rule 0 0 0") ; 0
+  (assert-eq :expected 1 :actual (cal-rule 0 0 1) :description "cal-rule 0 0 1") ; 1
+  ; (assert-eq :expected 2 :actual (cal-rule 0 1 0) :description "cal-rule 0 1 0") ; 1
+  ; (assert-eq :expected 3 :actual (cal-rule 0 1 1) :description "cal-rule 0 1 1") ; 1
+  ; (assert-eq :expected 4 :actual (cal-rule 1 0 0) :description "cal-rule 1 0 0") ; 0
+  ; (assert-eq :expected 5 :actual (cal-rule 1 0 1) :description "cal-rule 1 0 1") ; 1
+  ; (assert-eq :expected 6 :actual (cal-rule 1 1 0) :description "cal-rule 1 1 0") ; 1
+  ; (assert-eq :expected 7 :actual (cal-rule 1 1 1) :description "cal-rule 1 1 1") ; 0
+)
 ; ----------------------------------------------------
 
 
@@ -75,7 +76,7 @@
     (c (nth grid (get-cell grid (+ index 1)))))
     (is-alive (cal-rule a b c))))
 
-(fn main () (print (generation-of-cell (list 0 0 0 1) 0) "\n"))
+;; (fn main () (print (generation-of-cell (list 0 0 0 1) 0) "\n"))
 
 ; (assert-eq
 ;   0 ; expected

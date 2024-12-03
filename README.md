@@ -52,6 +52,9 @@ To get started with NeoLisp, follow these steps:
 ;; Quoting (worked in tree walker but still working on getting this in the new compiler)
 
 '(10 20 30) ;;  -> (10 20 30)
+
+;; Builtin testing run with `neolisp test`
+(test add (assert-eq :expected 4 :actual (add 1 2) :description "1 + 2 = 3"))
 ```
 
 ## Examples

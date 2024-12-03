@@ -1,16 +1,18 @@
 use super::{
     compiler::Compiler,
     error::Error,
-    instruction::{Instruction, OpCode, Value},
+    instruction::{Callable, Instruction, OpCode, Value},
     symbol_table::SymbolTable,
 };
 use anyhow::{anyhow, Result};
+use crossterm::style::Stylize;
 use intrinsic::Intrinsic;
 use num_traits::FromPrimitive;
 
-const INSTRUCTION_CALL: [fn(&mut Machine) -> Result<()>; 29] = [
+const INSTRUCTION_CALL: [fn(&mut Machine) -> Result<()>; 31] = [
     Machine::instruction_halt,
     Machine::instruction_return,
+    Machine::instruction_return_from_test,
     Machine::instruction_push,
     Machine::instruction_add,
     Machine::instruction_sub,
@@ -27,6 +29,7 @@ const INSTRUCTION_CALL: [fn(&mut Machine) -> Result<()>; 29] = [
     Machine::instruction_mod,
     Machine::instruction_rot,
     Machine::instruction_call_function,
+    Machine::instruction_call_test,
     Machine::instruction_tail_call_function,
     Machine::instruction_set_local,
     Machine::instruction_set_global,
@@ -143,6 +146,11 @@ impl Machine {
         }
     }
 
+    pub fn with_symbol_table(mut self, symbol_table: SymbolTable) -> Self {
+        self.symbol_table = Some(symbol_table);
+        self
+    }
+
     pub fn set_options(&mut self, options: MachineOptions) {
         self.options = options;
     }
@@ -256,7 +264,12 @@ impl Machine {
         #[cfg(any(debug_assertions, test))]
         if !self.options.quiet {
             eprintln!("cycles: {}", self.cycle_count);
-            eprintln!("stack {:#?}", self.stack);
+            if !self.free.is_empty() {
+                eprintln!("free {:#?}", self.free);
+            }
+            if !self.stack.is_empty() {
+                eprintln!("stack {:#?}", self.stack);
+            }
         }
         Ok(())
     }
@@ -309,7 +322,8 @@ impl Machine {
             }
             Value::CODE_CALLABLE => {
                 let index = self.get_u32()? as usize;
-                Ok(Value::Callable(index))
+                let name = self.get_string()?;
+                Ok(Value::Callable(Box::new(Callable::new(index, name))))
             }
             Value::CODE_BUILTIN => {
                 let index = self.get_u32()? as usize;
@@ -457,6 +471,33 @@ impl Machine {
         self.stack.pop();
         let frame = self.get_current_frame_mut()?;
         frame.stack.push(value);
+        Ok(())
+    }
+
+    fn instruction_return_from_test(&mut self) -> Result<()> {
+        let (value, test_name) = {
+            let frame = self.get_current_frame_mut()?;
+            let Some(value) = frame.stack.pop() else {
+                // TODO: ERROR REPORTING
+                panic!("missing return value on stack");
+            };
+            let test_name = frame.args[0].clone();
+            if let Some(address) = frame.return_address {
+                self.ip = address;
+            }
+            (value, test_name)
+        };
+
+        eprintln!(
+            "test {}: {}",
+            test_name.to_string().split("()").collect::<Vec<_>>()[1],
+            if matches!(value, Value::Bool(true)) {
+                "pass".green()
+            } else {
+                "fail".red()
+            }
+        );
+        self.stack.pop();
         Ok(())
     }
 
@@ -724,12 +765,12 @@ impl Machine {
             };
             value
         };
-        let address = match value {
+        let callable = match value {
             Value::Builtin(index) => {
                 INTRISICS[index](self, count as u8)?;
                 return Ok(());
             }
-            Value::Callable(address) => address,
+            Value::Callable(data) => data,
             _ => {
                 // TODO: ERROR REPORT;
                 panic!("can not call '{}' type", value);
@@ -745,7 +786,30 @@ impl Machine {
 
         let new_frame = Frame::new(self.ip, param_values);
         self.stack.push(new_frame);
-        self.ip = address;
+        self.ip = callable.address;
+        Ok(())
+    }
+
+    fn instruction_call_test(&mut self) -> Result<()> {
+        if self.stack.len() >= Self::MAX_STACK_FRAME_SIZE {
+            return Err(anyhow!("stack frame overflow at {}", self.ip));
+        }
+        let value = {
+            let frame = self.get_current_frame_mut()?;
+            let Some(value) = frame.stack.pop() else {
+                // TODO: ERROR REPORT;
+                panic!("missing callable value on stack");
+            };
+            value
+        };
+        let Value::Callable(callable) = value else {
+            // TODO: ERROR REPORT;
+            panic!("can not call '{}' type", value);
+        };
+        let test_name = Value::String(Box::new(callable.name));
+        let new_frame = Frame::new(self.ip, vec![test_name]);
+        self.stack.push(new_frame);
+        self.ip = callable.address;
         Ok(())
     }
 
@@ -760,7 +824,7 @@ impl Machine {
             // TODO: ERROR REPORT;
             panic!("missing callable value on stack");
         };
-        let Value::Callable(address) = value else {
+        let Value::Callable(callable) = value else {
             // TODO: ERROR REPORT;
             panic!("can not call '{}' type", value);
         };
@@ -770,7 +834,7 @@ impl Machine {
         param_values.reverse();
 
         frame.args = param_values;
-        self.ip = address;
+        self.ip = callable.address;
         Ok(())
     }
 
@@ -883,6 +947,7 @@ impl Machine {
             match opcode {
                 OpCode::Halt => instructions.push(Instruction::Halt),
                 OpCode::Return => instructions.push(Instruction::Return),
+                OpCode::ReturnFromTest => instructions.push(Instruction::ReturnFromTest),
                 OpCode::Push => instructions.push(Instruction::Push(Box::new(self.get_value()?))),
                 OpCode::Add => instructions.push(Instruction::Add(self.get_u8()? as usize)),
                 OpCode::Sub => instructions.push(Instruction::Sub(self.get_u8()? as usize)),
@@ -907,6 +972,7 @@ impl Machine {
                 OpCode::Mod => instructions.push(Instruction::Mod),
                 OpCode::Rot => instructions.push(Instruction::Rot),
                 OpCode::Call => instructions.push(Instruction::Call(self.get_u8()? as usize)),
+                OpCode::CallTest => instructions.push(Instruction::CallTest),
                 OpCode::TailCall => {
                     instructions.push(Instruction::TailCall(self.get_u8()? as usize))
                 }
@@ -1225,7 +1291,8 @@ mod tests {
 mod intrinsic {
     use super::{Machine, Value};
     use anyhow::Result;
-    use std::io::Write;
+    use crossterm::style::Stylize;
+    use std::collections::HashMap;
 
     pub(crate) struct Intrinsic;
     impl Intrinsic {
@@ -1388,13 +1455,13 @@ mod intrinsic {
             let Some(Value::List(mut list)) = machine.pop()? else {
                 anyhow::bail!("expected list on stack for filter")
             };
-            let Some(Value::Callable(address)) = machine.pop()? else {
+            let Some(Value::Callable(callable)) = machine.pop()? else {
                 anyhow::bail!("expected lambda on stack for filter")
             };
             let mut result = Vec::new();
             for value in list.drain(..) {
                 machine.push(value.clone())?;
-                machine.call_from_address(address, 1)?;
+                machine.call_from_address(callable.address, 1)?;
                 let Some(Value::Bool(true)) = machine.pop()? else {
                     continue;
                 };
@@ -1411,7 +1478,7 @@ mod intrinsic {
             let Some(Value::List(mut list)) = machine.pop()? else {
                 anyhow::bail!("expected list on stack for fold")
             };
-            let Some(Value::Callable(address)) = machine.pop()? else {
+            let Some(Value::Callable(callable)) = machine.pop()? else {
                 anyhow::bail!("expected lambda on stack for fold")
             };
             let Some(initial) = machine.pop()? else {
@@ -1421,7 +1488,7 @@ mod intrinsic {
             for value in list.drain(..).rev() {
                 machine.push(result)?;
                 machine.push(value)?;
-                machine.call_from_address(address, 2)?;
+                machine.call_from_address(callable.address, 2)?;
                 let Some(v) = machine.pop()? else {
                     // TODO: ERROR REPORTING
                     anyhow::bail!("expected value on stack for fold right")
@@ -1440,7 +1507,7 @@ mod intrinsic {
             let Some(Value::List(mut list)) = machine.pop()? else {
                 anyhow::bail!("expected list on stack for fold")
             };
-            let Some(Value::Callable(address)) = machine.pop()? else {
+            let Some(Value::Callable(callable)) = machine.pop()? else {
                 anyhow::bail!("expected lambda on stack for fold")
             };
             let Some(initial) = machine.pop()? else {
@@ -1450,7 +1517,7 @@ mod intrinsic {
             for value in list.drain(..) {
                 machine.push(result)?;
                 machine.push(value)?;
-                machine.call_from_address(address, 2)?;
+                machine.call_from_address(callable.address, 2)?;
                 let Some(v) = machine.pop()? else {
                     // TODO: ERROR REPORTING
                     anyhow::bail!("expected value on stack for fold")
@@ -1471,13 +1538,13 @@ mod intrinsic {
                 anyhow::bail!("expected list on stack for map")
             };
 
-            let Some(Value::Callable(address)) = machine.pop()? else {
+            let Some(Value::Callable(callable)) = machine.pop()? else {
                 anyhow::bail!("expected lambda on stack for map")
             };
             let mut result = Vec::new();
             for value in list.drain(..) {
                 machine.push(value)?;
-                machine.call_from_address(address, 1)?;
+                machine.call_from_address(callable.address, 1)?;
                 let Some(v) = machine.pop()? else {
                     // TODO: ERROR REPORTING
                     anyhow::bail!("expected value on stack for map")
@@ -1654,36 +1721,46 @@ mod intrinsic {
         }
 
         pub(crate) fn intrinsic_assert_eq(machine: &mut Machine, count: u8) -> Result<()> {
-            // (assert-eq 1 2)
+            // (assert-eq :expected 1 :actual 2)
             if count < 2 {
                 anyhow::bail!("assert-eq at least 2 args");
             }
 
             let frame = machine.get_current_frame_mut()?;
 
-            let Some(result) = frame.stack.pop() else {
-                anyhow::bail!("expected a value on stack for assert-eq");
+            let index = frame.stack.len() - count as usize;
+            let args = frame.stack.split_off(index);
+
+            let mut keys: HashMap<String, Value> = HashMap::new();
+            let mut iter = args.into_iter();
+            while let Some(key) = iter.next() {
+                let Some(value) = iter.next() else {
+                    // TODO: RUNTIME ERROR
+                    panic!("expected value to key: {key:?}")
+                };
+                keys.insert(key.to_string(), value);
+            }
+
+            let Some(expected) = keys.get(":expected") else {
+                // TODO: RUNTIME ERROR
+                anyhow::bail!("expected value to key: :expected")
+            };
+            let Some(actual) = keys.get(":actual") else {
+                // TODO: RUNTIME ERROR
+                anyhow::bail!("expected value to key: :actual")
             };
 
-            let mut failed = false;
-            let mut message = String::new();
-            for _ in 0..count - 1 {
-                let Some(value) = frame.stack.pop() else {
-                    anyhow::bail!("expected a value on stack for assert-eq");
-                };
-                failed = result != value;
-                if failed {
-                    message = format!("assert-eq failed expected {} got {}", result, value);
-                    break;
-                }
-            }
+            let failed = expected != actual;
             if failed {
-                if let Some(Value::String(result)) = frame.stack.pop() {
-                    eprintln!("TEST: {}", result);
-                }
-                anyhow::bail!(message);
+                eprintln!("{}", format!("expected: {expected}").green());
+                eprintln!("{}", format!("actual: {actual}").red());
             }
 
+            if let (Some(message), true) = (keys.get(":description"), failed) {
+                eprintln!("{}", format!("description: {message}").yellow());
+            }
+
+            frame.stack.push(Value::Bool(!failed));
             Ok(())
         }
 
@@ -1702,9 +1779,10 @@ mod intrinsic {
                 anyhow::bail!("expected boolean on stack for assert")
             };
             if !value {
-                let _ = writeln!(std::io::stderr(), "{message}");
-                std::process::exit(1);
+                eprintln!("assertion failed: {message}");
             }
+
+            frame.stack.push(Value::Bool(value));
 
             Ok(())
         }
