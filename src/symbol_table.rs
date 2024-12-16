@@ -720,7 +720,9 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
             Symbol::UnboundVariable(_) => {
                 skip = true;
             }
-            Symbol::Variable(_) => todo!(),
+            Symbol::Variable(_) => {
+                skip = true;
+            }
             Symbol::Parameter(p) => p.is_unbound = true,
             Symbol::Function(f) => {
                 f.is_recursive = f.name == scope_name || f.is_recursive;
