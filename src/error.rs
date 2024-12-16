@@ -61,6 +61,10 @@ pub enum Error {
         note: Option<String>,
         help: Option<String>,
     },
+    TestNotDefined {
+        span: Span,
+        name: String,
+    },
 }
 
 impl Error {
@@ -75,6 +79,7 @@ impl Error {
             Error::MainNotDefined => String::from("E004"),
             Error::RunTimeError { code, .. } => code.clone(),
             Error::Redefined { .. } => String::from("E005"),
+            Error::TestNotDefined { .. } => String::from("E006"),
         }
     }
 
@@ -96,6 +101,7 @@ impl Error {
             Self::MainNotDefined => &(0..0),
             Self::RunTimeError { span, .. } => span,
             Self::Redefined { new_span, .. } => new_span,
+            Self::TestNotDefined { span, .. } => span,
         }
     }
 
@@ -112,6 +118,11 @@ impl Error {
             Self::Redefined { original_span, .. } => Some(
                 Label::new((filename, original_span.clone()))
                     .with_message("this definition was shadowed by the previous one")
+                    .with_color(Color::Blue),
+            ),
+            Self::TestNotDefined { span, .. } => Some(
+                Label::new((filename, span.clone()))
+                    .with_message("this test is not defined")
                     .with_color(Color::Blue),
             ),
         }
@@ -132,6 +143,7 @@ impl Error {
             Self::MainNotDefined => "main is not defined".to_string(),
             Self::RunTimeError { message, .. } => message.to_string(),
             Self::Redefined { .. } => "redefined".to_string(),
+            Self::TestNotDefined { name, .. } => format!("test '{name}' is not defined"),
         }
     }
 
@@ -146,6 +158,7 @@ impl Error {
             Error::MainNotDefined => None,
             Error::RunTimeError { note, .. } => note.clone(),
             Error::Redefined { note, .. } => note.clone(),
+            Error::TestNotDefined { .. } => None,
         }
     }
     fn help(&self) -> Option<String> {
@@ -164,6 +177,7 @@ impl Error {
             Error::MainNotDefined => Some("If this is intentinal you may want to add the `--no-main` flag.".to_string()),
             Error::RunTimeError { help, .. } => help.clone(),
             Error::Redefined { help, .. } => help.clone(),
+            Error::TestNotDefined { .. } => None,
         }
     }
 

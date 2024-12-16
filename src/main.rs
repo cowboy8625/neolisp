@@ -54,10 +54,37 @@ fn main() -> anyhow::Result<()> {
 
             Ok(())
         }
-        Command::Test { file } => {
-            let filename = file.unwrap_or("main.nl".to_string());
+        Command::Test(t) => {
+            let filename = t.file.unwrap_or("main.nl".to_string());
             let src = std::fs::read_to_string(&filename)?;
-            neolisp::parser::parse_or_report(&filename, &src);
+            let compiler = Compiler::default()
+                .no_main(true)
+                .debug_ast(args.ast_debug)
+                .decompile(t.decompile)
+                .with_test(true)
+                .compile(&src);
+
+            let (symbol_table, instructions) = match compiler {
+                Ok(Some((symbol_table, instructions))) => (symbol_table, instructions),
+                Ok(None) => return Ok(()),
+                Err(errors) => {
+                    for error in errors {
+                        error.report(&filename, &src)?;
+                    }
+                    return Ok(());
+                }
+            };
+
+            let program: Vec<u8> = instructions.iter().flat_map(|i| i.to_bytecode()).collect();
+            let mut machine = Machine::new(program).with_symbol_table(symbol_table);
+
+            if !t.breakpoints.is_empty() {
+                let mut debugger =
+                    Debugger::new(&mut machine)?.with_breakpoints(t.breakpoints.clone());
+                debugger.run()?;
+            } else {
+                machine.run()?;
+            }
             Ok(())
         }
     }

@@ -5,6 +5,7 @@ use num_derive::{FromPrimitive, ToPrimitive};
 pub enum OpCode {
     Halt,
     Return,
+    ReturnFromTest,
     Push,
     Add,
     Sub,
@@ -21,6 +22,7 @@ pub enum OpCode {
     Mod,
     Rot,
     Call,
+    CallTest,
     TailCall,
     SetLocal,
     SetGlobal,
@@ -38,6 +40,7 @@ pub enum OpCode {
 pub enum Instruction {
     Halt,
     Return,
+    ReturnFromTest,
     Push(Box<Value>),
     Add(usize),
     Sub(usize),
@@ -54,6 +57,7 @@ pub enum Instruction {
     Mod,
     Rot,
     Call(usize),
+    CallTest,
     TailCall(usize),
     SetLocal,
     SetGlobal,
@@ -72,6 +76,7 @@ impl Instruction {
         match self {
             Self::Halt => 1,
             Self::Return => 1,
+            Self::ReturnFromTest => 1,
             Self::Push(value) => 1 + value.size(),
             Self::Add(_) => 2,
             Self::Sub(_) => 2,
@@ -88,6 +93,7 @@ impl Instruction {
             Self::Mod => 1,
             Self::Rot => 1,
             Self::Call(_) => 2,
+            Self::CallTest => 1,
             Self::TailCall(_) => 2,
             Self::SetLocal => 1,
             Self::SetGlobal => 1,
@@ -106,6 +112,7 @@ impl Instruction {
         match self {
             Self::Halt => OpCode::Halt,
             Self::Return => OpCode::Return,
+            Self::ReturnFromTest => OpCode::ReturnFromTest,
             Self::Push(_) => OpCode::Push,
             Self::Add(_) => OpCode::Add,
             Self::Sub(_) => OpCode::Sub,
@@ -122,6 +129,7 @@ impl Instruction {
             Self::Mod => OpCode::Mod,
             Self::Rot => OpCode::Rot,
             Self::Call(..) => OpCode::Call,
+            Self::CallTest => OpCode::CallTest,
             Self::TailCall(..) => OpCode::TailCall,
             Self::SetLocal => OpCode::SetLocal,
             Self::SetGlobal => OpCode::SetGlobal,
@@ -141,6 +149,7 @@ impl Instruction {
         match self {
             Self::Halt => bytes.push(OpCode::Halt as u8),
             Self::Return => bytes.push(OpCode::Return as u8),
+            Self::ReturnFromTest => bytes.push(OpCode::ReturnFromTest as u8),
             Self::Push(value) => {
                 bytes.push(OpCode::Push as u8);
                 bytes.extend(&value.to_bytecode());
@@ -164,7 +173,8 @@ impl Instruction {
             | Self::Rot
             | Self::SetLocal
             | Self::SetGlobal
-            | Self::SetFree => bytes.push(self.opcode() as u8),
+            | Self::SetFree
+            | Self::CallTest => bytes.push(self.opcode() as u8),
             Self::Call(count) | Self::TailCall(count) => {
                 bytes.push(self.opcode() as u8);
                 bytes.push(*count as u8);
@@ -186,6 +196,39 @@ impl Instruction {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct Callable {
+    pub address: usize,
+    pub name: String,
+}
+
+impl Callable {
+    pub fn new(address: usize, name: impl Into<String>) -> Self {
+        Self {
+            address,
+            name: name.into(),
+        }
+    }
+
+    pub fn to_bytecode(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend(&(self.address as u32).to_le_bytes());
+        bytes.extend(&(self.name.len() as u32).to_le_bytes());
+        bytes.extend(self.name.as_bytes());
+        bytes
+    }
+
+    pub fn size(&self) -> usize {
+        4 + 4 + self.name.len()
+    }
+}
+
+impl std::fmt::Display for Callable {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}", self.address, self.name)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     U8(u8),
     I32(i32),
@@ -195,7 +238,7 @@ pub enum Value {
     String(Box<String>),
     Bool(bool),
     List(Box<Vec<Value>>),
-    Callable(usize),
+    Callable(Box<Callable>),
     Builtin(usize),
     Symbol(Box<String>),
     Keyword(Box<String>),
@@ -253,9 +296,10 @@ impl Value {
                 }
                 bytes
             }
-            Value::Callable(index) => {
+            Value::Callable(callable) => {
                 let mut bytes = vec![Self::CODE_CALLABLE];
-                bytes.extend_from_slice(&(*index as u32).to_le_bytes());
+                let callable_bytes = callable.to_bytecode();
+                bytes.extend(callable_bytes);
                 bytes
             }
             Value::Builtin(index) => {
@@ -290,7 +334,7 @@ impl Value {
             Value::List(vec) => 4 + vec.iter().map(|v| v.size()).sum::<usize>(),
             // 4 bytes    4 bytes
             // start......end
-            Value::Callable(_) => 4,
+            Value::Callable(callable) => callable.size(),
             Value::Builtin(_) => 4,
             Value::Symbol(v) => 4 + v.len(),
             Value::Keyword(v) => 4 + v.len(),
@@ -338,7 +382,7 @@ impl std::fmt::Display for Value {
                         .join(" ")
                 )
             }
-            Self::Callable(index) => write!(f, "<function {index:?}>"),
+            Self::Callable(data) => write!(f, "<function {data}>"),
             Self::Builtin(index) => write!(f, "<function {:?}>", BUILTINS[*index]),
             Self::Symbol(value) => write!(f, "{value}"),
             Self::Keyword(value) => write!(f, "{value}"),

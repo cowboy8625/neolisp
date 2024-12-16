@@ -1,35 +1,47 @@
+; TODO: make so that if a assert fails then the test fails
+; currently the only assert that matters is the last one.
+
+; Helpers for testing
+; test is a list of assert-eq or assert
+(fn it (tests) (fold false (lambda (acc value) (or acc value)) tests))
+; ----------------------------------------------------
+
 ; create a list of numbers from 0 to n
 ; recursively create a list of numbers from 0 to n
 ; this returns a reverse list
 (fn range (n)
+  (var range-helper (lambda (n acc)
     (if (> n 0)
-      (cons (- n 1) (range (- n 1)))
-      (list)))
+        (range-helper (- n 1) (cons (- n 1) acc))
+        acc)))
+  (range-helper n (list)))
 
-
-;; (fn range (n)
-;;   (var range-helper (lambda (n acc)
-;;     (if (> n 0)
-;;         (range-helper (- n 1) (cons (- n 1) acc))
-;;         acc)))
-;;   (range-helper n (list)))
-
-; (assert-eq (list 3 2 1 0) (range 4) "range n: 4 return (3 2 1 0)")
-; (assert-eq (list 0 1 2 3) (reverse (range 4)) "range n: 4 return (0 1 2 3)")
+(test range
+  (assert-eq
+    :expected (list 0 1 2 3)
+    :actual (range 4)
+    :description "range n: 4 return (0 1 2 3)")
+)
+; ----------------------------------------------------
 
 ; Current pattern           111 110 101 100 011 010 001 000
 ; New state for center cell  0   1   1   0   1   1   1   0
 ; returns 0..7 for all the possibile states the three cells can be in
-(fn cal-rule (a b c) (+ (* a 4) (* b 2) (* c 1)))
+(fn cal-rule (a b c) (+ (* a 4) (* b 2) c))
 
-; (assert-eq 0 (cal-rule 0 0 0) "cal-rule 0 0 0") ; 0
-; (assert-eq 1 (cal-rule 0 0 1) "cal-rule 0 0 1") ; 1
-; (assert-eq 2 (cal-rule 0 1 0) "cal-rule 0 1 0") ; 1
-; (assert-eq 3 (cal-rule 0 1 1) "cal-rule 0 1 1") ; 1
-; (assert-eq 4 (cal-rule 1 0 0) "cal-rule 1 0 0") ; 0
-; (assert-eq 5 (cal-rule 1 0 1) "cal-rule 1 0 1") ; 1
-; (assert-eq 6 (cal-rule 1 1 0) "cal-rule 1 1 0") ; 1
-; (assert-eq 7 (cal-rule 1 1 1) "cal-rule 1 1 1") ; 0
+(test cal-rule
+  (it
+    (list
+      (assert-eq :expected 0 :actual (cal-rule 0 0 0) :description "cal-rule 0 0 0") ; 0
+      (assert-eq :expected 1 :actual (cal-rule 0 0 1) :description "cal-rule 0 0 1") ; 1
+      (assert-eq :expected 2 :actual (cal-rule 0 1 0) :description "cal-rule 0 1 0") ; 1
+      (assert-eq :expected 3 :actual (cal-rule 0 1 1) :description "cal-rule 0 1 1") ; 1
+      (assert-eq :expected 4 :actual (cal-rule 1 0 0) :description "cal-rule 1 0 0") ; 0
+      (assert-eq :expected 5 :actual (cal-rule 1 0 1) :description "cal-rule 1 0 1") ; 1
+      (assert-eq :expected 6 :actual (cal-rule 1 1 0) :description "cal-rule 1 1 0") ; 1
+      (assert-eq :expected 7 :actual (cal-rule 1 1 1) :description "cal-rule 1 1 1") ; 0
+    ))
+)
 ; ----------------------------------------------------
 
 
@@ -45,72 +57,100 @@
       ; else
       0)))))))))
 
-; (assert-eq 0 (is-alive 0) "is-alive 0 -> 0")
-; (assert-eq 1 (is-alive 1) "is-alive 1 -> 1")
-; (assert-eq 1 (is-alive 2) "is-alive 2 -> 1")
-; (assert-eq 1 (is-alive 3) "is-alive 3 -> 1")
-; (assert-eq 0 (is-alive 4) "is-alive 4 -> 0")
-; (assert-eq 1 (is-alive 5) "is-alive 5 -> 1")
-; (assert-eq 1 (is-alive 6) "is-alive 6 -> 1")
-; (assert-eq 0 (is-alive 7) "is-alive 7 -> 0")
+(test is-alive
+  (it
+    (list
+      (assert-eq :expected 0 :actual (is-alive 0) :description "is-alive 0 -> 0")
+      (assert-eq :expected 1 :actual (is-alive 1) :description "is-alive 1 -> 1")
+      (assert-eq :expected 1 :actual (is-alive 2) :description "is-alive 2 -> 1")
+      (assert-eq :expected 1 :actual (is-alive 3) :description "is-alive 3 -> 1")
+      (assert-eq :expected 0 :actual (is-alive 4) :description "is-alive 4 -> 0")
+      (assert-eq :expected 1 :actual (is-alive 5) :description "is-alive 5 -> 1")
+      (assert-eq :expected 1 :actual (is-alive 6) :description "is-alive 6 -> 1")
+      (assert-eq :expected 0 :actual (is-alive 7) :description "is-alive 7 -> 0")
+    )
+  )
+)
 ; ----------------------------------------------------
 
 
 ; Returns the index of the cell in the grid and will wrap around either end
 (fn get-cell (grid i)
-  (mod (+ i (length grid)) (length grid)))
+  (var len (length grid))
+  (mod (+ i len) len))
 
-; (assert-eq 2 (get-cell (list 'a 'b 'c) -1) "get-cell list len 3, index -1, returns 2")
-; (assert-eq 0 (get-cell (list 'a 'b 'c)  0) "get-cell list len 3, index  0, returns 0")
-; (assert-eq 1 (get-cell (list 'a 'b 'c)  1) "get-cell list len 3, index  1, returns 1")
-; (assert-eq 2 (get-cell (list 'a 'b 'c)  2) "get-cell list len 3, index  2, returns 2")
-; (assert-eq 0 (get-cell (list 'a 'b 'c)  3) "get-cell list len 3, index  3, returns 0")
+(test get-cell
+  (it
+    (list
+      (assert-eq :expected 2 :actual (get-cell (list 'a 'b 'c) -1) :description "get-cell list len 3, index -1, returns 2")
+      (assert-eq :expected 0 :actual (get-cell (list 'a 'b 'c)  0) :description "get-cell list len 3, index  0, returns 0")
+      (assert-eq :expected 1 :actual (get-cell (list 'a 'b 'c)  1) :description "get-cell list len 3, index  1, returns 1")
+      (assert-eq :expected 2 :actual (get-cell (list 'a 'b 'c)  2) :description "get-cell list len 3, index  2, returns 2")
+      (assert-eq :expected 0 :actual (get-cell (list 'a 'b 'c)  3) :description "get-cell list len 3, index  3, returns 0")
+      (assert-eq :expected 1 :actual (get-cell (list 'a 'b 'c)  4) :description "get-cell list len 3, index  4, returns 1")
+      (assert-eq :expected 2 :actual (get-cell (list 'a 'b 'c)  5) :description "get-cell list len 3, index  5, returns 2")
+      (assert-eq :expected 0 :actual (get-cell (list 'a 'b 'c)  6) :description "get-cell list len 3, index  6, returns 0")
+      (assert-eq :expected 1 :actual (get-cell (list 'a 'b 'c)  7) :description "get-cell list len 3, index  7, returns 1")
+    )
+  )
+)
 ; ----------------------------------------------------
 
 ; Returns the state of the cells next generation
 (fn generation-of-cell (grid index)
-  (let
-    ((a (nth grid (get-cell grid (- index 1))))
-    (b (nth grid (get-cell grid index)))
-    (c (nth grid (get-cell grid (+ index 1)))))
-    (is-alive (cal-rule a b c))))
+  (is-alive (cal-rule
+    (nth grid (get-cell grid (- index 1)))
+    (nth grid (get-cell grid index))
+    (nth grid (get-cell grid (+ index 1)))
+    )))
+; TODO: using let is not evaluating the first binding
+; (fn generation-of-cell (grid index)
+;   (let
+;     (
+;       (a (nth grid (get-cell grid (- index 1))))
+;       (b (nth grid (get-cell grid index)))
+;       (c (nth grid (get-cell grid (+ index 1))))
+;     )
+;     (is-alive (cal-rule a b c))))
 
-(fn main () (print (generation-of-cell (list 0 0 0 1) 0) "\n"))
 
-; (assert-eq
-;   0 ; expected
-;   ;                         ↓
-;   (generation-of-cell (list 0 0 0 1) 0) ; actual
-;   "generation-of-cell, grid: 0 0 0 1, index 0, returns 0") ; description
-; (assert-eq
-;   0 ; expected
-;   ;                           ↓
-;   (generation-of-cell (list 0 0 0 1) 1) ; actual
-;   "generation-of-cell, grid: 0 0 0 1, index 1, returns 0") ; description
-; (assert-eq
-;   1 ; expected
-;   ;                             ↓
-;   (generation-of-cell (list 0 0 0 1) 2) ; actual
-;   "generation-of-cell, grid: 0 0 0 1, index 2, returns 1") ; description
-; (assert-eq
-;   1 ; expected
-;   ;                               ↓
-;   (generation-of-cell (list 0 0 0 1) 3) ; actual
-;   "generation-of-cell, grid: 0 0 0 1, index 3, returns 1") ; description
+(test generation-of-cell
+  (it
+    (list
+      (assert-eq
+        :expected 0
+        :actual (generation-of-cell (list 0 0 0 1) 0)
+        :description  "generation-of-cell, grid: 0 0 0 1, index 0, returns 0")
+      (assert-eq
+        :expected 0
+        :actual (generation-of-cell (list 0 0 0 1) 1)
+        :description "generation-of-cell, grid: 0 0 0 1, index 1, returns 0")
+      (assert-eq
+        :expected 1
+        :actual (generation-of-cell (list 0 0 0 1) 2)
+        :description "generation-of-cell, grid: 0 0 0 1, index 2, returns 1")
+      (assert-eq
+        :expected 1
+        :actual (generation-of-cell (list 0 0 0 1) 3)
+        :description "generation-of-cell, grid: 0 0 0 1, index 3, returns 1")
+    )
+  )
+)
 ; ----------------------------------------------------
 
 ; Returns the next generation of the grid
-;;;; (fn next-generation (grid)
-;;;;   (map
-;;;;     (lambda (i) (generation-of-cell grid i))
-;;;;     (reverse (range (length grid)))
-;;;; ))
+(fn next-generation (grid)
+(var len (length grid))
+  (map
+    (lambda (i) (generation-of-cell grid i))
+    (range len)))
 
-; (assert-eq
-;   (list 0 0 1 1) ; expected
-;   (next-generation (list 0 0 0 1)) ; actual
-;   "next-generation, grid: 0 0 0 1, returns 0 0 1 1") ; description
 
+(test next-generation
+  (assert-eq
+    :expected (list 0 0 1 1)
+    :actual (next-generation (list 0 0 0 1))
+    :description "next-generation, grid: 0 0 0 1, returns 0 0 1 1"))
 
 ; ----------------------------------------------------
 

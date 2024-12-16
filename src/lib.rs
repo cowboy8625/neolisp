@@ -28,7 +28,7 @@ const BUILTINS: &[&str] = &[
     "cons",
     "car",
 ];
-const KEYWORDS: &[&str] = &["var", "let", "fn", "if", "lambda", "loop", "quote"];
+const KEYWORDS: &[&str] = &["var", "let", "fn", "if", "lambda", "loop", "quote", "test"];
 
 pub mod ast;
 pub mod cli;
@@ -39,6 +39,7 @@ pub mod emitter;
 pub mod error;
 pub mod expr_walker;
 pub mod instruction;
+pub mod intrinsic;
 pub mod machine;
 pub mod parser;
 pub mod repl;
