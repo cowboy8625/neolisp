@@ -772,7 +772,7 @@ mod tests {
                 Add(2),
                 Push(Box::new(F64(3.0))),
                 Eq(2),
-                Push(Box::new(Builtin(21))),
+                Push(Box::new(Builtin(20))),
                 Call(1),
                 ReturnFromTest,
                 Push(Box::new(Callable(Box::new(CallableData::new(
