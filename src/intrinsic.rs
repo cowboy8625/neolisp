@@ -311,15 +311,31 @@ impl Intrinsic {
             anyhow::bail!("append only support 2 args");
         }
         let frame = machine.get_current_frame_mut()?;
-        let Some(Value::List(mut list2)) = frame.stack.pop() else {
+        let Some(mut rhs) = frame.stack.pop() else {
             anyhow::bail!("expected list on stack for append")
         };
-        let Some(Value::List(mut list1)) = frame.stack.pop() else {
+        let Some(mut lhs) = frame.stack.pop() else {
             anyhow::bail!("expected list on stack for append")
         };
 
-        list1.append(&mut list2);
-        frame.stack.push(Value::List(list1));
+        match (&mut lhs, &mut rhs) {
+            (Value::List(lhs), Value::List(rhs)) => {
+                lhs.append(rhs);
+                frame.stack.push(Value::List(Box::new(lhs.to_vec())));
+            }
+            (Value::String(lhs), Value::String(rhs)) => {
+                frame
+                    .stack
+                    .push(Value::String(Box::new(format!("{}{}", lhs, rhs))));
+            }
+            _ => {
+                anyhow::bail!(
+                    "expected list on stack for append but found {} and {}",
+                    lhs.type_of(),
+                    rhs.type_of()
+                );
+            }
+        }
         Ok(())
     }
 
@@ -424,8 +440,9 @@ impl Intrinsic {
         }
 
         let frame = machine.get_current_frame_mut()?;
-        let Some(Value::List(list)) = frame.stack.pop() else {
-            anyhow::bail!("expected a List on stack for nth");
+        let top = frame.stack.pop();
+        let Some(Value::List(list)) = top else {
+            anyhow::bail!("expected a List on stack for length but found {top:?}");
         };
 
         frame.stack.push(Value::F64(list.len() as f64));

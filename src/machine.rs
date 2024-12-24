@@ -601,6 +601,7 @@ impl Machine {
         let value = args.iter().skip(1).all(|right| match (left, right) {
             (Value::I32(l), Value::I32(r)) => l == r,
             (Value::F64(l), Value::F64(r)) => l == r,
+            (Value::Keyword(l), Value::Keyword(r)) => l == r,
             _ => panic!("invalid types for Less Than"),
         });
         frame.stack.push(Value::Bool(value));

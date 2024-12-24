@@ -282,6 +282,28 @@ impl AstWalker<Program> for Emitter<'_> {
             unreachable!("This should never fail as we already checked this in AstWalker");
         };
 
+        let scope_name = self.symbol_table.get_scope_name();
+
+        let params = self
+            .symbol_table
+            .get(&scope_name)
+            .map(|s| s.get_parameters())
+            .unwrap_or_default();
+
+        for param in params.iter() {
+            let Some(symbol) = self.symbol_table.get(&param.name) else {
+                panic!("Variable `{}` should be known at this point", param.name,);
+            };
+            let Symbol::Parameter(Parameter {
+                is_unbound: true, ..
+            }) = symbol
+            else {
+                continue;
+            };
+            program.push(Instruction::GetLocal(param.id));
+            program.push(Instruction::SetFree);
+        }
+
         for spanned in function.body.iter() {
             self.walk_expr(program, spanned);
         }
@@ -551,7 +573,9 @@ impl AstWalker<Program> for Emitter<'_> {
         };
         match symbol {
             Symbol::UnboundVariable(UnboundVariable { id, .. }) => {
+                println!("id: {id}, name: {name}");
                 program.push(Instruction::GetFree(*id));
+                // program.push(Instruction::SetFree);
             }
             Symbol::Variable(Variable { id, .. }) => {
                 if symbol.is_global() {

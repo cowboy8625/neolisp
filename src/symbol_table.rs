@@ -270,7 +270,7 @@ impl Symbol {
             Symbol::UnboundVariable(v) => v.scope_level,
             Symbol::Variable(v) => v.scope_level,
             Symbol::Parameter(v) => v.scope_level,
-            Symbol::Function(v) => v.scope_level,
+            Symbol::Function(v) => return true,
             Symbol::Lambda(v) => v.scope_level,
             Symbol::Let(v) => v.scope_level,
             Symbol::Test(v) => v.scope_level,
@@ -427,17 +427,9 @@ impl SymbolTable {
     fn push(&mut self, symbol: impl Into<Symbol>) {
         let symbol = symbol.into();
 
-        let name = match &symbol {
-            Symbol::Function(Function { name, .. })
-            | Symbol::Variable(Variable { name, .. })
-            | Symbol::Parameter(Parameter { name, .. })
-            | Symbol::UnboundVariable(UnboundVariable { name, .. }) => name.to_string(),
-            Symbol::Lambda(l) => l.name(),
-            Symbol::Let(l) => l.name(),
-            Symbol::Test(t) => t.name(),
-        };
+        let name = symbol.name();
 
-        if matches!(self.scope_stack.last(), Some(sn) if &name == sn) {
+        if self.scope_stack.last().map_or(false, |sn| &name == sn) {
             self.scope_stack.pop();
             let scope_name = self.get_full_scope_name();
             self.scopes.entry(scope_name).or_default().insert(symbol);
@@ -774,7 +766,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         };
         let params = scope.get_parameters();
         let has_value_in_current_scope = params.iter().any(|p| p.name == name);
-        if has_value_in_current_scope {
+        if has_value_in_current_scope || scope.is_global() {
             return;
         }
         let scope_name = table.get_scope_name();

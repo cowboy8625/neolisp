@@ -1,5 +1,5 @@
 use neolisp::{
-    cli::{Cli, Command},
+    cli::{Cli, Command, EditMode, Test},
     compiler::Compiler,
     debugger::Debugger,
     machine::Machine,
@@ -11,6 +11,16 @@ use clap::Parser as ClapParser;
 fn main() -> anyhow::Result<()> {
     let args = Cli::parse();
 
+    // let args = Cli {
+    //     ast_debug: false,
+    //     history_path: "/tmp/.history".to_string(),
+    //     editor_mode: EditMode::Vi,
+    //     command: Some(Command::Test(Test {
+    //         breakpoints: vec![],
+    //         decompile: false,
+    //         file: Some(String::from("./samples/m.nl")),
+    //     })),
+    // };
     let Some(command) = args.command.clone() else {
         repl::run(args)?;
         return Ok(());

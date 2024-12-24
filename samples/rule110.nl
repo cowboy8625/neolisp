@@ -9,12 +9,13 @@
 ; create a list of numbers from 0 to n
 ; recursively create a list of numbers from 0 to n
 ; this returns a reverse list
+(fn range-helper (n acc)
+  (if (<= n 0)
+      acc
+      (range-helper (- n 1) (cons (- n 1) acc))))
+
 (fn range (n)
-  (var range-helper (lambda (n acc)
-    (if (> n 0)
-        (range-helper (- n 1) (cons (- n 1) acc))
-        acc)))
-  (range-helper n (list)))
+  (range-helper n '()))
 
 (test range
   (assert-eq
