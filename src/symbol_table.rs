@@ -136,6 +136,7 @@ impl Function {
         span: Span,
         parameters: Vec<Parameter>,
         scope_level: usize,
+        is_recursive: bool,
     ) -> Self {
         Self {
             id,
@@ -145,7 +146,7 @@ impl Function {
             parameters,
             scope_level,
             location: None,
-            is_recursive: false,
+            is_recursive,
         }
     }
 }
@@ -273,7 +274,7 @@ impl Symbol {
             Symbol::Function(_) => return true,
             Symbol::Lambda(v) => v.scope_level,
             Symbol::Let(v) => v.scope_level,
-            Symbol::Test(_) => v.scope_level,
+            Symbol::Test(_) => return true,
         };
         level == 1
     }
@@ -534,6 +535,10 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
             return;
         };
 
+        let is_recursive = function_expr
+            .body
+            .iter()
+            .any(|spanned| is_recursive(name, spanned));
         let old_variable_counter = self.variable_counter;
         self.variable_counter = 0;
         table.enter_scope(name);
@@ -570,6 +575,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
             function_expr.name.span.clone(),
             parameters,
             table.scope_level(),
+            is_recursive,
         );
         table.push(function);
 
