@@ -43,7 +43,6 @@ const INSTRUCTION_CALL: [fn(&mut Machine) -> Result<()>; 31] = [
     Machine::instruction_jump,
 ];
 
-// FIXME: remove nth double intrinsic call
 const INTRISICS: [fn(&mut Machine, u8) -> Result<()>; 24] = [
     Intrinsic::intrinsic_sleep,
     Intrinsic::intrinsic_is_atom,
