@@ -20,7 +20,6 @@ const BUILTINS: &[&str] = &[
     "cdr",
     "typeof",
     "print",
-    "nth",
     "length",
     "assert-eq",
     "assert",

@@ -270,10 +270,10 @@ impl Symbol {
             Symbol::UnboundVariable(v) => v.scope_level,
             Symbol::Variable(v) => v.scope_level,
             Symbol::Parameter(v) => v.scope_level,
-            Symbol::Function(v) => return true,
+            Symbol::Function(_) => return true,
             Symbol::Lambda(v) => v.scope_level,
             Symbol::Let(v) => v.scope_level,
-            Symbol::Test(v) => v.scope_level,
+            Symbol::Test(_) => v.scope_level,
         };
         level == 1
     }

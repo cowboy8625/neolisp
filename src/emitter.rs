@@ -573,7 +573,8 @@ impl AstWalker<Program> for Emitter<'_> {
         };
         match symbol {
             Symbol::UnboundVariable(UnboundVariable { id, .. }) => {
-                println!("id: {id}, name: {name}");
+                #[cfg(debug_assertions)]
+                eprintln!("id: {id}, name: {name}");
                 program.push(Instruction::GetFree(*id));
                 // program.push(Instruction::SetFree);
             }

@@ -30,7 +30,7 @@ r|run [file]        - run
 j|jump <addr>       - jump to address
 "#;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Command {
     Help,
     Quit,
@@ -52,10 +52,12 @@ enum State {
 #[derive(Debug)]
 pub struct Debugger<'a> {
     input_buffer: String,
+    last_command: Option<Command>,
     last_instruction_pointer: Option<usize>,
     output: String,
     machine: &'a mut Machine,
     state: State,
+    error_message: Option<String>,
     instructions: Vec<Instruction>,
     breakpoints: HashSet<usize>,
     is_running: bool,
@@ -66,10 +68,12 @@ impl<'a> Debugger<'a> {
         let instructions = machine.decompile()?;
         Ok(Self {
             input_buffer: String::new(),
+            last_command: None,
             last_instruction_pointer: None,
             output: String::new(),
             machine,
             state: State::default(),
+            error_message: None,
             instructions,
             breakpoints: HashSet::new(),
             is_running: true,
@@ -93,12 +97,17 @@ impl<'a> Debugger<'a> {
         let mut last_tick = Instant::now();
 
         while self.is_running {
+            if self.error_message.is_some() {
+                self.state = State::Paused;
+            }
             match self.state {
                 State::Running if self.breakpoints.contains(&self.machine.ip) => {
                     self.state = State::Paused;
                 }
                 State::Running => {
-                    self.machine.run_once()?;
+                    if let Err(error) = self.machine.run_once() {
+                        self.error_message = Some(error.to_string());
+                    }
                 }
                 State::Paused => {}
             }
@@ -108,7 +117,6 @@ impl<'a> Debugger<'a> {
                 let event = event::read()?;
                 self.event_handler(event)?;
             }
-
             last_tick = Instant::now();
         }
         Ok(())
@@ -127,6 +135,24 @@ impl<'a> Debugger<'a> {
     }
 
     fn draw(&mut self, f: &mut Frame) {
+        if let Some(error_message) = self.error_message.clone() {
+            self.draw_run_time_error(f, error_message);
+            return;
+        }
+        self.draw_normal(f);
+    }
+
+    fn draw_run_time_error(&mut self, f: &mut Frame, error_message: String) {
+        let size = f.area();
+        let error_annoying_popup_window = Paragraph::new(error_message).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title("Your Program Is F'ed Up Bro"),
+        );
+        f.render_widget(error_annoying_popup_window, size);
+    }
+
+    fn draw_normal(&mut self, f: &mut Frame) {
         let size = f.area();
 
         // Layout with two sections: input and VM state
@@ -251,6 +277,10 @@ impl<'a> Debugger<'a> {
     }
 
     fn key_code_handler(&mut self, code: &KeyCode) -> Result<()> {
+        if self.error_message.is_some() && code == &KeyCode::Enter {
+            self.error_message = None;
+            return Ok(());
+        }
         match code {
             KeyCode::Char(c) => {
                 self.input_buffer.push(*c);
@@ -258,60 +288,71 @@ impl<'a> Debugger<'a> {
             KeyCode::Backspace => {
                 self.input_buffer.pop();
             }
+            KeyCode::Enter if self.input_buffer.is_empty() => {
+                if let Some(command) = self.last_command.clone() {
+                    self.execute_command(command)?;
+                }
+            }
             KeyCode::Enter => {
                 match parse_input(&self.input_buffer) {
-                    Result::Ok(command) => match command {
-                        Command::Help => self.output = HELP.to_string(),
-                        Command::Quit => self.is_running = false,
-                        Command::Step => match self.machine.run_once() {
-                            Result::Ok(_) => {}
-                            Result::Err(err) => self.output.push_str(&format!("error: {}\n", err)),
-                        },
-                        Command::Continue => self.state = State::Running,
-                        Command::AddBreakPoint(address) => {
-                            self.toggle_breakpoint(address);
-                        }
-                        Command::Run(Some(file)) => match std::fs::read_to_string(&file) {
-                            Result::Ok(src) => {
-                                match self.machine.load_from_string(&src) {
-                                    Result::Ok(_) => {}
-                                    Result::Err(errors) => {
-                                        for error in errors {
-                                            error.report(&file, &src)?;
-                                        }
-                                    }
-                                };
-                                let instructions = self.machine.decompile()?;
-                                self.instructions = instructions;
-                            }
-                            Result::Err(err) => {
-                                self.output.push_str(&format!("error: {}\n", err));
-                            }
-                        },
-                        Command::Run(None) => {
-                            self.machine.ip = 0x0000;
-                        }
-                        Command::Reset => {
-                            self.machine.global.clear();
-                            self.machine.free.clear();
-                            self.machine.stack.clear();
-                            self.machine.ip = 0x0000;
-                            self.machine.stack.push(MachineFrame {
-                                return_address: None,
-                                args: Vec::with_capacity(256),
-                                stack: Vec::with_capacity(1024),
-                            });
-                        }
-                        Command::Jump(address) => {
-                            self.machine.ip = address;
-                        }
-                    },
+                    Result::Ok(command) => self.execute_command(command)?,
                     Result::Err(err) => self.output.push_str(&format!("error: {}\n", err)),
                 }
 
                 self.input_buffer.clear();
             }
             _ => self.output.push_str(&format!("{:?}\n", code)),
+        }
+        Ok(())
+    }
+
+    fn execute_command(&mut self, command: Command) -> Result<()> {
+        self.last_command = Some(command.clone());
+        match command {
+            Command::Help => self.output = HELP.to_string(),
+            Command::Quit => self.is_running = false,
+            Command::Step => match self.machine.run_once() {
+                Result::Ok(_) => {}
+                Result::Err(err) => self.output.push_str(&format!("error: {}\n", err)),
+            },
+            Command::Continue => self.state = State::Running,
+            Command::AddBreakPoint(address) => {
+                self.toggle_breakpoint(address);
+            }
+            Command::Run(Some(file)) => match std::fs::read_to_string(&file) {
+                Result::Ok(src) => {
+                    match self.machine.load_from_string(&src) {
+                        Result::Ok(_) => {}
+                        Result::Err(errors) => {
+                            for error in errors {
+                                error.report(&file, &src)?;
+                            }
+                        }
+                    };
+                    let instructions = self.machine.decompile()?;
+                    self.instructions = instructions;
+                }
+                Result::Err(err) => {
+                    self.output.push_str(&format!("error: {}\n", err));
+                }
+            },
+            Command::Run(None) => {
+                self.machine.ip = 0x0000;
+            }
+            Command::Reset => {
+                self.machine.global.clear();
+                self.machine.free.clear();
+                self.machine.stack.clear();
+                self.machine.ip = 0x0000;
+                self.machine.stack.push(MachineFrame {
+                    return_address: None,
+                    args: Vec::with_capacity(256),
+                    stack: Vec::with_capacity(1024),
+                });
+            }
+            Command::Jump(address) => {
+                self.machine.ip = address;
+            }
         }
         Ok(())
     }

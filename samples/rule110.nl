@@ -77,8 +77,7 @@
 
 ; Returns the index of the cell in the grid and will wrap around either end
 (fn get-cell (grid i)
-  (var len (length grid))
-  (mod (+ i len) len))
+  (mod (+ i (length grid)) (length grid)))
 
 (test get-cell
   (it
@@ -99,11 +98,12 @@
 
 ; Returns the state of the cells next generation
 (fn generation-of-cell (grid index)
-  (is-alive (cal-rule
+  (is-alive
+  (cal-rule
     (nth grid (get-cell grid (- index 1)))
     (nth grid (get-cell grid index))
-    (nth grid (get-cell grid (+ index 1)))
-    )))
+    (nth grid (get-cell grid (+ index 1))))
+  ))
 ; TODO: using let is not evaluating the first binding
 ; (fn generation-of-cell (grid index)
 ;   (let
@@ -141,10 +141,9 @@
 
 ; Returns the next generation of the grid
 (fn next-generation (grid)
-(var len (length grid))
   (map
     (lambda (i) (generation-of-cell grid i))
-    (range len)))
+    (range (length grid))))
 
 
 (test next-generation

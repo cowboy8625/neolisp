@@ -43,7 +43,8 @@ const INSTRUCTION_CALL: [fn(&mut Machine) -> Result<()>; 31] = [
     Machine::instruction_jump,
 ];
 
-const INTRISICS: [fn(&mut Machine, u8) -> Result<()>; 25] = [
+// FIXME: remove nth double intrinsic call
+const INTRISICS: [fn(&mut Machine, u8) -> Result<()>; 24] = [
     Intrinsic::intrinsic_sleep,
     Intrinsic::intrinsic_is_atom,
     Intrinsic::intrinsic_is_number,
@@ -62,7 +63,6 @@ const INTRISICS: [fn(&mut Machine, u8) -> Result<()>; 25] = [
     Intrinsic::intrinsic_cdr,
     Intrinsic::intrinsic_typeof,
     Intrinsic::intrinsic_print,
-    Intrinsic::intrinsic_nth,
     Intrinsic::intrinsic_length,
     Intrinsic::intrinsic_assert_eq,
     Intrinsic::intrinsic_assert,
@@ -227,7 +227,7 @@ impl Machine {
         while self.ip < self.program.len() {
             let Some(byte) = self.peek_u8() else {
                 // TODO: ERROR REPORTING
-                panic!("missing opcode on stack");
+                anyhow::bail!("missing opcode on stack");
             };
             if let Some(OpCode::Return) = OpCode::from_u8(*byte) {
                 self.instruction_return()?;
@@ -461,7 +461,7 @@ impl Machine {
             let frame = self.get_current_frame_mut()?;
             let Some(value) = frame.stack.pop() else {
                 // TODO: ERROR REPORTING
-                panic!("missing return value on stack");
+                anyhow::bail!("missing return value on stack");
             };
             if let Some(address) = frame.return_address {
                 self.ip = address;
@@ -479,7 +479,7 @@ impl Machine {
             let frame = self.get_current_frame_mut()?;
             let Some(value) = frame.stack.pop() else {
                 // TODO: ERROR REPORTING
-                panic!("missing return value on stack");
+                anyhow::bail!("missing return value on stack");
             };
             let test_name = frame.args[0].clone();
             if let Some(address) = frame.return_address {
@@ -522,7 +522,7 @@ impl Machine {
                 (Value::F64(l), Value::F64(r)) => {
                     left = Value::F64(l + r);
                 }
-                _ => panic!("invalid types for Add"),
+                _ => anyhow::bail!("invalid types for Add"),
             }
         }
         frame.stack.push(left);
@@ -543,7 +543,7 @@ impl Machine {
                 (Value::F64(l), Value::F64(r)) => {
                     left = Value::F64(l - r);
                 }
-                _ => panic!("invalid types for Sub"),
+                _ => anyhow::bail!("invalid types for Sub"),
             }
         }
         frame.stack.push(left);
@@ -564,7 +564,7 @@ impl Machine {
                 (Value::F64(l), Value::F64(r)) => {
                     left = Value::F64(l * r);
                 }
-                _ => panic!("invalid types for Mul"),
+                _ => anyhow::bail!("invalid types for Mul"),
             }
         }
         frame.stack.push(left);
@@ -585,7 +585,7 @@ impl Machine {
                 (Value::F64(l), Value::F64(r)) => {
                     left = Value::F64(l / r);
                 }
-                _ => panic!("invalid types for Div"),
+                _ => anyhow::bail!("invalid types for Div"),
             }
         }
         frame.stack.push(left);
@@ -602,7 +602,8 @@ impl Machine {
             (Value::I32(l), Value::I32(r)) => l == r,
             (Value::F64(l), Value::F64(r)) => l == r,
             (Value::Keyword(l), Value::Keyword(r)) => l == r,
-            _ => panic!("invalid types for Less Than"),
+            // TODO: 🤔 Should we throw an error or just return false
+            _ => false,
         });
         frame.stack.push(Value::Bool(value));
         Ok(())
@@ -617,7 +618,8 @@ impl Machine {
         let value = args.iter().skip(1).all(|right| match (left, right) {
             (Value::I32(l), Value::I32(r)) => l > r,
             (Value::F64(l), Value::F64(r)) => l > r,
-            _ => panic!("invalid types for Less Than"),
+            // TODO: 🤔 Should we throw an error or just return false
+            _ => false,
         });
         frame.stack.push(Value::Bool(value));
         Ok(())
@@ -632,7 +634,8 @@ impl Machine {
         let value = args.iter().skip(1).all(|right| match (left, right) {
             (Value::I32(l), Value::I32(r)) => l < r,
             (Value::F64(l), Value::F64(r)) => l < r,
-            _ => panic!("invalid types for Less Than"),
+            // TODO: 🤔 Should we throw an error or just return false
+            _ => false,
         });
         frame.stack.push(Value::Bool(value));
         Ok(())
@@ -647,13 +650,15 @@ impl Machine {
         let value = args.iter().skip(1).all(|right| match (left, right) {
             (Value::I32(l), Value::I32(r)) => l >= r,
             (Value::F64(l), Value::F64(r)) => l >= r,
-            _ => panic!("invalid types for Greater Than Or Equal"),
+            // TODO: 🤔 Should we throw an error or just return false
+            _ => false,
         });
         frame.stack.push(Value::Bool(value));
         Ok(())
     }
 
     fn instruction_less_than_or_equal(&mut self) -> Result<()> {
+        // (> 3 4 2 2 2 2 2 2 "lskdjfdslkfj")
         let count = self.get_u8()? as usize;
         let frame = self.get_current_frame_mut()?;
         let index = frame.stack.len() - count;
@@ -662,7 +667,8 @@ impl Machine {
         let value = args.iter().skip(1).all(|right| match (left, right) {
             (Value::I32(l), Value::I32(r)) => l <= r,
             (Value::F64(l), Value::F64(r)) => l <= r,
-            _ => panic!("invalid types for Greater Than Or Equal"),
+            // TODO: 🤔 Should we throw an error or just return false
+            _ => false,
         });
         frame.stack.push(Value::Bool(value));
         Ok(())
@@ -679,7 +685,7 @@ impl Machine {
                 (Value::Bool(l), Value::Bool(r)) => {
                     left = Value::Bool(l && *r);
                 }
-                _ => panic!("invalid types for Or"),
+                _ => anyhow::bail!("invalid types for Or"),
             }
         }
         frame.stack.push(left);
@@ -705,7 +711,7 @@ impl Machine {
                 (Value::Bool(l), Value::Bool(r)) => {
                     left = Value::Bool(l || *r);
                 }
-                _ => panic!("invalid types for And"),
+                _ => anyhow::bail!("invalid types for And"),
             }
         }
         frame.stack.push(left);
@@ -715,13 +721,13 @@ impl Machine {
     fn instruction_not(&mut self) -> Result<()> {
         let frame = self.get_current_frame_mut()?;
         let Some(value) = frame.stack.pop() else {
-            panic!("expected value on stack for Not")
+            anyhow::bail!("expected value on stack for Not")
         };
         match value {
             Value::Bool(b) => {
                 frame.stack.push(Value::Bool(!b));
             }
-            _ => panic!("invalid types for Not"),
+            _ => anyhow::bail!("invalid types for Not"),
         }
         Ok(())
     }
@@ -729,10 +735,10 @@ impl Machine {
     fn instruction_mod(&mut self) -> Result<()> {
         let frame = self.get_current_frame_mut()?;
         let Some(right) = frame.stack.pop() else {
-            panic!("expected value on stack for Mod")
+            anyhow::bail!("expected value on stack for Mod")
         };
         let Some(left) = frame.stack.last() else {
-            panic!("expected value on stack for Mod")
+            anyhow::bail!("expected value on stack for Mod")
         };
         let last_index = frame.stack.len() - 1;
         match (left, right) {
@@ -742,7 +748,7 @@ impl Machine {
             (Value::F64(left), Value::F64(right)) => {
                 frame.stack[last_index] = Value::F64(left % right);
             }
-            _ => panic!("invalid types for Mod"),
+            _ => anyhow::bail!("invalid types for Mod"),
         }
         Ok(())
     }
@@ -762,7 +768,7 @@ impl Machine {
             let frame = self.get_current_frame_mut()?;
             let Some(value) = frame.stack.pop() else {
                 // TODO: ERROR REPORT;
-                panic!("missing callable value on stack");
+                anyhow::bail!("missing callable value on stack");
             };
             value
         };
@@ -774,7 +780,7 @@ impl Machine {
             Value::Callable(data) => data,
             _ => {
                 // TODO: ERROR REPORT;
-                panic!("can not call '{}' type", value);
+                anyhow::bail!("can not call '{}' type", value);
             }
         };
         let mut param_values = {
@@ -799,13 +805,13 @@ impl Machine {
             let frame = self.get_current_frame_mut()?;
             let Some(value) = frame.stack.pop() else {
                 // TODO: ERROR REPORT;
-                panic!("missing callable value on stack");
+                anyhow::bail!("missing callable value on stack");
             };
             value
         };
         let Value::Callable(callable) = value else {
             // TODO: ERROR REPORT;
-            panic!("can not call '{}' type", value);
+            anyhow::bail!("can not call '{}' type", value);
         };
         let test_name = Value::String(Box::new(callable.name));
         let new_frame = Frame::new(self.ip, vec![test_name]);
@@ -823,11 +829,11 @@ impl Machine {
 
         let Some(value) = frame.stack.pop() else {
             // TODO: ERROR REPORT;
-            panic!("missing callable value on stack");
+            anyhow::bail!("missing callable value on stack");
         };
         let Value::Callable(callable) = value else {
             // TODO: ERROR REPORT;
-            panic!("can not call '{}' type", value);
+            anyhow::bail!("can not call '{}' type", value);
         };
 
         let length = frame.stack.len();
@@ -843,7 +849,7 @@ impl Machine {
         let frame = self.get_current_frame_mut()?;
         let Some(value) = frame.stack.pop() else {
             // TODO: ERROR REPORT;
-            panic!("no value on stack for SetLocal");
+            anyhow::bail!("no value on stack for SetLocal");
         };
         frame.args.push(value);
         Ok(())
@@ -854,7 +860,7 @@ impl Machine {
         let frame = self.get_current_frame_mut()?;
         let Some(value) = frame.args.get(index) else {
             // TODO: ERROR REPORTING
-            panic!("no args on the arg stack");
+            anyhow::bail!("no args on the arg stack");
         };
         frame.stack.push(value.clone());
         Ok(())
@@ -864,7 +870,7 @@ impl Machine {
         let frame = self.get_current_frame_mut()?;
         let Some(value) = frame.stack.pop() else {
             // TODO: ERROR REPORTING
-            panic!("missing value on stack frame for SetGlobal instruction")
+            anyhow::bail!("missing value on stack frame for SetGlobal instruction")
         };
 
         self.global.push(value);
@@ -876,7 +882,7 @@ impl Machine {
         let index = self.get_u32()? as usize;
         let Some(value) = self.global.get(index).cloned() else {
             // TODO: ERROR REPORTING
-            panic!("no value on the global stack");
+            anyhow::bail!("no value on the global stack");
         };
         let frame = self.get_current_frame_mut()?;
         frame.stack.push(value);
@@ -887,7 +893,7 @@ impl Machine {
         let frame = self.get_current_frame_mut()?;
         let Some(value) = frame.stack.pop() else {
             // TODO: ERROR REPORTING
-            panic!("no value on the stack for SetFree");
+            anyhow::bail!("no value on the stack for SetFree");
         };
         self.free.push(value);
         Ok(())
@@ -897,7 +903,7 @@ impl Machine {
         let index = self.get_u32()? as usize;
         let Some(value) = self.free.get(index).cloned() else {
             // TODO: ERROR REPORTING
-            panic!("no value on the free stack at index {index}");
+            anyhow::bail!("no value on the free stack at index {index}");
         };
         let frame = self.get_current_frame_mut()?;
         frame.stack.push(value);
@@ -908,7 +914,7 @@ impl Machine {
         let address = self.get_u32()? as usize;
         let frame = self.get_current_frame_mut()?;
         let Some(value) = frame.stack.pop() else {
-            panic!("expected value on stack for JumpIf")
+            anyhow::bail!("expected value on stack for JumpIf")
         };
         if value == Value::Bool(false) {
             self.ip += address;
