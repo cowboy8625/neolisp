@@ -46,5 +46,9 @@ jobs:
     - name: Clippy
       run: cargo clippy -- -D clippy::all
       continue-on-error: ${{ matrix.can-fail }}
-    - name: Test Build
-      run: cargo build
+    - name: Rust Test Build
+      run: cargo test
+    - name: Neolisp Test Build
+      run: cargo run -r -- samples/demo.nl
+    - name: Benchmark
+      run: cargo bench
