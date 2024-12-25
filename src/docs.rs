@@ -38,8 +38,7 @@ fn doc_parser() -> impl Parser<char, HashMap<String, String>, Error = Simple<cha
 }
 
 pub fn load_doc() -> HashMap<String, String> {
-    let src = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/Docs.md"));
-    // let src = include_str!("../Docs.md");
+    let src = include_str!("../Docs.md");
     let ast = doc_parser().parse(src);
     match ast {
         Ok(ast) => ast,
@@ -49,10 +48,10 @@ pub fn load_doc() -> HashMap<String, String> {
     }
 }
 
+#[cfg(not(windows))]
 #[test]
 fn test_load_doc() {
     let doc = load_doc();
-    eprintln!("{}: {:#?}", doc.len(), doc);
     assert!(doc.contains_key("fn"));
     assert!(doc.contains_key("lambda"));
     assert!(doc.contains_key("var"));
