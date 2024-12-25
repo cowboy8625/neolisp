@@ -42,7 +42,7 @@ pub enum Command {
     Jump(usize),
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 enum State {
     #[default]
     Running,
@@ -89,36 +89,42 @@ impl<'a> Debugger<'a> {
         let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))?;
         enable_raw_mode()?;
         stdout().execute(EnterAlternateScreen)?;
-        stdout()
-            .execute(EnableMouseCapture)
-            .expect("Could not enable mouse capture");
+        stdout().execute(EnableMouseCapture)?;
 
-        let tick_rate = Duration::from_millis(250);
         let mut last_tick = Instant::now();
 
         while self.is_running {
             if self.error_message.is_some() {
                 self.state = State::Paused;
             }
-            match self.state {
-                State::Running if self.breakpoints.contains(&self.machine.ip) => {
-                    self.state = State::Paused;
-                }
-                State::Running => {
+
+            if self.state == State::Running {
+                for _ in 0..100 {
+                    if self.breakpoints.contains(&self.machine.ip) {
+                        terminal.clear()?;
+                        self.state = State::Paused;
+                        break;
+                    }
                     if let Err(error) = self.machine.run_once() {
+                        terminal.clear()?;
                         self.error_message = Some(error.to_string());
+                        self.state = State::Paused;
+                        break;
                     }
                 }
-                State::Paused => {}
             }
 
-            terminal.draw(|f| self.draw(f))?;
-            if event::poll(tick_rate - last_tick.elapsed())? {
+            if self.state == State::Paused || last_tick.elapsed() >= Duration::from_millis(250) {
+                terminal.draw(|f| self.draw(f))?;
+                last_tick = Instant::now();
+            }
+
+            if event::poll(Duration::from_millis(1))? {
                 let event = event::read()?;
                 self.event_handler(event)?;
             }
-            last_tick = Instant::now();
         }
+
         Ok(())
     }
 
@@ -279,6 +285,9 @@ impl<'a> Debugger<'a> {
     fn key_code_handler(&mut self, code: &KeyCode) -> Result<()> {
         if self.error_message.is_some() && code == &KeyCode::Enter {
             self.error_message = None;
+            return Ok(());
+        }
+        if self.error_message.is_some() {
             return Ok(());
         }
         match code {
