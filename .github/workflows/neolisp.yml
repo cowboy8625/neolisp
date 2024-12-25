@@ -47,5 +47,5 @@ jobs:
       run: cargo test
       continue-on-error: true
     - name: Neolisp Test Build
-      run: cargo run -r -- samples/demo.nl
+      run: cargo run -r -- test samples/demo.nl
       continue-on-error: true

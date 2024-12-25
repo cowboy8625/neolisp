@@ -52,6 +52,7 @@ pub fn load_doc() -> HashMap<String, String> {
 #[test]
 fn test_load_doc() {
     let doc = load_doc();
+    eprintln!("{}: {:#?}", doc.len(), doc);
     assert!(doc.contains_key("fn"));
     assert!(doc.contains_key("lambda"));
     assert!(doc.contains_key("var"));
