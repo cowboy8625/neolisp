@@ -66,7 +66,7 @@ fn test_load_doc() {
     assert!(doc.contains_key("or"));
     assert!(doc.contains_key("not"));
     assert!(doc.contains_key("print"));
-    assert!(doc.contains_key("typeof"));
+    assert!(doc.contains_key("type?"));
     assert!(doc.contains_key("help"));
     assert!(doc.contains_key("list"));
     assert!(doc.contains_key("cons"));

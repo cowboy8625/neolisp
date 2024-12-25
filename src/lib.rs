@@ -18,7 +18,7 @@ const BUILTINS: &[&str] = &[
     "append",
     "last",
     "cdr",
-    "typeof",
+    "type?",
     "print",
     "length",
     "assert-eq",

@@ -178,12 +178,14 @@
 (print 10)
 ```
 
-### typeof
+### type?
 - returns the type of the first argument
 - argument type: `Any`
 - example:
 ```lisp
-(typeof 10) ; -> f32
+(fn add (x y) (+ x y))
+(type? add) ; -> Function
+(type? 10) ; -> f32
 ```
 
 ### help

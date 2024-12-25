@@ -395,13 +395,13 @@ impl Intrinsic {
     }
 
     pub(crate) fn intrinsic_typeof(machine: &mut Machine, count: u8) -> Result<()> {
-        // (typeof 1) => "Number"
+        // (type? 1) => "Number"
         if count != 1 {
-            anyhow::bail!("typeof only support 1 args");
+            anyhow::bail!("type? only support 1 args");
         }
         let frame = machine.get_current_frame_mut()?;
         let Some(value) = frame.stack.pop() else {
-            anyhow::bail!("expected value on stack for typeof")
+            anyhow::bail!("expected value on stack for type?")
         };
         frame.stack.push(Value::String(Box::new(value.type_of())));
         Ok(())
