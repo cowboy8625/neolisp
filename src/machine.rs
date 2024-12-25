@@ -497,6 +497,9 @@ impl Machine {
             }
         );
         self.stack.pop();
+        if matches!(value, Value::Bool(false)) {
+            std::process::exit(1);
+        }
         Ok(())
     }
 
@@ -598,9 +601,13 @@ impl Machine {
         let args = frame.stack.split_off(index);
         let left = &args[0];
         let value = args.iter().skip(1).all(|right| match (left, right) {
+            (Value::U8(l), Value::U8(r)) => l == r,
+            (Value::F32(l), Value::F32(r)) => l == r,
             (Value::I32(l), Value::I32(r)) => l == r,
             (Value::F64(l), Value::F64(r)) => l == r,
             (Value::Keyword(l), Value::Keyword(r)) => l == r,
+            (Value::Symbol(l), Value::Symbol(r)) => l == r,
+            (Value::String(l), Value::String(r)) => l == r,
             // TODO: 🤔 Should we throw an error or just return false
             _ => false,
         });
