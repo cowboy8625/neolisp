@@ -1,27 +1,40 @@
+; This file servers as a demo of what neolisp can do
+; while also having a test suite in the language.
+
 (var a 123)
 (var b 321)
 
-(fn sub (x y) (- x y))
+(test b-a (assert-eq :expected 198 :actual (- b a) :description "321 - 123 = 198"))
+
+; map is builtin but you can also make your own
+(fn map1 (f lst)
+  (if (= 0 (length lst))
+    '()
+    (cons (f (car lst))
+      (map1 f (cdr lst)))))
+
+(test my-map
+  (assert-eq
+    :expected '(2 3 4)
+    :actual (map1 (lambda (x) (+ x 1)) '(1 2 3))
+    :description "321 - 123 = 198"))
 
 (var add (lambda (x y) (+ x y)))
-
-
-(var c (add b a))
-(var d (sub b a))
-
-(print c ", " d "\n")
-
-(if (> d 0)
-  (print "d is positive\n")
-  (print "d is negative\n"))
-
-(var e '(1 2 3))
-(print e "\n")
-
 ;; Builtin testing run with `neolisp test`
 (test add (assert-eq :expected 3 :actual (add 1 2) :description "1 + 2 = 3"))
 ;; >> test add passed
 
-(print 'this_is_a_quoted_var_name "\n")
-;; >> this_is_a_quoted_var_name
+(fn range-helper (n acc)
+  (if (<= n 0)
+      acc
+      (range-helper (- n 1) (cons (- n 1) acc))))
 
+(fn range (n)
+  (range-helper n '()))
+
+(test range
+  (assert-eq
+    :expected (list 0 1 2 3)
+    :actual (range 4)
+    :description "range n: 4 return (0 1 2 3)")
+)
