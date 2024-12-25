@@ -39,12 +39,6 @@ fn doc_parser() -> impl Parser<char, HashMap<String, String>, Error = Simple<cha
 
 pub fn load_doc() -> HashMap<String, String> {
     let src = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/Docs.md"));
-    eprintln!("Docs.md content: {src}");
-
-    match std::fs::read_to_string("../Docs.md") {
-        Ok(content) => eprintln!("Docs.md content: {content}"),
-        Err(err) => eprintln!("Error reading Docs.md: {err:?}"),
-    }
     // let src = include_str!("../Docs.md");
     let ast = doc_parser().parse(src);
     match ast {
