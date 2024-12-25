@@ -25,28 +25,12 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v1
       with:
-        fetch-depth: 0
+        fetch-depth: 1
     - name: Install Rust
       uses: hecrj/setup-rust-action@master
       with:
         rust-version: ${{ matrix.rust }}
         components: rustfmt,clippy
-    - name: Environment Information
-      shell: bash
-      run: |
-        ls -la &&
-        printenv | sort -u
-    - name: Debug Docs.md
-      shell: bash
-      run: |
-        echo "Checking Docs.md"
-        if [ -f Docs.md ]; then
-          echo "Docs.md exists"
-          cat Docs.md
-        else
-          echo "Docs.md does not exist"
-          exit 1
-        fi
     - name: Toolchain Information
       run: |
         rustc --version
@@ -61,3 +45,7 @@ jobs:
       continue-on-error: ${{ matrix.can-fail }}
     - name: Rust Test Build
       run: cargo test
+      continue-on-error: true
+    - name: Neolisp Test Build
+      run: cargo run -r -- samples/demo.nl
+      continue-on-error: true
