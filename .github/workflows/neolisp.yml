@@ -1,11 +1,9 @@
 name: neolisp Test
 
 on:
-  # Build master branch only
   push:
     branches:
       - master
-  # Build pull requests targeting master branch only
   pull_request:
     branches:
       - master
@@ -18,7 +16,6 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-2019, macOS-latest]
         rust: [stable, nightly]
-        # Allow failures on nightly, it's just informative
         include:
           - rust: stable
             can-fail: false
@@ -28,12 +25,22 @@ jobs:
     - name: Checkout Repository
       uses: actions/checkout@v1
       with:
-        fetch-depth: 1
+        fetch-depth: 0
     - name: Install Rust
       uses: hecrj/setup-rust-action@master
       with:
         rust-version: ${{ matrix.rust }}
         components: rustfmt,clippy
+    - name: Debug Docs.md
+      run: |
+        echo "Checking Docs.md"
+        if [ -f Docs.md ]; then
+          echo "Docs.md exists"
+          cat Docs.md
+        else
+          echo "Docs.md does not exist"
+          exit 1
+        fi
     - name: Toolchain Information
       run: |
         rustc --version
@@ -48,7 +55,8 @@ jobs:
       continue-on-error: ${{ matrix.can-fail }}
     - name: Rust Test Build
       run: cargo test
-    # - name: Neolisp Test Build
-    #   run: cargo run -r -- samples/demo.nl
-    # - name: Benchmark
-    #   run: cargo bench
+    - name: Environment Information
+      run: |
+        ls -la &&
+        printenv | sort -u
+
