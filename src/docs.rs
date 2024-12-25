@@ -38,13 +38,13 @@ fn doc_parser() -> impl Parser<char, HashMap<String, String>, Error = Simple<cha
 }
 
 pub fn load_doc() -> HashMap<String, String> {
-    let src = include_str!("../Docs.md");
+    let src = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/Docs.md"));
+    // let src = include_str!("../Docs.md");
     let ast = doc_parser().parse(src);
     match ast {
         Ok(ast) => ast,
         Err(err) => {
-            println!("{err:?}");
-            panic!("failed to parse docs");
+            panic!("failed to parse docs {err:#?}");
         }
     }
 }

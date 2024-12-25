@@ -50,5 +50,5 @@ jobs:
       run: cargo test
     # - name: Neolisp Test Build
     #   run: cargo run -r -- samples/demo.nl
-    - name: Benchmark
-      run: cargo bench
+    # - name: Benchmark
+    #   run: cargo bench
