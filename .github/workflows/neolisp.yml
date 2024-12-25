@@ -31,7 +31,12 @@ jobs:
       with:
         rust-version: ${{ matrix.rust }}
         components: rustfmt,clippy
+    - name: Environment Information
+      run: |
+        ls -la &&
+        printenv | sort -u
     - name: Debug Docs.md
+      shell: bash
       run: |
         echo "Checking Docs.md"
         if [ -f Docs.md ]; then
@@ -55,8 +60,3 @@ jobs:
       continue-on-error: ${{ matrix.can-fail }}
     - name: Rust Test Build
       run: cargo test
-    - name: Environment Information
-      run: |
-        ls -la &&
-        printenv | sort -u
-
