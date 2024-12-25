@@ -544,7 +544,9 @@ impl AstWalker<Program> for Emitter<'_> {
         let jump_instruction_index = program.len();
         program.push(Instruction::JumpIf(usize::MAX));
 
-        self.walk_expr(program, r#loop.body);
+        for stmt in r#loop.body.iter() {
+            self.walk_expr(program, stmt);
+        }
         program.push(Instruction::Jump(start));
 
         program[jump_instruction_index] = Instruction::JumpIf(self.get_program_size(program));

@@ -763,7 +763,9 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
 
     fn handle_loop(&mut self, table: &mut SymbolTable, loop_expr: &LoopExpr) {
         self.walk_expr(table, loop_expr.condition);
-        self.walk_expr(table, loop_expr.body);
+        for spanned in loop_expr.body.iter() {
+            self.walk_expr(table, spanned);
+        }
     }
 
     fn handle_symbol(&mut self, table: &mut SymbolTable, name: &str, span: Span) {

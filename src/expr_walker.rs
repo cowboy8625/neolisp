@@ -41,7 +41,7 @@ impl TestExpr<'_> {
 #[derive(Debug)]
 pub struct LoopExpr<'a> {
     pub condition: &'a Spanned<Expr>,
-    pub body: &'a Spanned<Expr>,
+    pub body: &'a [&'a Spanned<Expr>],
 }
 
 #[derive(Debug)]
@@ -508,7 +508,12 @@ pub trait AstWalker<T> {
             return;
         };
 
-        let Some(body_spanned) = elements.get(BODY) else {
+        let body_list = &elements.iter().skip(BODY).collect::<Vec<_>>();
+        // TODO: Is a empty body valid?
+        // (fn foo ())
+        // I think to answer this question I would as is this useful?
+        // I don't think so? But I will leave it for now till I am sure.
+        if body_list.is_empty() {
             self.error(Error::ExpectedFound {
                 span: condtion_spanned.span.clone(),
                 expected: "expression after condition".to_string(),
@@ -521,7 +526,7 @@ pub trait AstWalker<T> {
 
         let loop_expr = LoopExpr {
             condition: condtion_spanned,
-            body: body_spanned,
+            body: body_list,
         };
         self.handle_loop(t, &loop_expr);
     }
