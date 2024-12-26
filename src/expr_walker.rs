@@ -17,6 +17,12 @@ pub struct VarExpr<'a> {
 }
 
 #[derive(Debug)]
+pub struct SetExpr<'a> {
+    pub name: &'a Spanned<Expr>,
+    pub body: &'a Spanned<Expr>,
+}
+
+#[derive(Debug)]
 pub struct TestExpr<'a> {
     pub keyword: &'a Spanned<Expr>,
     pub name: &'a Spanned<Expr>,
@@ -110,6 +116,7 @@ pub trait AstWalker<T> {
     fn handle_let_binding(&mut self, _: &mut T, _: &LetBindingExpr);
     fn handle_call(&mut self, _: &mut T, _: &CallExpr);
     fn handle_var(&mut self, _: &mut T, _: &VarExpr);
+    fn handle_set(&mut self, _: &mut T, _: &SetExpr);
     fn handle_if_else(&mut self, _: &mut T, _: &IfElseExpr);
     fn handle_loop(&mut self, _: &mut T, _: &LoopExpr);
     fn handle_bool(&mut self, _: &mut T, _: bool);
@@ -180,6 +187,7 @@ pub trait AstWalker<T> {
     fn walk_keyword(&mut self, t: &mut T, name: &str, exprs: &[Spanned<Expr>], span: Span) {
         match name {
             "var" => self.walk_var(t, exprs),
+            "set" => self.walk_set(t, exprs),
             "test" => self.walk_test(t, exprs, span),
             "loop" => self.walk_loop(t, exprs),
             "lambda" => self.walk_lambda(t, exprs),
@@ -452,6 +460,50 @@ pub trait AstWalker<T> {
             body: body_spanned,
         };
         self.handle_var(t, &var);
+    }
+
+    fn walk_set(&mut self, t: &mut T, elements: &[Spanned<Expr>]) {
+        const NAME: usize = 1;
+        const BODY: usize = 2;
+
+        let starting_span = elements[0].span.clone();
+        let Some(name_spanned) = elements.get(NAME) else {
+            self.error(Error::ExpectedFound {
+                span: starting_span,
+                expected: "name after set".to_string(),
+                found: "nothing".to_string(),
+                note: None,
+                help: Some("(set <name> <expression>)".to_string()),
+            });
+            return;
+        };
+        let Expr::Symbol(_) = &name_spanned.expr else {
+            self.error(Error::ExpectedFound {
+                span: name_spanned.span.clone(),
+                expected: "Symbol".to_string(),
+                found: name_spanned.expr.type_of(),
+                note: None,
+                help: Some("(set <name> <expression>)".to_string()),
+            });
+            return;
+        };
+
+        let Some(body_spanned) = elements.get(BODY) else {
+            self.error(Error::ExpectedFound {
+                span: name_spanned.span.clone(),
+                expected: "expression after name".to_string(),
+                found: "nothing".to_string(),
+                note: None,
+                help: Some("(set <name> <expression>)".to_string()),
+            });
+            return;
+        };
+
+        let set = SetExpr {
+            name: name_spanned,
+            body: body_spanned,
+        };
+        self.handle_set(t, &set);
     }
 
     fn walk_test(&mut self, t: &mut T, elements: &[Spanned<Expr>], span: Span) {

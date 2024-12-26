@@ -1,5 +1,5 @@
 use super::{
-    emitter::{Emitter, EmitterOptions},
+    emitter::Emitter,
     error::Error,
     instruction::Instruction,
     parser::parser,
@@ -7,6 +7,24 @@ use super::{
 };
 
 use chumsky::prelude::Parser;
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct CompilerOptions {
+    pub no_main: bool,
+    pub test: bool,
+}
+
+impl CompilerOptions {
+    pub fn with_no_main(mut self, no_main: bool) -> Self {
+        self.no_main = no_main;
+        self
+    }
+
+    pub fn with_test(mut self, test: bool) -> Self {
+        self.test = test;
+        self
+    }
+}
 
 #[derive(Debug, Default)]
 pub struct Compiler {
@@ -59,15 +77,19 @@ impl Compiler {
             return Ok(None);
         }
 
-        let options = EmitterOptions::default()
+        let options = CompilerOptions::default()
             .with_test(self.test)
             .with_no_main(self.no_main);
         let mut symbol_table = match self.symbol_table.take() {
             Some(mut table) => {
-                SymbolTableBuilder::default().build_from_scope(&ast, &mut table)?;
+                SymbolTableBuilder::default()
+                    .with_options(options)
+                    .build_from_scope(&ast, &mut table)?;
                 table
             }
-            None => SymbolTableBuilder::default().build(&ast)?,
+            None => SymbolTableBuilder::default()
+                .with_options(options)
+                .build(&ast)?,
         };
 
         let offset = if self.symbol_table.is_some() {

@@ -42,6 +42,19 @@
 (var y 321)
 (+ 123 321) ; -> 444
 ```
+
+### set
+- sets the value of a variable that has been already defined with `var`
+- arguments
+   1. `Symbol`: name of the variable
+   2. `Any`: value
+- example:
+```lisp
+(var x 123)
+(var y 321)
+(+ 123 321) ; -> 444
+```
+
 ### let
 - binds a list of values to symbols in the current scope and returns the last evaluated value
 - arguments
@@ -344,7 +357,7 @@
 ; returns -> (2)
 (let (x 0)
 (loop (< x 3)
-    (var x (+ x 1))))
+    (set x (+ x 1))))
 ```
 
 ### assert

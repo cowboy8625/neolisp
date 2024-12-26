@@ -1,3 +1,5 @@
+use crate::{compiler::CompilerOptions, expr_walker::SetExpr};
+
 use super::{
     ast::{Expr, Span, Spanned},
     error::Error,
@@ -11,24 +13,6 @@ use super::{
     },
     BUILTINS,
 };
-
-#[derive(Debug, Default)]
-pub struct EmitterOptions {
-    pub no_main: bool,
-    pub test: bool,
-}
-
-impl EmitterOptions {
-    pub fn with_no_main(mut self, no_main: bool) -> Self {
-        self.no_main = no_main;
-        self
-    }
-
-    pub fn with_test(mut self, test: bool) -> Self {
-        self.test = test;
-        self
-    }
-}
 
 type Program = Vec<Instruction>;
 
@@ -46,14 +30,14 @@ impl ProgramSize for Program {
 pub struct Emitter<'a> {
     symbol_table: &'a mut SymbolTable,
     lambda_counter: usize,
-    options: EmitterOptions,
+    options: CompilerOptions,
     offset: usize,
     tests: Vec<(String, Span)>,
     errors: Vec<Error>,
 }
 
 impl<'a> Emitter<'a> {
-    pub fn new(symbol_table: &'a mut SymbolTable, options: EmitterOptions) -> Self {
+    pub fn new(symbol_table: &'a mut SymbolTable, options: CompilerOptions) -> Self {
         symbol_table.enter_scope("global");
         Self {
             symbol_table,
@@ -126,16 +110,16 @@ impl<'a> Emitter<'a> {
     fn emit_set_instruction(program: &mut Program, symbol: &Symbol) {
         match symbol {
             Symbol::UnboundVariable(UnboundVariable { .. }) => {
-                program.push(Instruction::SetFree);
+                program.push(Instruction::SetFree(symbol.id()));
             }
             Symbol::Variable(Variable { .. }) => {
                 if symbol.is_global() {
-                    program.push(Instruction::SetGlobal);
+                    program.push(Instruction::SetGlobal(symbol.id()));
                 } else {
-                    program.push(Instruction::SetLocal);
+                    program.push(Instruction::SetLocal(symbol.id()));
                 }
             }
-            Symbol::Parameter(Parameter { .. }) => program.push(Instruction::SetLocal),
+            Symbol::Parameter(Parameter { .. }) => program.push(Instruction::SetLocal(symbol.id())),
             Symbol::Function(Function { .. }) => {
                 todo!("Function not implemented in emit_set_instruction")
             }
@@ -236,6 +220,15 @@ impl AstWalker<Program> for Emitter<'_> {
         let name = format!("test(){}", test_expr.name);
         self.symbol_table.enter_scope(&name);
 
+        let Some(id) = self.symbol_table.get(&name).map(|s| s.id()) else {
+            // NOTE: This probably will never happen.
+            self.error(Error::TestNotDefined {
+                name: name.clone(),
+                span: test_expr.span.clone(),
+            });
+            return;
+        };
+
         for spanned in test_expr.body.iter() {
             self.walk_expr(program, spanned);
         }
@@ -248,7 +241,7 @@ impl AstWalker<Program> for Emitter<'_> {
         let callable = Callable::new(address, name.to_string());
         let value = Value::Callable(Box::new(callable));
         program.push(Instruction::Push(Box::new(value)));
-        program.push(Instruction::SetGlobal);
+        program.push(Instruction::SetGlobal(id));
 
         self.tests.push((name, test_expr.span.clone()));
     }
@@ -278,6 +271,10 @@ impl AstWalker<Program> for Emitter<'_> {
 
         self.symbol_table.enter_scope(name);
 
+        let Some(id) = self.symbol_table.get(name).map(|s| s.id()) else {
+            unreachable!("This should never fail as we already checked this in AstWalker");
+        };
+
         if !function.params.expr.is_list() {
             unreachable!("This should never fail as we already checked this in AstWalker");
         };
@@ -301,7 +298,7 @@ impl AstWalker<Program> for Emitter<'_> {
                 continue;
             };
             program.push(Instruction::GetLocal(param.id));
-            program.push(Instruction::SetFree);
+            program.push(Instruction::SetFree(param.id));
         }
 
         for spanned in function.body.iter() {
@@ -324,7 +321,7 @@ impl AstWalker<Program> for Emitter<'_> {
         let callable = Callable::new(start, name.to_string());
         let value = Value::Callable(Box::new(callable));
         program.push(Instruction::Push(Box::new(value)));
-        program.push(Instruction::SetGlobal);
+        program.push(Instruction::SetGlobal(id));
     }
 
     fn handle_lambda(&mut self, program: &mut Program, lambda: &LambdaExpr) {
@@ -355,7 +352,7 @@ impl AstWalker<Program> for Emitter<'_> {
                 continue;
             };
             program.push(Instruction::GetLocal(param.id));
-            program.push(Instruction::SetFree);
+            program.push(Instruction::SetFree(param.id));
         }
 
         if !lambda.params.expr.is_list() {
@@ -432,7 +429,7 @@ impl AstWalker<Program> for Emitter<'_> {
                 continue;
             };
             program.push(Instruction::GetLocal(param.id));
-            program.push(Instruction::SetFree);
+            program.push(Instruction::SetFree(param.id));
         }
 
         self.walk_expr(program, let_binding.body);
@@ -465,9 +462,9 @@ impl AstWalker<Program> for Emitter<'_> {
         };
 
         let set_instruction = if symbol.is_global() {
-            Instruction::SetGlobal
+            Instruction::SetGlobal(symbol.id())
         } else {
-            Instruction::SetLocal
+            Instruction::SetLocal(symbol.id())
         };
 
         program.push(set_instruction);
@@ -482,7 +479,22 @@ impl AstWalker<Program> for Emitter<'_> {
             Instruction::GetLocal(symbol.id())
         };
         program.push(get_instruction);
-        program.push(Instruction::SetFree);
+        program.push(Instruction::SetFree(symbol.id()));
+    }
+
+    fn handle_set(&mut self, program: &mut Program, set: &SetExpr) {
+        let Expr::Symbol(name) = &set.name.expr else {
+            unreachable!("This should never fail as we already checked this in AstWalker");
+        };
+
+        self.walk_expr(program, set.body);
+
+        let Some(symbol) = self.symbol_table.get(name) else {
+            // NOTE: Probably need to have a user error message
+            panic!("unknown symbol: {}", name);
+        };
+
+        Self::emit_set_instruction(program, symbol);
     }
 
     fn handle_quote(&mut self, program: &mut Program, quote: &QuoteExpr) {
@@ -630,15 +642,15 @@ mod tests {
             instructions,
             vec![
                 Push(Box::new(F64(1.0))),
-                SetLocal,
+                SetLocal(0),
                 GetLocal(0),
-                SetFree,
+                SetFree(0),
                 Push(Box::new(F64(2.0))),
-                SetLocal,
+                SetLocal(0),
                 GetLocal(0),
-                SetFree,
+                SetFree(0),
                 Push(Box::new(F64(3.0))),
-                SetLocal,
+                SetLocal(0),
                 GetFree(0),
                 GetFree(1),
                 GetLocal(0),
@@ -696,7 +708,7 @@ mod tests {
                 Call(1),
                 Return,
                 Push(Box::new(Callable(Box::new(CallableData::new(5, "apply"))))),
-                SetGlobal,
+                SetGlobal(0),
                 Push(Box::new(F64(123.0))),
                 Jump(67),
                 GetLocal(0),
@@ -748,7 +760,7 @@ mod tests {
                 TailCall(3),
                 Return,
                 Push(Box::new(Callable(Box::new(CallableData::new(5, "fib"))))),
-                SetGlobal,
+                SetGlobal(0),
             ]
         );
     }
@@ -781,7 +793,7 @@ mod tests {
                     5,
                     "test()test-testing"
                 ))))),
-                SetGlobal,
+                SetGlobal(0),
                 GetGlobal(0),
                 CallTest,
             ]

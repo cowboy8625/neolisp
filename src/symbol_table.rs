@@ -1,3 +1,5 @@
+use crate::{compiler::CompilerOptions, expr_walker::SetExpr};
+
 use super::{
     ast::{Ast, Expr, Span, Spanned},
     error::Error,
@@ -448,9 +450,15 @@ pub struct SymbolTableBuilder {
     unbound_counter: usize,
     variable_counter: usize,
     errors: Vec<Error>,
+    options: CompilerOptions,
 }
 
 impl SymbolTableBuilder {
+    pub fn with_options(mut self, options: CompilerOptions) -> Self {
+        self.options = options;
+        self
+    }
+
     pub fn build(mut self, ast: &Ast) -> std::result::Result<SymbolTable, Vec<Error>> {
         let mut table = SymbolTable::default();
         table.enter_scope("global");
@@ -505,6 +513,9 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
     }
 
     fn handle_test(&mut self, table: &mut SymbolTable, test_expr: &TestExpr) {
+        if !self.options.test {
+            return;
+        }
         let id = self.variable_id();
         let name = format!("test(){}", test_expr.name);
         let old_variable_counter = self.variable_counter;
@@ -751,6 +762,11 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         }
 
         table.push(symbol);
+    }
+
+    fn handle_set(&mut self, table: &mut SymbolTable, var: &SetExpr) {
+        self.walk_expr(table, var.name);
+        self.walk_expr(table, var.body);
     }
 
     fn handle_if_else(&mut self, i: &mut SymbolTable, if_else: &IfElseExpr) {

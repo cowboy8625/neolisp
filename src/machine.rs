@@ -852,13 +852,21 @@ impl Machine {
     }
 
     fn instruction_set_local(&mut self) -> Result<()> {
+        let index = self.get_u32()? as usize;
         let frame = self.get_current_frame_mut()?;
         let Some(value) = frame.stack.pop() else {
             // TODO: ERROR REPORT;
             anyhow::bail!("no value on stack for SetLocal");
         };
-        frame.args.push(value);
-        Ok(())
+        if let Some(stack_value) = frame.args.get_mut(index) {
+            *stack_value = value;
+            return Ok(());
+        }
+        if index == frame.args.len() {
+            frame.args.push(value);
+            return Ok(());
+        }
+        anyhow::bail!("something in the compiler is wrong with SetLocal");
     }
 
     fn instruction_get_local(&mut self) -> Result<()> {
@@ -873,15 +881,22 @@ impl Machine {
     }
 
     fn instruction_set_global(&mut self) -> Result<()> {
+        let index = self.get_u32()? as usize;
         let frame = self.get_current_frame_mut()?;
         let Some(value) = frame.stack.pop() else {
             // TODO: ERROR REPORTING
             anyhow::bail!("missing value on stack frame for SetGlobal instruction")
         };
 
-        self.global.push(value);
-
-        Ok(())
+        if let Some(stack_value) = self.global.get_mut(index) {
+            *stack_value = value;
+            return Ok(());
+        }
+        if index == self.global.len() {
+            self.global.push(value);
+            return Ok(());
+        }
+        anyhow::bail!("something in the compiler is wrong with SetGlobal");
     }
 
     fn instruction_get_global(&mut self) -> Result<()> {
@@ -896,13 +911,21 @@ impl Machine {
     }
 
     fn instruction_set_free(&mut self) -> Result<()> {
+        let index = self.get_u32()? as usize;
         let frame = self.get_current_frame_mut()?;
         let Some(value) = frame.stack.pop() else {
             // TODO: ERROR REPORTING
             anyhow::bail!("no value on the stack for SetFree");
         };
-        self.free.push(value);
-        Ok(())
+        if let Some(stack_value) = self.free.get_mut(index) {
+            *stack_value = value;
+            return Ok(());
+        }
+        if index == self.free.len() {
+            self.free.push(value);
+            return Ok(());
+        }
+        anyhow::bail!("something in the compiler is wrong with SetFree");
     }
 
     fn instruction_get_free(&mut self) -> Result<()> {
@@ -989,9 +1012,15 @@ impl Machine {
                 OpCode::TailCall => {
                     instructions.push(Instruction::TailCall(self.get_u8()? as usize))
                 }
-                OpCode::SetLocal => instructions.push(Instruction::SetLocal),
-                OpCode::SetGlobal => instructions.push(Instruction::SetGlobal),
-                OpCode::SetFree => instructions.push(Instruction::SetFree),
+                OpCode::SetLocal => {
+                    instructions.push(Instruction::SetLocal(self.get_u32()? as usize));
+                }
+                OpCode::SetGlobal => {
+                    instructions.push(Instruction::SetGlobal(self.get_u32()? as usize));
+                }
+                OpCode::SetFree => {
+                    instructions.push(Instruction::SetFree(self.get_u32()? as usize));
+                }
                 OpCode::GetLocal => {
                     instructions.push(Instruction::GetLocal(self.get_u32()? as usize))
                 }

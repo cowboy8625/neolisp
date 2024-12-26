@@ -59,9 +59,9 @@ pub enum Instruction {
     Call(usize),
     CallTest,
     TailCall(usize),
-    SetLocal,
-    SetGlobal,
-    SetFree,
+    SetLocal(usize),
+    SetGlobal(usize),
+    SetFree(usize),
     GetLocal(usize),
     GetGlobal(usize),
     GetFree(usize),
@@ -95,9 +95,9 @@ impl Instruction {
             Self::Call(_) => 2,
             Self::CallTest => 1,
             Self::TailCall(_) => 2,
-            Self::SetLocal => 1,
-            Self::SetGlobal => 1,
-            Self::SetFree => 1,
+            Self::SetLocal(_) => 5,
+            Self::SetGlobal(_) => 5,
+            Self::SetFree(_) => 5,
             Self::GetLocal(_) => 5,
             Self::GetGlobal(_) => 5,
             Self::GetFree(_) => 5,
@@ -131,9 +131,9 @@ impl Instruction {
             Self::Call(..) => OpCode::Call,
             Self::CallTest => OpCode::CallTest,
             Self::TailCall(..) => OpCode::TailCall,
-            Self::SetLocal => OpCode::SetLocal,
-            Self::SetGlobal => OpCode::SetGlobal,
-            Self::SetFree => OpCode::SetFree,
+            Self::SetLocal(..) => OpCode::SetLocal,
+            Self::SetGlobal(..) => OpCode::SetGlobal,
+            Self::SetFree(..) => OpCode::SetFree,
             Self::GetLocal(_) => OpCode::GetLocal,
             Self::GetGlobal(_) => OpCode::GetGlobal,
             Self::GetFree(_) => OpCode::GetFree,
@@ -168,13 +168,7 @@ impl Instruction {
                 bytes.push(self.opcode() as u8);
                 bytes.push(*count as u8);
             }
-            Self::Not
-            | Self::Mod
-            | Self::Rot
-            | Self::SetLocal
-            | Self::SetGlobal
-            | Self::SetFree
-            | Self::CallTest => bytes.push(self.opcode() as u8),
+            Self::Not | Self::Mod | Self::Rot | Self::CallTest => bytes.push(self.opcode() as u8),
             Self::Call(count) | Self::TailCall(count) => {
                 bytes.push(self.opcode() as u8);
                 bytes.push(*count as u8);
@@ -182,6 +176,9 @@ impl Instruction {
             Self::GetLocal(address)
             | Self::GetGlobal(address)
             | Self::GetFree(address)
+            | Self::SetLocal(address)
+            | Self::SetGlobal(address)
+            | Self::SetFree(address)
             | Self::JumpIf(address)
             | Self::JumpForward(address)
             | Self::JumpBackward(address)
