@@ -635,7 +635,7 @@ mod tests {
     (let (y 2)
     (let (z 3)
     (print x y z "\n"))))"#;
-        let (_, instructions) = Compiler::default()
+        let (_, _, instructions) = Compiler::default()
             .no_main(true)
             .compile(src)
             .ok()
@@ -670,7 +670,7 @@ mod tests {
         let src = r#"
 (if true "then\n" "else\n")
 "#;
-        let (_, instructions) = Compiler::default()
+        let (_, _, instructions) = Compiler::default()
             .no_main(true)
             .compile(src)
             .ok()
@@ -696,7 +696,7 @@ mod tests {
  (fn apply (f x) (f x))
  (apply (lambda (x) (+ x 321)) 123)
  "#;
-        let (_, instructions) = Compiler::default()
+        let (_, _, instructions) = Compiler::default()
             .no_main(true)
             .compile(src)
             .ok()
@@ -736,7 +736,7 @@ mod tests {
       a
       (fib (- n 1) b (+ a b))))
  "#;
-        let (_, instructions) = Compiler::default()
+        let (_, _, instructions) = Compiler::default()
             .no_main(true)
             .compile(src)
             .ok()

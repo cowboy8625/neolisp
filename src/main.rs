@@ -66,8 +66,10 @@ fn main() -> anyhow::Result<()> {
                 .with_test(true)
                 .compile(&src);
 
-            let (symbol_table, instructions) = match compiler {
-                Ok(Some((symbol_table, instructions))) => (symbol_table, instructions),
+            let (symbol_table, runtime_table, instructions) = match compiler {
+                Ok(Some((symbol_table, runtime_table, instructions))) => {
+                    (symbol_table, runtime_table, instructions)
+                }
                 Ok(None) => return Ok(()),
                 Err(errors) => {
                     for error in errors {
@@ -78,7 +80,7 @@ fn main() -> anyhow::Result<()> {
             };
 
             let program: Vec<u8> = instructions.iter().flat_map(|i| i.to_bytecode()).collect();
-            let mut machine = Machine::new(program).with_symbol_table(symbol_table);
+            let mut machine = Machine::new(program, runtime_table).with_symbol_table(symbol_table);
 
             if !t.breakpoints.is_empty() {
                 let mut debugger =

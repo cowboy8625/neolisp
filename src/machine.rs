@@ -163,8 +163,10 @@ impl Machine {
             .with_offset(self.program.len())
             .no_main(true)
             .compile(src);
-        let (st, instructions) = match compiler {
-            Ok(Some((symbol_table, instructions))) => (symbol_table, instructions),
+        let (st, runtime_table, instructions) = match compiler {
+            Ok(Some((symbol_table, runtime_table, instructions))) => {
+                (symbol_table, runtime_table, instructions)
+            }
             Ok(None) => return Ok(()),
             Err(errors) => {
                 for error in errors {
@@ -177,6 +179,7 @@ impl Machine {
 
         let program: Vec<u8> = instructions.iter().flat_map(|i| i.to_bytecode()).collect();
         self.program.extend(program);
+        self.runtime_table.extend(runtime_table);
         Ok(())
     }
 
