@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{compiler::CompilerOptions, expr_walker::SetExpr};
 
 use super::{
@@ -29,6 +31,7 @@ impl ProgramSize for Program {
 #[derive(Debug)]
 pub struct Emitter<'a> {
     symbol_table: &'a mut SymbolTable,
+    runtime_table: HashMap<usize, Symbol>,
     lambda_counter: usize,
     options: CompilerOptions,
     offset: usize,
@@ -41,6 +44,7 @@ impl<'a> Emitter<'a> {
         symbol_table.enter_scope("global");
         Self {
             symbol_table,
+            runtime_table: HashMap::new(),
             lambda_counter: 0,
             options,
             offset: 0,
@@ -57,7 +61,7 @@ impl<'a> Emitter<'a> {
     pub fn compile(
         mut self,
         ast: &[Spanned<Expr>],
-    ) -> std::result::Result<Vec<Instruction>, Vec<Error>> {
+    ) -> std::result::Result<(Vec<Instruction>, HashMap<usize, Symbol>), Vec<Error>> {
         let mut program = Vec::new();
         self.walk(&mut program, ast);
         if !self.options.no_main {
@@ -78,7 +82,7 @@ impl<'a> Emitter<'a> {
         self.symbol_table.exit_scope();
 
         self.compile_tests(&mut program)?;
-        Ok(program)
+        Ok((program, self.runtime_table))
     }
 
     fn get_operator_opcode(op: &str, count: usize) -> Option<Instruction> {

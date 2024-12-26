@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 use super::{
     compiler::Compiler,
     error::Error,
     instruction::{Callable, Instruction, OpCode, Value},
     symbol_table::SymbolTable,
 };
-use crate::intrinsic::Intrinsic;
+use crate::{intrinsic::Intrinsic, symbol_table::Symbol};
 use anyhow::{anyhow, Result};
 use crossterm::style::Stylize;
 use num_traits::FromPrimitive;
@@ -97,7 +99,7 @@ pub struct MachineOptions {
     pub quiet: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Machine {
     pub(crate) options: MachineOptions,
     pub(crate) program: Vec<u8>,
@@ -107,14 +109,9 @@ pub struct Machine {
     pub(crate) ip: usize,
     pub(crate) is_running: bool,
     pub(crate) symbol_table: Option<SymbolTable>,
+    pub(crate) runtime_table: HashMap<usize, Symbol>,
     #[cfg(any(debug_assertions, test))]
     pub(crate) cycle_count: usize,
-}
-
-impl Default for Machine {
-    fn default() -> Self {
-        Self::new(Vec::new())
-    }
 }
 
 // Constants
@@ -124,7 +121,7 @@ impl Machine {
 
 // Public
 impl Machine {
-    pub fn new(program: Vec<u8>) -> Self {
+    pub fn new(program: Vec<u8>, runtime_table: HashMap<usize, Symbol>) -> Self {
         let mut stack = Vec::with_capacity(1024);
         stack.push(Frame {
             return_address: None,
@@ -140,6 +137,7 @@ impl Machine {
             ip: 0,
             is_running: true,
             symbol_table: None,
+            runtime_table,
             #[cfg(any(debug_assertions, test))]
             cycle_count: 0,
         }

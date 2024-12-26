@@ -154,17 +154,16 @@
 
 ; ----------------------------------------------------
 
-; Loop
-;;;; (fn main ()
-;;;;   (let
-;;;;     ((grid (append (map (lambda (x) 0) (range 100)) (list 1)))
-;;;;     (is-running true))
-;;;;     (loop is-running
-;;;;       (var grid (next-generation grid))
-;;;;       ; (print grid)
-;;;;       (let
-;;;;         ((line (to-string (map (lambda (x) (if (= x 1) "*" " ")) grid))))
-;;;;           (print line "\n")))))
+(fn main ()
+  (let
+    ((grid (append (map (lambda (x) 0) (range 100)) (list 1)))
+    (is-running true))
+    (loop is-running
+      (set grid (next-generation grid))
+      (print grid)
+      (let
+        ((line (to-string (map (lambda (x) (if (= x 1) "*" " ")) grid))))
+          (print line "\n")))))
 
 ; Testing the creation of the grid
 ; (assert-eq

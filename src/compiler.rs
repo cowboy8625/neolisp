@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+
+use crate::symbol_table::Symbol;
+
 use super::{
     emitter::Emitter,
     error::Error,
@@ -33,6 +37,7 @@ pub struct Compiler {
     no_main: bool,
     test: bool,
     symbol_table: Option<SymbolTable>,
+    runtime_table: HashMap<usize, Symbol>,
     emitter_offset: usize,
 }
 
@@ -69,7 +74,7 @@ impl Compiler {
     pub fn compile(
         mut self,
         src: &str,
-    ) -> Result<Option<(SymbolTable, Vec<Instruction>)>, Vec<Error>> {
+    ) -> Result<Option<(SymbolTable, HashMap<usize, Symbol>, Vec<Instruction>)>, Vec<Error>> {
         let ast = parser().parse(src)?;
 
         if self.debug_ast {
@@ -98,7 +103,7 @@ impl Compiler {
             0
         };
 
-        let instructions = Emitter::new(&mut symbol_table, options)
+        let (instructions, runtime_table) = Emitter::new(&mut symbol_table, options)
             .with_offset(offset)
             .compile(&ast)?;
 
@@ -112,6 +117,6 @@ impl Compiler {
             return Ok(None);
         }
 
-        Ok(Some((symbol_table, instructions)))
+        Ok(Some((symbol_table, runtime_table, instructions)))
     }
 }

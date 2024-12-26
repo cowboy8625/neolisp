@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use neolisp::instruction::{Callable, Instruction, Value};
 use neolisp::machine::Machine;
@@ -22,7 +24,7 @@ pub fn benchmark_call(c: &mut Criterion) {
 
     c.bench_function("((lambda (x y) (+ x y)) 1 1)", |b| {
         b.iter(|| {
-            let mut machine = Machine::new(black_box(program.clone()));
+            let mut machine = Machine::new(black_box(program.clone()), HashMap::default());
             machine.run().unwrap();
         })
     });
