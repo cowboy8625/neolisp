@@ -933,7 +933,8 @@ impl Machine {
     }
 
     fn instruction_set_free(&mut self) -> Result<()> {
-        let index = self.get_u32()? as usize;
+        let metadata = self.get_metadata()?;
+        let index = metadata.data;
         let frame = self.get_current_frame_mut()?;
         let Some(value) = frame.stack.pop() else {
             // TODO: ERROR REPORTING
