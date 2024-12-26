@@ -1,3 +1,4 @@
+use crate::instruction::RuntimeMetadata;
 use crate::{compiler::CompilerOptions, expr_walker::SetExpr};
 
 use super::{
@@ -108,18 +109,13 @@ impl<'a> Emitter<'a> {
     }
 
     fn emit_set_instruction(program: &mut Program, symbol: &Symbol) {
-        match symbol {
-            Symbol::UnboundVariable(UnboundVariable { .. }) => {
-                program.push(Instruction::SetFree(symbol.id()));
-            }
-            Symbol::Variable(Variable { .. }) => {
-                if symbol.is_global() {
-                    program.push(Instruction::SetGlobal(symbol.id()));
-                } else {
-                    program.push(Instruction::SetLocal(symbol.id()));
-                }
-            }
-            Symbol::Parameter(Parameter { .. }) => program.push(Instruction::SetLocal(symbol.id())),
+        use Instruction::*;
+        let metadata = RuntimeMetadata::new(symbol.id(), symbol.name());
+        let instruction = match symbol {
+            Symbol::UnboundVariable(UnboundVariable { .. }) => SetFree(metadata),
+            Symbol::Variable(Variable { .. }) if symbol.is_global() => SetGlobal(metadata),
+            Symbol::Variable(Variable { .. }) => SetLocal(metadata),
+            Symbol::Parameter(Parameter { .. }) => SetLocal(metadata),
             Symbol::Function(Function { .. }) => {
                 todo!("Function not implemented in emit_set_instruction")
             }
@@ -128,7 +124,8 @@ impl<'a> Emitter<'a> {
             }
             Symbol::Let(Let { .. }) => todo!("Let not implemented in emit_set_instruction"),
             Symbol::Test(Test { .. }) => todo!("Test not implemented in emit_set_instruction"),
-        }
+        };
+        program.push(instruction);
     }
 
     fn tail_call_optimization(&self, program: &mut Program, name: &str) {
@@ -152,7 +149,7 @@ impl<'a> Emitter<'a> {
             return;
         };
 
-        if *value != symbol.id() {
+        if value.data != symbol.id() {
             return;
         }
 
@@ -172,7 +169,8 @@ impl<'a> Emitter<'a> {
                 self.error(Error::TestNotDefined { name, span });
                 continue;
             };
-            program.push(Instruction::GetGlobal(symbol.id()));
+            let metadata = RuntimeMetadata::new(symbol.id(), name);
+            program.push(Instruction::GetGlobal(metadata));
             program.push(Instruction::CallTest);
         }
         Ok(())
@@ -241,7 +239,8 @@ impl AstWalker<Program> for Emitter<'_> {
         let callable = Callable::new(address, name.to_string());
         let value = Value::Callable(Box::new(callable));
         program.push(Instruction::Push(Box::new(value)));
-        program.push(Instruction::SetGlobal(id));
+        let metadata = RuntimeMetadata::new(id, &name);
+        program.push(Instruction::SetGlobal(metadata));
 
         self.tests.push((name, test_expr.span.clone()));
     }
@@ -297,8 +296,9 @@ impl AstWalker<Program> for Emitter<'_> {
             else {
                 continue;
             };
-            program.push(Instruction::GetLocal(param.id));
-            program.push(Instruction::SetFree(param.id));
+            let metadata = RuntimeMetadata::new(param.id, &param.name);
+            program.push(Instruction::GetLocal(metadata.clone()));
+            program.push(Instruction::SetFree(metadata));
         }
 
         for spanned in function.body.iter() {
@@ -321,7 +321,8 @@ impl AstWalker<Program> for Emitter<'_> {
         let callable = Callable::new(start, name.to_string());
         let value = Value::Callable(Box::new(callable));
         program.push(Instruction::Push(Box::new(value)));
-        program.push(Instruction::SetGlobal(id));
+        let metadata = RuntimeMetadata::new(id, name);
+        program.push(Instruction::SetGlobal(metadata));
     }
 
     fn handle_lambda(&mut self, program: &mut Program, lambda: &LambdaExpr) {
@@ -351,8 +352,9 @@ impl AstWalker<Program> for Emitter<'_> {
             else {
                 continue;
             };
-            program.push(Instruction::GetLocal(param.id));
-            program.push(Instruction::SetFree(param.id));
+            let metadata = RuntimeMetadata::new(param.id, &param.name);
+            program.push(Instruction::GetLocal(metadata.clone()));
+            program.push(Instruction::SetFree(metadata));
         }
 
         if !lambda.params.expr.is_list() {
@@ -428,8 +430,9 @@ impl AstWalker<Program> for Emitter<'_> {
             else {
                 continue;
             };
-            program.push(Instruction::GetLocal(param.id));
-            program.push(Instruction::SetFree(param.id));
+            let metadata = RuntimeMetadata::new(param.id, &param.name);
+            program.push(Instruction::GetLocal(metadata.clone()));
+            program.push(Instruction::SetFree(metadata));
         }
 
         self.walk_expr(program, let_binding.body);
@@ -461,10 +464,11 @@ impl AstWalker<Program> for Emitter<'_> {
             panic!("unknown symbol: {}", name);
         };
 
+        let metadata = RuntimeMetadata::new(symbol.id(), name);
         let set_instruction = if symbol.is_global() {
-            Instruction::SetGlobal(symbol.id())
+            Instruction::SetGlobal(metadata.clone())
         } else {
-            Instruction::SetLocal(symbol.id())
+            Instruction::SetLocal(metadata.clone())
         };
 
         program.push(set_instruction);
@@ -474,12 +478,12 @@ impl AstWalker<Program> for Emitter<'_> {
         }
 
         let get_instruction = if symbol.is_global() {
-            Instruction::GetGlobal(symbol.id())
+            Instruction::GetGlobal(metadata.clone())
         } else {
-            Instruction::GetLocal(symbol.id())
+            Instruction::GetLocal(metadata.clone())
         };
         program.push(get_instruction);
-        program.push(Instruction::SetFree(symbol.id()));
+        program.push(Instruction::SetFree(metadata));
     }
 
     fn handle_set(&mut self, program: &mut Program, set: &SetExpr) {
@@ -581,32 +585,23 @@ impl AstWalker<Program> for Emitter<'_> {
     }
 
     fn handle_symbol(&mut self, program: &mut Program, name: &str, span: Span) {
+        use Instruction::*;
         let Some(symbol) = self.symbol_table.get(name) else {
             self.error(Error::SymbolNotDefined(span, name.to_string()));
             return;
         };
-        match symbol {
-            Symbol::UnboundVariable(UnboundVariable { id, .. }) => {
-                #[cfg(debug_assertions)]
-                program.push(Instruction::GetFree(*id));
-            }
-            Symbol::Variable(Variable { id, .. }) => {
-                if symbol.is_global() {
-                    program.push(Instruction::GetGlobal(*id));
-                } else {
-                    program.push(Instruction::GetLocal(*id));
-                }
-            }
-            Symbol::Parameter(Parameter { id, .. }) => {
-                program.push(Instruction::GetLocal(*id));
-            }
-            Symbol::Function(Function { id, .. }) => {
-                program.push(Instruction::GetGlobal(*id));
-            }
+        let metadata = RuntimeMetadata::new(symbol.id(), name);
+        let instruction = match symbol {
+            Symbol::UnboundVariable(UnboundVariable { .. }) => GetFree(metadata),
+            Symbol::Variable(Variable { .. }) if symbol.is_global() => GetGlobal(metadata),
+            Symbol::Variable(Variable { .. }) => GetLocal(metadata),
+            Symbol::Parameter(Parameter { .. }) => GetLocal(metadata),
+            Symbol::Function(Function { .. }) => GetGlobal(metadata),
             Symbol::Lambda(Lambda { .. }) => todo!("Lambdas are not supported yet in symbol"),
             Symbol::Let(Let { .. }) => todo!("Lets are not supported yet in symbol"),
             Symbol::Test(Test { .. }) => todo!("Tests are not supported yet in symbol"),
-        }
+        };
+        program.push(instruction);
     }
 
     fn handle_keyword(&mut self, program: &mut Program, name: &str, _: Span) {
@@ -622,6 +617,7 @@ mod tests {
     use crate::instruction::{
         Callable as CallableData,
         Instruction::{self, *},
+        RuntimeMetadata,
         Value::*,
     };
     use crate::symbol_table::SymbolTable;
@@ -631,6 +627,17 @@ mod tests {
         let mut st = SymbolTable::default();
         Compiler::default()
             .no_main(true)
+            .compile(src, &mut st)
+            .ok()
+            .flatten()
+            .unwrap()
+    }
+
+    fn compile_test(src: &str) -> Vec<Instruction> {
+        let mut st = SymbolTable::default();
+        Compiler::default()
+            .no_main(true)
+            .with_test(true)
             .compile(src, &mut st)
             .ok()
             .flatten()
@@ -650,18 +657,18 @@ mod tests {
             instructions,
             vec![
                 Push(Box::new(F64(1.0))),
-                SetLocal(0),
-                GetLocal(0),
-                SetFree(0),
+                SetLocal(RuntimeMetadata::new(0, "x")),
+                GetLocal(RuntimeMetadata::new(0, "x")),
+                SetFree(RuntimeMetadata::new(0, "x")),
                 Push(Box::new(F64(2.0))),
-                SetLocal(0),
-                GetLocal(0),
-                SetFree(0),
+                SetLocal(RuntimeMetadata::new(0, "y")),
+                GetLocal(RuntimeMetadata::new(0, "y")),
+                SetFree(RuntimeMetadata::new(0, "y")),
                 Push(Box::new(F64(3.0))),
-                SetLocal(0),
-                GetFree(0),
-                GetFree(1),
-                GetLocal(0),
+                SetLocal(RuntimeMetadata::new(0, "z")),
+                GetFree(RuntimeMetadata::new(0, "x")),
+                GetFree(RuntimeMetadata::new(1, "y")),
+                GetLocal(RuntimeMetadata::new(0, "z")),
                 Push(Box::new(String(Box::new("\n".to_string())))),
                 Push(Box::new(Builtin(17))),
                 Call(4),
@@ -700,23 +707,23 @@ mod tests {
         assert_eq!(
             instructions,
             vec![
-                Jump(18),
-                GetLocal(1),
-                GetLocal(0),
+                Jump(22),
+                GetLocal(RuntimeMetadata::new(1, "x")),
+                GetLocal(RuntimeMetadata::new(0, "f")),
                 Call(1),
                 Return,
                 Push(Box::new(Callable(Box::new(CallableData::new(5, "apply"))))),
-                SetGlobal(0),
+                SetGlobal(RuntimeMetadata::new(0, "apply")),
                 Push(Box::new(F64(123.0))),
-                Jump(67),
-                GetLocal(0),
+                Jump(83),
+                GetLocal(RuntimeMetadata::new(0, "x")),
                 Push(Box::new(F64(321.0))),
                 Add(2),
                 Return,
                 Push(Box::new(Callable(Box::new(CallableData::new(
-                    49, "lambda_0"
+                    63, "lambda_0"
                 ))))),
-                GetGlobal(0),
+                GetGlobal(RuntimeMetadata::new(0, "apply")),
                 Call(2)
             ]
         );
@@ -735,25 +742,25 @@ mod tests {
         assert_eq!(
             instructions,
             vec![
-                Jump(79),
-                GetLocal(0),
+                Jump(95),
+                GetLocal(RuntimeMetadata::new(0, "n")),
                 Push(Box::new(F64(0.0))),
                 Eq(2),
-                JumpIf(10),
-                GetLocal(1),
-                JumpForward(41),
-                GetLocal(1),
-                GetLocal(2),
+                JumpIf(12),
+                GetLocal(RuntimeMetadata::new(1, "a")),
+                JumpForward(53),
+                GetLocal(RuntimeMetadata::new(1, "a")),
+                GetLocal(RuntimeMetadata::new(2, "b")),
                 Add(2),
-                GetLocal(2),
-                GetLocal(0),
+                GetLocal(RuntimeMetadata::new(2, "b")),
+                GetLocal(RuntimeMetadata::new(0, "n")),
                 Push(Box::new(F64(1.0))),
                 Sub(2),
-                GetGlobal(0),
+                GetGlobal(RuntimeMetadata::new(0, "fib")),
                 TailCall(3),
                 Return,
                 Push(Box::new(Callable(Box::new(CallableData::new(5, "fib"))))),
-                SetGlobal(0),
+                SetGlobal(RuntimeMetadata::new(0, "fib")),
             ]
         );
     }
@@ -762,7 +769,7 @@ mod tests {
         let src = r#"
  (test test-testing (assert (= (+ 1 2) 3)))
  "#;
-        let instructions = compiler(src);
+        let instructions = compile_test(src);
 
         assert_eq!(
             instructions,
@@ -780,8 +787,8 @@ mod tests {
                     5,
                     "test()test-testing"
                 ))))),
-                SetGlobal(0),
-                GetGlobal(0),
+                SetGlobal(RuntimeMetadata::new(0, "test()test-testing")),
+                GetGlobal(RuntimeMetadata::new(0, "test()test-testing")),
                 CallTest,
             ]
         );

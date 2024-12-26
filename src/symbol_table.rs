@@ -360,8 +360,8 @@ impl Scope {
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct SymbolTable {
-    scopes: HashMap<String, Scope>,
-    scope_stack: Vec<String>,
+    pub scopes: HashMap<String, Scope>,
+    pub scope_stack: Vec<String>,
 }
 
 impl SymbolTable {
@@ -463,23 +463,14 @@ impl SymbolTableBuilder {
         self
     }
 
-    pub fn build(mut self, ast: &Ast) -> std::result::Result<SymbolTable, Vec<Error>> {
-        let mut table = SymbolTable::default();
-        table.enter_scope("global");
-        self.walk(&mut table, ast);
-        table.exit_scope();
-        if !self.errors.is_empty() {
-            return Err(self.errors);
-        }
-        Ok(table)
-    }
-
-    pub fn build_from_scope(
+    pub fn build(
         mut self,
-        ast: &[Spanned<Expr>],
+        ast: &Ast,
         table: &mut SymbolTable,
     ) -> std::result::Result<(), Vec<Error>> {
+        table.enter_scope("global");
         self.walk(table, ast);
+        table.exit_scope();
         if !self.errors.is_empty() {
             return Err(self.errors);
         }

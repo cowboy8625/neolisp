@@ -1,7 +1,7 @@
 use super::{
     compiler::Compiler,
     error::Error,
-    instruction::{Callable, Instruction, OpCode, Value},
+    instruction::{Callable, Instruction, OpCode, RuntimeMetadata, Value},
     symbol_table::SymbolTable,
 };
 use crate::intrinsic::Intrinsic;
@@ -110,7 +110,7 @@ pub struct MachineOptions {
     pub quiet: bool,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Machine {
     pub(crate) options: MachineOptions,
     pub(crate) program: Vec<u8>,
@@ -124,6 +124,14 @@ pub struct Machine {
     pub(crate) cycle_count: usize,
 }
 
+impl Default for Machine {
+    fn default() -> Self {
+        let program = Vec::new();
+        let symbol_table = SymbolTable::default();
+        Self::new(program, symbol_table)
+    }
+}
+
 // Constants
 impl Machine {
     const MAX_STACK_FRAME_SIZE: usize = 1024;
@@ -133,12 +141,7 @@ impl Machine {
 impl Machine {
     pub fn new(program: Vec<u8>, symbol_table: SymbolTable) -> Self {
         let mut stack = Vec::with_capacity(1024);
-        stack.push(Frame {
-            return_address: None,
-            scope_name: Box::new("global".to_string()),
-            args: Vec::with_capacity(256),
-            stack: Vec::with_capacity(1024),
-        });
+        stack.push(Frame::default());
         Self {
             options: MachineOptions::default(),
             program,
@@ -440,6 +443,15 @@ impl Machine {
         let bytes = self.program[self.ip..self.ip + len].to_vec();
         self.ip += len;
         Ok(String::from_utf8(bytes)?)
+    }
+
+    fn get_metadata(&mut self) -> Result<RuntimeMetadata> {
+        let id = self.get_u32()? as usize;
+        let len = self.get_u8()? as usize;
+        let bytes = self.program[self.ip..self.ip + len].to_vec();
+        self.ip += len;
+        let name = String::from_utf8(bytes)?;
+        Ok(RuntimeMetadata::new(id, &name))
     }
 
     pub(crate) fn get_current_frame(&self) -> Result<&Frame> {
@@ -858,7 +870,8 @@ impl Machine {
     }
 
     fn instruction_set_local(&mut self) -> Result<()> {
-        let index = self.get_u32()? as usize;
+        let metadata = self.get_metadata()?;
+        let index = metadata.data;
         let frame = self.get_current_frame_mut()?;
         let Some(value) = frame.stack.pop() else {
             // TODO: ERROR REPORT;
@@ -876,7 +889,8 @@ impl Machine {
     }
 
     fn instruction_get_local(&mut self) -> Result<()> {
-        let index = self.get_u32()? as usize;
+        let metadata = self.get_metadata()?;
+        let index = metadata.data;
         let frame = self.get_current_frame_mut()?;
         let Some(value) = frame.args.get(index) else {
             // TODO: ERROR REPORTING
@@ -887,7 +901,8 @@ impl Machine {
     }
 
     fn instruction_set_global(&mut self) -> Result<()> {
-        let index = self.get_u32()? as usize;
+        let metadata = self.get_metadata()?;
+        let index = metadata.data;
         let frame = self.get_current_frame_mut()?;
         let Some(value) = frame.stack.pop() else {
             // TODO: ERROR REPORTING
@@ -906,7 +921,8 @@ impl Machine {
     }
 
     fn instruction_get_global(&mut self) -> Result<()> {
-        let index = self.get_u32()? as usize;
+        let metadata = self.get_metadata()?;
+        let index = metadata.data;
         let Some(value) = self.global.get(index).cloned() else {
             // TODO: ERROR REPORTING
             anyhow::bail!("no value on the global stack");
@@ -935,7 +951,8 @@ impl Machine {
     }
 
     fn instruction_get_free(&mut self) -> Result<()> {
-        let index = self.get_u32()? as usize;
+        let metadata = self.get_metadata()?;
+        let index = metadata.data;
         let Some(value) = self.free.get(index).cloned() else {
             // TODO: ERROR REPORTING
             anyhow::bail!("no value on the free stack at index {index}");
@@ -1019,22 +1036,28 @@ impl Machine {
                     instructions.push(Instruction::TailCall(self.get_u8()? as usize))
                 }
                 OpCode::SetLocal => {
-                    instructions.push(Instruction::SetLocal(self.get_u32()? as usize));
+                    let metadata = self.get_metadata()?;
+                    instructions.push(Instruction::SetLocal(metadata));
                 }
                 OpCode::SetGlobal => {
-                    instructions.push(Instruction::SetGlobal(self.get_u32()? as usize));
+                    let metadata = self.get_metadata()?;
+                    instructions.push(Instruction::SetGlobal(metadata));
                 }
                 OpCode::SetFree => {
-                    instructions.push(Instruction::SetFree(self.get_u32()? as usize));
+                    let metadata = self.get_metadata()?;
+                    instructions.push(Instruction::SetFree(metadata));
                 }
                 OpCode::GetLocal => {
-                    instructions.push(Instruction::GetLocal(self.get_u32()? as usize))
+                    let metadata = self.get_metadata()?;
+                    instructions.push(Instruction::GetLocal(metadata));
                 }
                 OpCode::GetGlobal => {
-                    instructions.push(Instruction::GetGlobal(self.get_u32()? as usize))
+                    let metadata = self.get_metadata()?;
+                    instructions.push(Instruction::GetGlobal(metadata));
                 }
                 OpCode::GetFree => {
-                    instructions.push(Instruction::GetFree(self.get_u32()? as usize))
+                    let metadata = self.get_metadata()?;
+                    instructions.push(Instruction::GetFree(metadata));
                 }
                 OpCode::JumpIf => instructions.push(Instruction::JumpIf(self.get_u32()? as usize)),
                 OpCode::JumpForward => {

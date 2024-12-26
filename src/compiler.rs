@@ -78,15 +78,9 @@ impl Compiler {
             .with_test(self.test)
             .with_no_main(self.no_main);
 
-        // FIXME: for some reason extending the symbol table works but if we try to build one from
-        // the Default SymbolTable it doesnt work.
-        let new_symbol_table = SymbolTableBuilder::default()
+        SymbolTableBuilder::default()
             .with_options(options)
-            .build(&ast)?;
-        symbol_table.extend(new_symbol_table);
-        // SymbolTableBuilder::default()
-        //     .with_options(options)
-        //     .build_from_scope(&ast, symbol_table)?;
+            .build(&ast, symbol_table)?;
 
         let offset = if self.symbol_table.is_some() {
             self.emitter_offset

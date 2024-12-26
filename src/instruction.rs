@@ -59,12 +59,12 @@ pub enum Instruction {
     Call(usize),
     CallTest,
     TailCall(usize),
-    SetLocal(usize),
-    SetGlobal(usize),
-    SetFree(usize),
-    GetLocal(usize),
-    GetGlobal(usize),
-    GetFree(usize),
+    SetLocal(RuntimeMetadata),
+    SetGlobal(RuntimeMetadata),
+    SetFree(RuntimeMetadata),
+    GetLocal(RuntimeMetadata),
+    GetGlobal(RuntimeMetadata),
+    GetFree(RuntimeMetadata),
     JumpIf(usize),
     JumpForward(usize),
     JumpBackward(usize),
@@ -95,12 +95,12 @@ impl Instruction {
             Self::Call(_) => 2,
             Self::CallTest => 1,
             Self::TailCall(_) => 2,
-            Self::SetLocal(_) => 5,
-            Self::SetGlobal(_) => 5,
-            Self::SetFree(_) => 5,
-            Self::GetLocal(_) => 5,
-            Self::GetGlobal(_) => 5,
-            Self::GetFree(_) => 5,
+            Self::SetLocal(md) => 1 + md.size(),
+            Self::SetGlobal(md) => 1 + md.size(),
+            Self::SetFree(md) => 1 + md.size(),
+            Self::GetLocal(md) => 1 + md.size(),
+            Self::GetGlobal(md) => 1 + md.size(),
+            Self::GetFree(md) => 1 + md.size(),
             Self::JumpIf(_) => 5,
             Self::JumpForward(_) => 5,
             Self::JumpBackward(_) => 5,
@@ -173,13 +173,16 @@ impl Instruction {
                 bytes.push(self.opcode() as u8);
                 bytes.push(*count as u8);
             }
-            Self::GetLocal(address)
-            | Self::GetGlobal(address)
-            | Self::GetFree(address)
-            | Self::SetLocal(address)
-            | Self::SetGlobal(address)
-            | Self::SetFree(address)
-            | Self::JumpIf(address)
+            Self::GetLocal(metadata)
+            | Self::GetGlobal(metadata)
+            | Self::GetFree(metadata)
+            | Self::SetLocal(metadata)
+            | Self::SetGlobal(metadata)
+            | Self::SetFree(metadata) => {
+                bytes.push(self.opcode() as u8);
+                bytes.extend(&metadata.to_bytecode());
+            }
+            Self::JumpIf(address)
             | Self::JumpForward(address)
             | Self::JumpBackward(address)
             | Self::Jump(address) => {
@@ -188,6 +191,39 @@ impl Instruction {
             }
         }
 
+        bytes
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RuntimeMetadata {
+    pub data: usize,
+    pub name: Box<String>,
+}
+
+impl RuntimeMetadata {
+    pub fn new(data: usize, name: impl Into<String>) -> Self {
+        Self {
+            data,
+            name: Box::new(name.into()),
+        }
+    }
+
+    pub fn size(&self) -> usize {
+        // 4 bytes for address
+        // 1 bytes for name length
+        // name
+        4 + 1 + self.name.len()
+    }
+
+    pub fn to_bytecode(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend(&(self.data as u32).to_le_bytes());
+        if self.name.len() > 255 {
+            panic!("Name too long");
+        }
+        bytes.extend(&(self.name.len() as u8).to_le_bytes());
+        bytes.extend(self.name.as_bytes());
         bytes
     }
 }
