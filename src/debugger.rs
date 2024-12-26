@@ -322,7 +322,7 @@ impl<'a> Debugger<'a> {
             Command::Quit => self.is_running = false,
             Command::Step => match self.machine.run_once() {
                 Result::Ok(_) => {}
-                Result::Err(err) => self.output.push_str(&format!("error: {}\n", err)),
+                Result::Err(err) => self.error_message = Some(err.to_string()),
             },
             Command::Continue => self.state = State::Running,
             Command::AddBreakPoint(address) => {
