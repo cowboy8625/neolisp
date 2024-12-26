@@ -57,19 +57,16 @@ impl Compiler {
         self
     }
 
-    pub fn with_maybe_a_symbol_table(mut self, symbol_table: Option<SymbolTable>) -> Self {
-        self.symbol_table = symbol_table;
-        self
-    }
     pub fn with_offset(mut self, offset: usize) -> Self {
         self.emitter_offset = offset;
         self
     }
 
     pub fn compile(
-        mut self,
+        self,
         src: &str,
-    ) -> Result<Option<(SymbolTable, Vec<Instruction>)>, Vec<Error>> {
+        symbol_table: &mut SymbolTable,
+    ) -> Result<Option<Vec<Instruction>>, Vec<Error>> {
         let ast = parser().parse(src)?;
 
         if self.debug_ast {
@@ -80,17 +77,16 @@ impl Compiler {
         let options = CompilerOptions::default()
             .with_test(self.test)
             .with_no_main(self.no_main);
-        let mut symbol_table = match self.symbol_table.take() {
-            Some(mut table) => {
-                SymbolTableBuilder::default()
-                    .with_options(options)
-                    .build_from_scope(&ast, &mut table)?;
-                table
-            }
-            None => SymbolTableBuilder::default()
-                .with_options(options)
-                .build(&ast)?,
-        };
+
+        // FIXME: for some reason extending the symbol table works but if we try to build one from
+        // the Default SymbolTable it doesnt work.
+        let new_symbol_table = SymbolTableBuilder::default()
+            .with_options(options)
+            .build(&ast)?;
+        symbol_table.extend(new_symbol_table);
+        // SymbolTableBuilder::default()
+        //     .with_options(options)
+        //     .build_from_scope(&ast, symbol_table)?;
 
         let offset = if self.symbol_table.is_some() {
             self.emitter_offset
@@ -98,7 +94,7 @@ impl Compiler {
             0
         };
 
-        let instructions = Emitter::new(&mut symbol_table, options)
+        let instructions = Emitter::new(symbol_table, options)
             .with_offset(offset)
             .compile(&ast)?;
 
@@ -112,6 +108,6 @@ impl Compiler {
             return Ok(None);
         }
 
-        Ok(Some((symbol_table, instructions)))
+        Ok(Some(instructions))
     }
 }

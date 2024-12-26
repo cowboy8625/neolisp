@@ -289,7 +289,7 @@ impl AstWalker<Program> for Emitter<'_> {
 
         for param in params.iter() {
             let Some(symbol) = self.symbol_table.get(&param.name) else {
-                panic!("Variable `{}` should be known at this point", param.name,);
+                panic!("Variable `{}` should be known at this point", param.name);
             };
             let Symbol::Parameter(Parameter {
                 is_unbound: true, ..
@@ -588,9 +588,7 @@ impl AstWalker<Program> for Emitter<'_> {
         match symbol {
             Symbol::UnboundVariable(UnboundVariable { id, .. }) => {
                 #[cfg(debug_assertions)]
-                eprintln!("id: {id}, name: {name}");
                 program.push(Instruction::GetFree(*id));
-                // program.push(Instruction::SetFree);
             }
             Symbol::Variable(Variable { id, .. }) => {
                 if symbol.is_global() {
@@ -621,8 +619,23 @@ impl AstWalker<Program> for Emitter<'_> {
 #[cfg(test)]
 mod tests {
     use crate::compiler::Compiler;
-    use crate::instruction::{Callable as CallableData, Instruction::*, Value::*};
+    use crate::instruction::{
+        Callable as CallableData,
+        Instruction::{self, *},
+        Value::*,
+    };
+    use crate::symbol_table::SymbolTable;
     use pretty_assertions::assert_eq;
+
+    fn compiler(src: &str) -> Vec<Instruction> {
+        let mut st = SymbolTable::default();
+        Compiler::default()
+            .no_main(true)
+            .compile(src, &mut st)
+            .ok()
+            .flatten()
+            .unwrap()
+    }
 
     #[test]
     fn test_let_binding() {
@@ -631,12 +644,7 @@ mod tests {
     (let (y 2)
     (let (z 3)
     (print x y z "\n"))))"#;
-        let (_, instructions) = Compiler::default()
-            .no_main(true)
-            .compile(src)
-            .ok()
-            .flatten()
-            .unwrap();
+        let instructions = compiler(src);
 
         assert_eq!(
             instructions,
@@ -666,12 +674,7 @@ mod tests {
         let src = r#"
 (if true "then\n" "else\n")
 "#;
-        let (_, instructions) = Compiler::default()
-            .no_main(true)
-            .compile(src)
-            .ok()
-            .flatten()
-            .unwrap();
+        let instructions = compiler(src);
 
         assert_eq!(
             instructions,
@@ -692,12 +695,7 @@ mod tests {
  (fn apply (f x) (f x))
  (apply (lambda (x) (+ x 321)) 123)
  "#;
-        let (_, instructions) = Compiler::default()
-            .no_main(true)
-            .compile(src)
-            .ok()
-            .flatten()
-            .unwrap();
+        let instructions = compiler(src);
 
         assert_eq!(
             instructions,
@@ -732,12 +730,7 @@ mod tests {
       a
       (fib (- n 1) b (+ a b))))
  "#;
-        let (_, instructions) = Compiler::default()
-            .no_main(true)
-            .compile(src)
-            .ok()
-            .flatten()
-            .unwrap();
+        let instructions = compiler(src);
 
         assert_eq!(
             instructions,
@@ -769,13 +762,7 @@ mod tests {
         let src = r#"
  (test test-testing (assert (= (+ 1 2) 3)))
  "#;
-        let (_, instructions) = Compiler::default()
-            .no_main(true)
-            .with_test(true)
-            .compile(src)
-            .ok()
-            .flatten()
-            .unwrap();
+        let instructions = compiler(src);
 
         assert_eq!(
             instructions,

@@ -4,6 +4,7 @@ use neolisp::{
     debugger::Debugger,
     machine::Machine,
     repl,
+    symbol_table::SymbolTable,
 };
 
 use clap::Parser as ClapParser;
@@ -25,13 +26,14 @@ fn main() -> anyhow::Result<()> {
         Command::Run(r) => {
             let filename = r.file.unwrap_or("main.nl".to_string());
             let src = std::fs::read_to_string(&filename)?;
+            let mut symbol_table = SymbolTable::default();
             let compiler = Compiler::default()
                 .no_main(r.no_main)
                 .debug_ast(args.ast_debug)
                 .decompile(r.decompile)
-                .compile(&src);
-            let (_, instructions) = match compiler {
-                Ok(Some((symbol_table, instructions))) => (symbol_table, instructions),
+                .compile(&src, &mut symbol_table);
+            let instructions = match compiler {
+                Ok(Some(instructions)) => instructions,
                 Ok(None) => return Ok(()),
                 Err(errors) => {
                     for error in errors {
@@ -42,7 +44,7 @@ fn main() -> anyhow::Result<()> {
             };
 
             let program: Vec<u8> = instructions.iter().flat_map(|i| i.to_bytecode()).collect();
-            let mut machine = Machine::new(program);
+            let mut machine = Machine::new(program, symbol_table);
 
             if !r.breakpoints.is_empty() {
                 let mut debugger =
@@ -57,15 +59,16 @@ fn main() -> anyhow::Result<()> {
         Command::Test(t) => {
             let filename = t.file.unwrap_or("main.nl".to_string());
             let src = std::fs::read_to_string(&filename)?;
+            let mut symbol_table = SymbolTable::default();
             let compiler = Compiler::default()
                 .no_main(true)
                 .debug_ast(args.ast_debug)
                 .decompile(t.decompile)
                 .with_test(true)
-                .compile(&src);
+                .compile(&src, &mut symbol_table);
 
-            let (symbol_table, instructions) = match compiler {
-                Ok(Some((symbol_table, instructions))) => (symbol_table, instructions),
+            let instructions = match compiler {
+                Ok(Some(instructions)) => instructions,
                 Ok(None) => return Ok(()),
                 Err(errors) => {
                     for error in errors {
@@ -76,7 +79,7 @@ fn main() -> anyhow::Result<()> {
             };
 
             let program: Vec<u8> = instructions.iter().flat_map(|i| i.to_bytecode()).collect();
-            let mut machine = Machine::new(program).with_symbol_table(symbol_table);
+            let mut machine = Machine::new(program, symbol_table);
 
             if !t.breakpoints.is_empty() {
                 let mut debugger =

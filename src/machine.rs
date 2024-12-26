@@ -97,7 +97,7 @@ pub struct MachineOptions {
     pub quiet: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Machine {
     pub(crate) options: MachineOptions,
     pub(crate) program: Vec<u8>,
@@ -106,15 +106,9 @@ pub struct Machine {
     pub(crate) stack: Vec<Frame>,
     pub(crate) ip: usize,
     pub(crate) is_running: bool,
-    pub(crate) symbol_table: Option<SymbolTable>,
+    pub(crate) symbol_table: SymbolTable,
     #[cfg(any(debug_assertions, test))]
     pub(crate) cycle_count: usize,
-}
-
-impl Default for Machine {
-    fn default() -> Self {
-        Self::new(Vec::new())
-    }
 }
 
 // Constants
@@ -124,7 +118,7 @@ impl Machine {
 
 // Public
 impl Machine {
-    pub fn new(program: Vec<u8>) -> Self {
+    pub fn new(program: Vec<u8>, symbol_table: SymbolTable) -> Self {
         let mut stack = Vec::with_capacity(1024);
         stack.push(Frame {
             return_address: None,
@@ -139,14 +133,14 @@ impl Machine {
             stack,
             ip: 0,
             is_running: true,
-            symbol_table: None,
+            symbol_table,
             #[cfg(any(debug_assertions, test))]
             cycle_count: 0,
         }
     }
 
-    pub fn with_symbol_table(mut self, symbol_table: SymbolTable) -> Self {
-        self.symbol_table = Some(symbol_table);
+    pub fn with_program(mut self, program: Vec<u8>) -> Self {
+        self.program = program;
         self
     }
 
@@ -161,12 +155,11 @@ impl Machine {
     pub fn load_from_string(&mut self, src: &str) -> std::result::Result<(), Vec<Error>> {
         self.is_running = true;
         let compiler = Compiler::default()
-            .with_maybe_a_symbol_table(self.symbol_table.take())
             .with_offset(self.program.len())
             .no_main(true)
-            .compile(src);
-        let (st, instructions) = match compiler {
-            Ok(Some((symbol_table, instructions))) => (symbol_table, instructions),
+            .compile(src, &mut self.symbol_table);
+        let instructions = match compiler {
+            Ok(Some(instructions)) => instructions,
             Ok(None) => return Ok(()),
             Err(errors) => {
                 for error in errors {
@@ -175,7 +168,6 @@ impl Machine {
                 return Ok(());
             }
         };
-        self.symbol_table = Some(st);
 
         let program: Vec<u8> = instructions.iter().flat_map(|i| i.to_bytecode()).collect();
         self.program.extend(program);

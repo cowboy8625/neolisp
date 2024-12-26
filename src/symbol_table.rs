@@ -442,6 +442,10 @@ impl SymbolTable {
             self.scopes.entry(scope_name).or_default().insert(symbol);
         }
     }
+
+    pub fn extend(&mut self, other: SymbolTable) {
+        self.scopes.extend(other.scopes);
+    }
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]

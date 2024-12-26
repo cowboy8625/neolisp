@@ -273,10 +273,9 @@ impl Intrinsic {
         if count != 2 {
             anyhow::bail!("nth only support 2 args");
         }
-        let f = machine.free.clone();
         let frame = machine.get_current_frame_mut()?;
         let Some(Value::F64(index)) = frame.stack.pop() else {
-            anyhow::bail!("expected number on stack for nth frame: {frame:#?}\nfree: {f:#?}")
+            anyhow::bail!("expected number on stack for nth")
         };
         let Some(Value::List(mut list)) = frame.stack.pop() else {
             anyhow::bail!("expected list on stack for nth")

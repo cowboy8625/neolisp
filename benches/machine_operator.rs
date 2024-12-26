@@ -1,6 +1,7 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use neolisp::instruction::{Instruction, Value};
 use neolisp::machine::Machine;
+use neolisp::symbol_table::SymbolTable;
 
 macro_rules! operator_benchmark {
     ($func_name:ident, $test_name:literal, $instructions:expr) => {
@@ -12,7 +13,9 @@ macro_rules! operator_benchmark {
 
             c.bench_function($test_name, |b| {
                 b.iter(|| {
-                    Machine::new(black_box(program.clone())).run().unwrap();
+                    Machine::new(black_box(program.clone()), SymbolTable::default())
+                        .run()
+                        .unwrap();
                 })
             });
         }
