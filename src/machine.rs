@@ -73,14 +73,27 @@ const INTRISICS: [fn(&mut Machine, u8) -> Result<()>; 24] = [
 #[derive(Debug)]
 pub(crate) struct Frame {
     pub return_address: Option<usize>,
+    pub scope_name: Box<String>,
     pub args: Vec<Value>,
     pub stack: Vec<Value>,
 }
 
+impl Default for Frame {
+    fn default() -> Self {
+        Self {
+            return_address: None,
+            scope_name: Box::new("global".to_string()),
+            args: Vec::with_capacity(256),
+            stack: Vec::with_capacity(1024),
+        }
+    }
+}
+
 impl Frame {
-    fn new(return_address: usize, args: Vec<Value>) -> Self {
+    fn new(return_address: usize, scope_name: impl Into<String>, args: Vec<Value>) -> Self {
         Self {
             return_address: Some(return_address),
+            scope_name: Box::new(scope_name.into()),
             args,
             stack: Vec::new(),
         }
@@ -122,6 +135,7 @@ impl Machine {
         let mut stack = Vec::with_capacity(1024);
         stack.push(Frame {
             return_address: None,
+            scope_name: Box::new("global".to_string()),
             args: Vec::with_capacity(256),
             stack: Vec::with_capacity(1024),
         });
@@ -204,14 +218,14 @@ impl Machine {
         Ok(frame.stack.pop())
     }
 
-    pub fn call_from_address(&mut self, address: usize, count: u8) -> Result<()> {
+    pub fn call_from_address(&mut self, address: usize, count: u8, scope_name: &str) -> Result<()> {
         let param_values = {
             let frame = self.get_current_frame_mut()?;
             let length = frame.stack.len();
             frame.stack.split_off(length - count as usize)
         };
 
-        let new_frame = Frame::new(self.ip, param_values);
+        let new_frame = Frame::new(self.ip, scope_name, param_values);
         self.stack.push(new_frame);
         self.ip = address;
 
@@ -789,7 +803,7 @@ impl Machine {
 
         param_values.reverse();
 
-        let new_frame = Frame::new(self.ip, param_values);
+        let new_frame = Frame::new(self.ip, callable.name, param_values);
         self.stack.push(new_frame);
         self.ip = callable.address;
         Ok(())
@@ -811,8 +825,8 @@ impl Machine {
             // TODO: ERROR REPORT;
             anyhow::bail!("can not call '{}' type", value);
         };
-        let test_name = Value::String(Box::new(callable.name));
-        let new_frame = Frame::new(self.ip, vec![test_name]);
+        let test_name = Value::String(Box::new(callable.name.to_string()));
+        let new_frame = Frame::new(self.ip, callable.name, vec![test_name]);
         self.stack.push(new_frame);
         self.ip = callable.address;
         Ok(())

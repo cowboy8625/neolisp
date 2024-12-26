@@ -172,7 +172,7 @@ impl Intrinsic {
         let mut result = Vec::new();
         for value in list.drain(..) {
             machine.push(value.clone())?;
-            machine.call_from_address(callable.address, 1)?;
+            machine.call_from_address(callable.address, 1, &callable.name)?;
             let Some(Value::Bool(true)) = machine.pop()? else {
                 continue;
             };
@@ -200,7 +200,7 @@ impl Intrinsic {
         for value in list.drain(..).rev() {
             machine.push(result)?;
             machine.push(value)?;
-            machine.call_from_address(callable.address, 2)?;
+            machine.call_from_address(callable.address, 2, &callable.name)?;
             let Some(v) = machine.pop()? else {
                 // TODO: ERROR REPORTING
                 anyhow::bail!("expected value on stack for fold right")
@@ -229,7 +229,7 @@ impl Intrinsic {
         for value in list.drain(..) {
             machine.push(result)?;
             machine.push(value)?;
-            machine.call_from_address(callable.address, 2)?;
+            machine.call_from_address(callable.address, 2, &callable.name)?;
             let Some(v) = machine.pop()? else {
                 // TODO: ERROR REPORTING
                 anyhow::bail!("expected value on stack for fold")
@@ -256,7 +256,7 @@ impl Intrinsic {
         let mut result = Vec::new();
         for value in list.drain(..) {
             machine.push(value)?;
-            machine.call_from_address(callable.address, 1)?;
+            machine.call_from_address(callable.address, 1, &callable.name)?;
             let Some(v) = machine.pop()? else {
                 // TODO: ERROR REPORTING
                 anyhow::bail!("expected value on stack for map")
@@ -275,6 +275,9 @@ impl Intrinsic {
         }
         let frame = machine.get_current_frame_mut()?;
         let Some(Value::F64(index)) = frame.stack.pop() else {
+            let scope_name = frame.scope_name.to_string();
+            let scope = machine.symbol_table.get(&scope_name);
+            eprintln!("{:#?}", scope);
             anyhow::bail!("expected number on stack for nth")
         };
         let Some(Value::List(mut list)) = frame.stack.pop() else {

@@ -353,11 +353,7 @@ impl<'a> Debugger<'a> {
                 self.machine.free.clear();
                 self.machine.stack.clear();
                 self.machine.ip = 0x0000;
-                self.machine.stack.push(MachineFrame {
-                    return_address: None,
-                    args: Vec::with_capacity(256),
-                    stack: Vec::with_capacity(1024),
-                });
+                self.machine.stack.push(MachineFrame::default());
             }
             Command::Jump(address) => {
                 self.machine.ip = address;
