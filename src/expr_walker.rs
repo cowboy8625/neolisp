@@ -16,6 +16,14 @@ pub struct VarExpr<'a> {
     pub body: &'a Spanned<Expr>,
 }
 
+impl VarExpr<'_> {
+    pub fn span(&self) -> Span {
+        let start = self.name.span.start;
+        let end = self.body.span.end;
+        start..end
+    }
+}
+
 #[derive(Debug)]
 pub struct SetExpr<'a> {
     pub name: &'a Spanned<Expr>,
@@ -54,6 +62,20 @@ pub struct LoopExpr<'a> {
 pub struct LambdaExpr<'a> {
     pub params: &'a Spanned<Expr>,
     pub body: &'a [&'a Spanned<Expr>],
+}
+
+impl LambdaExpr<'_> {
+    pub fn span(&self) -> Span {
+        let start_span = self.params.span.clone();
+        let start = start_span.start;
+        let end = self
+            .body
+            .last()
+            .map(|expr| expr.span.end)
+            .unwrap_or(start_span.end);
+
+        start..end
+    }
 }
 
 #[derive(Debug)]
@@ -109,7 +131,7 @@ pub trait AstWalker<T> {
     fn error(&mut self, _: Error);
     fn get_lambda_name(&mut self) -> String;
     fn handle_operator(&mut self, _: &mut T, _: &str, _: &OperatorExpr);
-    fn handle_builtin(&mut self, _: &mut T, _: &str, _: &[Spanned<Expr>]);
+    fn handle_builtin(&mut self, _: &mut T, _: &str, _: Span, _: &[Spanned<Expr>]);
     fn handle_test(&mut self, _: &mut T, _: &TestExpr);
     fn handle_function(&mut self, _: &mut T, _: &FunctionExpr);
     fn handle_lambda(&mut self, _: &mut T, _: &LambdaExpr);
@@ -140,7 +162,7 @@ pub trait AstWalker<T> {
                 self.walk_keyword(t, symbol, exprs, span)
             }
             Expr::Symbol(symbol) if BUILTINS.contains(&symbol.as_str()) => {
-                self.handle_builtin(t, symbol, exprs)
+                self.handle_builtin(t, symbol, first.span.clone(), exprs)
             }
             Expr::Bool(_) | Expr::String(_) | Expr::Number(_) => {
                 self.error(Error::NotCallable(first.span.clone(), first.expr.type_of()))

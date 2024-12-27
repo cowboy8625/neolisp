@@ -349,6 +349,10 @@ impl Scope {
         self.symbols.insert(name.clone(), symbol);
     }
 
+    pub fn get(&self, name: &str) -> Option<&Symbol> {
+        self.symbols.get(name)
+    }
+
     pub fn get_mut(&mut self, name: &str) -> Option<&mut Symbol> {
         self.symbols.get_mut(name)
     }
@@ -501,7 +505,13 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         }
     }
 
-    fn handle_builtin(&mut self, table: &mut SymbolTable, _: &str, expr: &[Spanned<Expr>]) {
+    fn handle_builtin(
+        &mut self,
+        table: &mut SymbolTable,
+        _: &str,
+        _: Span,
+        expr: &[Spanned<Expr>],
+    ) {
         for spanned in expr.iter().skip(1) {
             self.walk_expr(table, spanned);
         }

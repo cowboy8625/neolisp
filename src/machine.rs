@@ -1,10 +1,11 @@
 use super::{
+    ast::Span,
     compiler::Compiler,
     error::Error,
     instruction::{Callable, Instruction, OpCode, RuntimeMetadata, Value},
     symbol_table::SymbolTable,
 };
-use crate::{intrinsic::Intrinsic, BUILTINS};
+use crate::intrinsic::Intrinsic;
 use anyhow::{anyhow, Result};
 use crossterm::style::Stylize;
 use num_traits::FromPrimitive;
@@ -74,6 +75,7 @@ const INTRISICS: [fn(&mut Machine, u8) -> Result<()>; 24] = [
 pub(crate) struct Frame {
     pub return_address: Option<usize>,
     pub scope_name: String,
+    pub span: Span,
     pub args: Vec<Value>,
     pub stack: Vec<Value>,
 }
@@ -83,6 +85,7 @@ impl Default for Frame {
         Self {
             return_address: None,
             scope_name: "global".to_string(),
+            span: Span::default(),
             args: Vec::with_capacity(256),
             stack: Vec::with_capacity(1024),
         }
@@ -90,10 +93,16 @@ impl Default for Frame {
 }
 
 impl Frame {
-    fn new(return_address: usize, scope_name: impl Into<String>, args: Vec<Value>) -> Self {
+    fn new(
+        return_address: usize,
+        scope_name: impl Into<String>,
+        span: Span,
+        args: Vec<Value>,
+    ) -> Self {
         Self {
             return_address: Some(return_address),
             scope_name: scope_name.into(),
+            span,
             args,
             stack: Vec::new(),
         }
@@ -103,6 +112,10 @@ impl Frame {
         let length = self.stack.len();
         self.stack[length - count..].rotate_left(count.saturating_sub(1));
     }
+}
+
+pub struct StackMetadata {
+    pub name: String,
 }
 
 #[derive(Debug, Default)]
@@ -221,14 +234,20 @@ impl Machine {
         Ok(frame.stack.pop())
     }
 
-    pub fn call_from_address(&mut self, address: usize, count: u8, scope_name: &str) -> Result<()> {
+    pub fn call_from_address(
+        &mut self,
+        address: usize,
+        span: Span,
+        count: u8,
+        scope_name: &str,
+    ) -> Result<()> {
         let param_values = {
             let frame = self.get_current_frame_mut()?;
             let length = frame.stack.len();
             frame.stack.split_off(length - count as usize)
         };
 
-        let new_frame = Frame::new(self.ip, scope_name, param_values);
+        let new_frame = Frame::new(self.ip, scope_name, span, param_values);
         self.stack.push(new_frame);
         self.ip = address;
 
@@ -331,11 +350,26 @@ impl Machine {
             Value::CODE_CALLABLE => {
                 let index = self.get_u32()? as usize;
                 let name = self.get_string()?;
-                Ok(Value::Callable(Box::new(Callable::new(index, name))))
+                // TODO: use leb128 at some point.
+                let start = self.get_u32()? as usize;
+                let end = self.get_u32()? as usize;
+                Ok(Value::Callable(Box::new(Callable::new(
+                    index,
+                    name,
+                    start..end,
+                ))))
             }
             Value::CODE_BUILTIN => {
                 let index = self.get_u32()? as usize;
-                Ok(Value::Builtin(index))
+                let name = self.get_string()?;
+                // TODO: use leb128 at some point.
+                let start = self.get_u32()? as usize;
+                let end = self.get_u32()? as usize;
+                Ok(Value::Builtin(Box::new(Callable::new(
+                    index,
+                    name,
+                    start..end,
+                ))))
             }
             Value::CODE_SYMBOL => {
                 let value = self.get_string()?;
@@ -451,7 +485,9 @@ impl Machine {
         let bytes = self.program[self.ip..self.ip + len].to_vec();
         self.ip += len;
         let name = String::from_utf8(bytes)?;
-        Ok(RuntimeMetadata::new(id, &name))
+        let start = self.get_u32()? as usize;
+        let end = self.get_u32()? as usize;
+        Ok(RuntimeMetadata::new(id, &name, start..end))
     }
 
     pub(crate) fn get_current_frame(&self) -> Result<&Frame> {
@@ -466,7 +502,7 @@ impl Machine {
             .map_or_else(|| Err(anyhow!("Stack is empty")), Ok)
     }
 
-    fn buildin_function_call(&mut self, index: usize, count: usize) -> Result<()> {
+    fn buildin_function_call(&mut self, callable: Callable, count: usize) -> Result<()> {
         let mut param_values = {
             let frame = self.get_current_frame_mut()?;
             let length = frame.stack.len();
@@ -475,10 +511,9 @@ impl Machine {
 
         param_values.reverse();
 
-        let name = BUILTINS[index];
-        let new_frame = Frame::new(self.ip, name, param_values);
+        let new_frame = Frame::new(self.ip, callable.name, callable.span, param_values);
         self.stack.push(new_frame);
-        INTRISICS[index](self, count as u8)?;
+        INTRISICS[callable.address](self, count as u8)?;
 
         let value = {
             let frame = self.get_current_frame_mut()?;
@@ -505,6 +540,7 @@ impl Machine {
     }
 
     fn instruction_return(&mut self) -> Result<()> {
+        self.symbol_table.exit_scope();
         let value = {
             let frame = self.get_current_frame_mut()?;
             let Some(value) = frame.stack.pop() else {
@@ -523,6 +559,7 @@ impl Machine {
     }
 
     fn instruction_return_from_test(&mut self) -> Result<()> {
+        self.symbol_table.exit_scope();
         let (value, test_name) = {
             let frame = self.get_current_frame_mut()?;
             let Some(value) = frame.stack.pop() else {
@@ -828,9 +865,8 @@ impl Machine {
             value
         };
 
-        if let Value::Builtin(index) = value {
-            self.buildin_function_call(index, count)?;
-            // INTRISICS[index](self, count as u8)?;
+        if let Value::Builtin(callable) = value {
+            self.buildin_function_call(*callable, count)?;
             return Ok(());
         }
 
@@ -838,6 +874,7 @@ impl Machine {
             // TODO: ERROR REPORT;
             anyhow::bail!("can not call '{}' type", value);
         };
+        self.symbol_table.enter_scope(&callable.name);
         let mut param_values = {
             let frame = self.get_current_frame_mut()?;
             let length = frame.stack.len();
@@ -846,7 +883,7 @@ impl Machine {
 
         param_values.reverse();
 
-        let new_frame = Frame::new(self.ip, callable.name, param_values);
+        let new_frame = Frame::new(self.ip, callable.name, callable.span, param_values);
         self.stack.push(new_frame);
         self.ip = callable.address;
         Ok(())
@@ -868,7 +905,8 @@ impl Machine {
             // TODO: ERROR REPORT;
             anyhow::bail!("can not call '{}' type", value);
         };
-        let new_frame = Frame::new(self.ip, callable.name, Vec::new());
+        self.symbol_table.enter_scope(&callable.name);
+        let new_frame = Frame::new(self.ip, callable.name, callable.span, Vec::new());
         self.stack.push(new_frame);
         self.ip = callable.address;
         Ok(())

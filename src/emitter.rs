@@ -110,7 +110,7 @@ impl<'a> Emitter<'a> {
 
     fn emit_set_instruction(program: &mut Program, symbol: &Symbol) {
         use Instruction::*;
-        let metadata = RuntimeMetadata::new(symbol.id(), symbol.name());
+        let metadata = RuntimeMetadata::new(symbol.id(), symbol.name(), symbol.span());
         let instruction = match symbol {
             Symbol::UnboundVariable(UnboundVariable { .. }) => SetFree(metadata),
             Symbol::Variable(Variable { .. }) if symbol.is_global() => SetGlobal(metadata),
@@ -169,7 +169,7 @@ impl<'a> Emitter<'a> {
                 self.error(Error::TestNotDefined { name, span });
                 continue;
             };
-            let metadata = RuntimeMetadata::new(symbol.id(), name);
+            let metadata = RuntimeMetadata::new(symbol.id(), name, span);
             program.push(Instruction::GetGlobal(metadata));
             program.push(Instruction::CallTest);
         }
@@ -236,16 +236,22 @@ impl AstWalker<Program> for Emitter<'_> {
         self.symbol_table.exit_scope();
         let body_size = self.get_program_size(program) - address;
         program[index] = Instruction::Jump(address + body_size);
-        let callable = Callable::new(address, name.to_string());
+        let callable = Callable::new(address, name.to_string(), test_expr.span.clone());
         let value = Value::Callable(Box::new(callable));
         program.push(Instruction::Push(Box::new(value)));
-        let metadata = RuntimeMetadata::new(id, &name);
+        let metadata = RuntimeMetadata::new(id, &name, test_expr.span.clone());
         program.push(Instruction::SetGlobal(metadata));
 
         self.tests.push((name, test_expr.span.clone()));
     }
 
-    fn handle_builtin(&mut self, program: &mut Program, name: &str, args: &[Spanned<Expr>]) {
+    fn handle_builtin(
+        &mut self,
+        program: &mut Program,
+        name: &str,
+        span: Span,
+        args: &[Spanned<Expr>],
+    ) {
         const ARGS: usize = 1;
         for arg in args.iter().skip(ARGS).rev() {
             self.walk_expr(program, arg);
@@ -254,7 +260,10 @@ impl AstWalker<Program> for Emitter<'_> {
             // NOTE: INTENTIONAL_PANIC
             panic!("Unknown builtin: {name}");
         };
-        program.push(Instruction::Push(Box::new(Value::Builtin(id))));
+        let end = args.last().map(|arg| arg.span.end).unwrap_or(span.end);
+        let span = span.start..end;
+        let callable = Box::new(Callable::new(id, name, span));
+        program.push(Instruction::Push(Box::new(Value::Builtin(callable))));
         program.push(Instruction::Call(args.len() - ARGS));
     }
 
@@ -296,7 +305,7 @@ impl AstWalker<Program> for Emitter<'_> {
             else {
                 continue;
             };
-            let metadata = RuntimeMetadata::new(param.id, &param.name);
+            let metadata = RuntimeMetadata::new(param.id, &param.name, param.span.clone());
             program.push(Instruction::GetLocal(metadata.clone()));
             program.push(Instruction::SetFree(metadata));
         }
@@ -318,10 +327,10 @@ impl AstWalker<Program> for Emitter<'_> {
         let body_size = self.get_program_size(program) - start;
         program[index] = Instruction::Jump(start + body_size);
 
-        let callable = Callable::new(start, name.to_string());
+        let callable = Callable::new(start, name.to_string(), function.span.clone());
         let value = Value::Callable(Box::new(callable));
         program.push(Instruction::Push(Box::new(value)));
-        let metadata = RuntimeMetadata::new(id, name);
+        let metadata = RuntimeMetadata::new(id, name, function.span.clone());
         program.push(Instruction::SetGlobal(metadata));
     }
 
@@ -352,7 +361,7 @@ impl AstWalker<Program> for Emitter<'_> {
             else {
                 continue;
             };
-            let metadata = RuntimeMetadata::new(param.id, &param.name);
+            let metadata = RuntimeMetadata::new(param.id, &param.name, param.span.clone());
             program.push(Instruction::GetLocal(metadata.clone()));
             program.push(Instruction::SetFree(metadata));
         }
@@ -372,7 +381,7 @@ impl AstWalker<Program> for Emitter<'_> {
 
         program[index] = Instruction::Jump(start + body_size);
 
-        let callable = Callable::new(start, name);
+        let callable = Callable::new(start, name, lambda.span());
         let value = Value::Callable(Box::new(callable));
         program.push(Instruction::Push(Box::new(value)));
     }
@@ -430,7 +439,7 @@ impl AstWalker<Program> for Emitter<'_> {
             else {
                 continue;
             };
-            let metadata = RuntimeMetadata::new(param.id, &param.name);
+            let metadata = RuntimeMetadata::new(param.id, &param.name, param.span.clone());
             program.push(Instruction::GetLocal(metadata.clone()));
             program.push(Instruction::SetFree(metadata));
         }
@@ -464,7 +473,7 @@ impl AstWalker<Program> for Emitter<'_> {
             panic!("unknown symbol: {}", name);
         };
 
-        let metadata = RuntimeMetadata::new(symbol.id(), name);
+        let metadata = RuntimeMetadata::new(symbol.id(), name, var.span());
         let set_instruction = if symbol.is_global() {
             Instruction::SetGlobal(metadata.clone())
         } else {
@@ -590,7 +599,7 @@ impl AstWalker<Program> for Emitter<'_> {
             self.error(Error::SymbolNotDefined(span, name.to_string()));
             return;
         };
-        let metadata = RuntimeMetadata::new(symbol.id(), name);
+        let metadata = RuntimeMetadata::new(symbol.id(), name, span);
         let instruction = match symbol {
             Symbol::UnboundVariable(UnboundVariable { .. }) => GetFree(metadata),
             Symbol::Variable(Variable { .. }) if symbol.is_global() => GetGlobal(metadata),
@@ -657,20 +666,24 @@ mod tests {
             instructions,
             vec![
                 Push(Box::new(F64(1.0))),
-                SetLocal(RuntimeMetadata::new(0, "x")),
-                GetLocal(RuntimeMetadata::new(0, "x")),
-                SetFree(RuntimeMetadata::new(0, "x")),
+                SetLocal(RuntimeMetadata::new(0, "x", 0..1)),
+                GetLocal(RuntimeMetadata::new(0, "x", 0..1)),
+                SetFree(RuntimeMetadata::new(0, "x", 0..1)),
                 Push(Box::new(F64(2.0))),
-                SetLocal(RuntimeMetadata::new(0, "y")),
-                GetLocal(RuntimeMetadata::new(0, "y")),
-                SetFree(RuntimeMetadata::new(0, "y")),
+                SetLocal(RuntimeMetadata::new(0, "y", 0..1)),
+                GetLocal(RuntimeMetadata::new(0, "y", 0..1)),
+                SetFree(RuntimeMetadata::new(0, "y", 0..1)),
                 Push(Box::new(F64(3.0))),
-                SetLocal(RuntimeMetadata::new(0, "z")),
+                SetLocal(RuntimeMetadata::new(0, "z", 0..1)),
                 Push(Box::new(String(Box::new("\n".to_string())))),
-                GetLocal(RuntimeMetadata::new(0, "z")),
-                GetFree(RuntimeMetadata::new(1, "y")),
-                GetFree(RuntimeMetadata::new(0, "x")),
-                Push(Box::new(Builtin(17))),
+                GetLocal(RuntimeMetadata::new(0, "z", 0..1)),
+                GetFree(RuntimeMetadata::new(1, "y", 0..1)),
+                GetFree(RuntimeMetadata::new(0, "x", 0..1)),
+                Push(Box::new(Builtin(Box::new(CallableData::new(
+                    17,
+                    "print",
+                    0..1
+                ))))),
                 Call(4),
             ]
         );
@@ -708,22 +721,28 @@ mod tests {
             instructions,
             vec![
                 Jump(22),
-                GetLocal(RuntimeMetadata::new(1, "x")),
-                GetLocal(RuntimeMetadata::new(0, "f")),
+                GetLocal(RuntimeMetadata::new(1, "x", 0..1)),
+                GetLocal(RuntimeMetadata::new(0, "f", 0..1)),
                 Call(1),
                 Return,
-                Push(Box::new(Callable(Box::new(CallableData::new(5, "apply"))))),
-                SetGlobal(RuntimeMetadata::new(0, "apply")),
+                Push(Box::new(Callable(Box::new(CallableData::new(
+                    5,
+                    "apply",
+                    0..1
+                ))))),
+                SetGlobal(RuntimeMetadata::new(0, "apply", 0..1)),
                 Push(Box::new(F64(123.0))),
                 Jump(83),
-                GetLocal(RuntimeMetadata::new(0, "x")),
+                GetLocal(RuntimeMetadata::new(0, "x", 0..1)),
                 Push(Box::new(F64(321.0))),
                 Add(2),
                 Return,
                 Push(Box::new(Callable(Box::new(CallableData::new(
-                    63, "lambda_0"
+                    63,
+                    "lambda_0",
+                    0..1
                 ))))),
-                GetGlobal(RuntimeMetadata::new(0, "apply")),
+                GetGlobal(RuntimeMetadata::new(0, "apply", 0..1)),
                 Call(2)
             ]
         );
@@ -743,24 +762,28 @@ mod tests {
             instructions,
             vec![
                 Jump(95),
-                GetLocal(RuntimeMetadata::new(0, "n")),
+                GetLocal(RuntimeMetadata::new(0, "n", 0..1)),
                 Push(Box::new(F64(0.0))),
                 Eq(2),
                 JumpIf(12),
-                GetLocal(RuntimeMetadata::new(1, "a")),
+                GetLocal(RuntimeMetadata::new(1, "a", 0..1)),
                 JumpForward(53),
-                GetLocal(RuntimeMetadata::new(1, "a")),
-                GetLocal(RuntimeMetadata::new(2, "b")),
+                GetLocal(RuntimeMetadata::new(1, "a", 0..1)),
+                GetLocal(RuntimeMetadata::new(2, "b", 0..1)),
                 Add(2),
-                GetLocal(RuntimeMetadata::new(2, "b")),
-                GetLocal(RuntimeMetadata::new(0, "n")),
+                GetLocal(RuntimeMetadata::new(2, "b", 0..1)),
+                GetLocal(RuntimeMetadata::new(0, "n", 0..1)),
                 Push(Box::new(F64(1.0))),
                 Sub(2),
-                GetGlobal(RuntimeMetadata::new(0, "fib")),
+                GetGlobal(RuntimeMetadata::new(0, "fib", 0..1)),
                 TailCall(3),
                 Return,
-                Push(Box::new(Callable(Box::new(CallableData::new(5, "fib"))))),
-                SetGlobal(RuntimeMetadata::new(0, "fib")),
+                Push(Box::new(Callable(Box::new(CallableData::new(
+                    5,
+                    "fib",
+                    0..1
+                ))))),
+                SetGlobal(RuntimeMetadata::new(0, "fib", 0..1)),
             ]
         );
     }
@@ -780,15 +803,20 @@ mod tests {
                 Add(2),
                 Push(Box::new(F64(3.0))),
                 Eq(2),
-                Push(Box::new(Builtin(20))),
+                Push(Box::new(Builtin(Box::new(CallableData::new(
+                    20,
+                    "assert",
+                    0..1
+                ))))),
                 Call(1),
                 ReturnFromTest,
                 Push(Box::new(Callable(Box::new(CallableData::new(
                     5,
-                    "test()test-testing"
+                    "test()test-testing",
+                    0..1
                 ))))),
-                SetGlobal(RuntimeMetadata::new(0, "test()test-testing")),
-                GetGlobal(RuntimeMetadata::new(0, "test()test-testing")),
+                SetGlobal(RuntimeMetadata::new(0, "test()test-testing", 0..1)),
+                GetGlobal(RuntimeMetadata::new(0, "test()test-testing", 0..1)),
                 CallTest,
             ]
         );

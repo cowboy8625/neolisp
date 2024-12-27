@@ -1,3 +1,4 @@
+use crate::error::Error;
 use crate::instruction::Value;
 use crate::machine::Machine;
 use anyhow::Result;
@@ -6,14 +7,19 @@ use std::collections::HashMap;
 
 pub(crate) struct Intrinsic;
 impl Intrinsic {
-    pub(crate) fn intrinsic_sleep(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn intrinsic_sleep(machine: &mut Machine, _: u8) -> Result<()> {
         // (sleep 1000) ; -> false
-        if count != 1 {
-            anyhow::bail!("sleep only support 1 arg");
-        }
         let frame = machine.get_current_frame_mut()?;
         let Some(Value::F64(value)) = frame.stack.pop() else {
-            anyhow::bail!("expected number on stack for sleep")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected number on stack for sleep".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
         std::thread::sleep(std::time::Duration::from_millis(value as u64));
         Ok(())
@@ -29,7 +35,15 @@ impl Intrinsic {
         }
         let frame = machine.get_current_frame_mut()?;
         let Some(item) = frame.args.pop() else {
-            anyhow::bail!("expected atom on stack for atom?")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected atom on stack for atom?".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
         let result = !matches!(item, Value::List(_) | Value::Callable(_));
         frame.stack.push(Value::Bool(result));
@@ -46,7 +60,15 @@ impl Intrinsic {
         }
         let frame = machine.get_current_frame_mut()?;
         let Some(item) = frame.args.pop() else {
-            anyhow::bail!("expected number on stack for number?")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected number on stack for number?".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
         let result = matches!(
             item,
@@ -65,15 +87,39 @@ impl Intrinsic {
         let frame = machine.get_current_frame_mut()?;
 
         let Some(Value::F64(end)) = frame.args.pop() else {
-            anyhow::bail!("expected int on stack for slice")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected int on stack for slice".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
 
         let Some(Value::F64(start)) = frame.args.pop() else {
-            anyhow::bail!("expected int on stack for slice")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected int on stack for slice".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
 
         let Some(item) = frame.args.pop() else {
-            anyhow::bail!("expected string or list on stack for slice")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected string or list on stack for slice".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
         match item {
             Value::String(string) => {
@@ -93,7 +139,17 @@ impl Intrinsic {
                     .collect::<Vec<_>>();
                 frame.stack.push(Value::List(Box::new(result)));
             }
-            _ => anyhow::bail!("expected string or list on stack for slice"),
+            _ => {
+                let error = Error::RunTimeError {
+                    span: frame.span.clone(),
+                    name: frame.scope_name.to_string(),
+                    message: "expected string or list on stack for slice".to_string(),
+                    code: "".to_string(),
+                    note: None,
+                    help: None,
+                };
+                anyhow::bail!(error)
+            }
         }
         Ok(())
     }
@@ -106,10 +162,26 @@ impl Intrinsic {
         }
         let frame = machine.get_current_frame_mut()?;
         let Some(Value::List(list)) = frame.stack.pop() else {
-            anyhow::bail!("expected list on stack for join")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected list on stack for join".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
         let Some(Value::String(string)) = frame.stack.pop() else {
-            anyhow::bail!("expected string on stack for join")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected string on stack for join".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
         let result = list
             .iter()
@@ -129,11 +201,27 @@ impl Intrinsic {
         let frame = machine.get_current_frame_mut()?;
 
         let Some(Value::String(string)) = frame.args.pop() else {
-            anyhow::bail!("expected string on stack for split")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected string on stack for split".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
 
         let Some(Value::String(item)) = frame.args.pop() else {
-            anyhow::bail!("expected string on stack for split")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected string on stack for split".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
 
         let result = string
@@ -154,7 +242,15 @@ impl Intrinsic {
         let frame = machine.get_current_frame_mut()?;
 
         let Some(value) = frame.args.pop() else {
-            anyhow::bail!("expected value on stack for to-string")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected value on stack for to-string".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
         frame.stack.push(Value::String(Box::new(value.to_string())));
 
@@ -171,10 +267,26 @@ impl Intrinsic {
         let (callable, mut list) = {
             let frame = machine.get_current_frame_mut()?;
             let Some(Value::List(list)) = frame.args.pop() else {
-                anyhow::bail!("expected list on stack for filter")
+                let error = Error::RunTimeError {
+                    span: frame.span.clone(),
+                    name: frame.scope_name.to_string(),
+                    message: "expected list on stack for filter".to_string(),
+                    code: "".to_string(),
+                    note: None,
+                    help: None,
+                };
+                anyhow::bail!(error)
             };
             let Some(Value::Callable(callable)) = frame.args.pop() else {
-                anyhow::bail!("expected lambda on stack for filter")
+                let error = Error::RunTimeError {
+                    span: frame.span.clone(),
+                    name: frame.scope_name.to_string(),
+                    message: "expected lambda on stack for filter".to_string(),
+                    code: "".to_string(),
+                    note: None,
+                    help: None,
+                };
+                anyhow::bail!(error)
             };
             (callable, list)
         };
@@ -182,7 +294,12 @@ impl Intrinsic {
         let mut result = Vec::new();
         for value in list.drain(..) {
             machine.push(value.clone())?;
-            machine.call_from_address(callable.address, 1, &callable.name)?;
+            machine.call_from_address(
+                callable.address,
+                callable.span.clone(),
+                1,
+                &callable.name,
+            )?;
             let Some(Value::Bool(true)) = machine.pop()? else {
                 continue;
             };
@@ -200,13 +317,37 @@ impl Intrinsic {
         let (mut list, callable, initial) = {
             let frame = machine.get_current_frame_mut()?;
             let Some(Value::List(list)) = frame.args.pop() else {
-                anyhow::bail!("expected list on stack for fold-right")
+                let error = Error::RunTimeError {
+                    span: frame.span.clone(),
+                    name: frame.scope_name.to_string(),
+                    message: "expected list on stack for fold-right".to_string(),
+                    code: "".to_string(),
+                    note: None,
+                    help: None,
+                };
+                anyhow::bail!(error)
             };
             let Some(Value::Callable(callable)) = frame.args.pop() else {
-                anyhow::bail!("expected lambda on stack for fold-right")
+                let error = Error::RunTimeError {
+                    span: frame.span.clone(),
+                    name: frame.scope_name.to_string(),
+                    message: "expected lambda on stack for fold-right".to_string(),
+                    code: "".to_string(),
+                    note: None,
+                    help: None,
+                };
+                anyhow::bail!(error)
             };
             let Some(initial) = frame.args.pop() else {
-                anyhow::bail!("expected number on stack for fold-right")
+                let error = Error::RunTimeError {
+                    span: frame.span.clone(),
+                    name: frame.scope_name.to_string(),
+                    message: "expected number on stack for fold-right".to_string(),
+                    code: "".to_string(),
+                    note: None,
+                    help: None,
+                };
+                anyhow::bail!(error)
             };
             (list, callable, initial)
         };
@@ -214,7 +355,12 @@ impl Intrinsic {
         for value in list.drain(..).rev() {
             machine.push(result)?;
             machine.push(value)?;
-            machine.call_from_address(callable.address, 2, &callable.name)?;
+            machine.call_from_address(
+                callable.address,
+                callable.span.clone(),
+                2,
+                &callable.name,
+            )?;
             let Some(v) = machine.pop()? else {
                 // TODO: ERROR REPORTING
                 anyhow::bail!("expected value on stack for fold-right")
@@ -230,27 +376,67 @@ impl Intrinsic {
         if count != 3 {
             anyhow::bail!("fold only support 3 args");
         }
-        let (mut list, callable, initial) = {
+        let (mut list, callable, initial, name, span) = {
             let frame = machine.get_current_frame_mut()?;
+            let span = frame.span.clone();
+            let name = frame.scope_name.to_string();
             let Some(Value::List(list)) = frame.args.pop() else {
-                anyhow::bail!("expected list on stack for fold")
+                let error = Error::RunTimeError {
+                    span,
+                    name,
+                    message: "expected list on stack for fold".to_string(),
+                    code: "".to_string(),
+                    note: None,
+                    help: None,
+                };
+                anyhow::bail!(error)
             };
             let Some(Value::Callable(callable)) = frame.args.pop() else {
-                anyhow::bail!("expected lambda on stack for fold")
+                let error = Error::RunTimeError {
+                    span,
+                    name,
+                    message: "expected lambda on stack for fold".to_string(),
+                    code: "".to_string(),
+                    note: None,
+                    help: None,
+                };
+                anyhow::bail!(error)
             };
             let Some(initial) = frame.args.pop() else {
-                anyhow::bail!("expected number on stack for fold")
+                let error = Error::RunTimeError {
+                    span,
+                    name,
+                    message: "expected number on stack for fold".to_string(),
+                    code: "".to_string(),
+                    note: None,
+                    help: None,
+                };
+                anyhow::bail!(error)
             };
-            (list, callable, initial)
+            (list, callable, initial, name, span)
         };
         let mut result = initial;
+
         for value in list.drain(..) {
             machine.push(result)?;
             machine.push(value)?;
-            machine.call_from_address(callable.address, 2, &callable.name)?;
+            machine.call_from_address(
+                callable.address,
+                callable.span.clone(),
+                2,
+                &callable.name,
+            )?;
             let Some(v) = machine.pop()? else {
                 // TODO: ERROR REPORTING
-                anyhow::bail!("expected value on stack for fold")
+                let error = Error::RunTimeError {
+                    span,
+                    name,
+                    message: "expected value on stack for fold".to_string(),
+                    code: "".to_string(),
+                    note: None,
+                    help: None,
+                };
+                anyhow::bail!(error)
             };
             result = v;
         }
@@ -264,25 +450,56 @@ impl Intrinsic {
             anyhow::bail!("map only support 2 args");
         }
 
-        let (mut list, callable) = {
+        let (mut list, callable, name, span) = {
             let frame = machine.get_current_frame_mut()?;
+            let span = frame.span.clone();
+            let name = frame.scope_name.to_string();
 
             let Some(Value::List(list)) = frame.args.pop() else {
-                anyhow::bail!("expected list on stack for map")
+                let error = Error::RunTimeError {
+                    span,
+                    name,
+                    message: "expected list on stack for map".to_string(),
+                    code: "".to_string(),
+                    note: None,
+                    help: None,
+                };
+                anyhow::bail!(error)
             };
 
             let Some(Value::Callable(callable)) = frame.args.pop() else {
-                anyhow::bail!("expected lambda on stack for map")
+                let error = Error::RunTimeError {
+                    span,
+                    name,
+                    message: "expected lambda on stack for map".to_string(),
+                    code: "".to_string(),
+                    note: None,
+                    help: None,
+                };
+                anyhow::bail!(error)
             };
-            (list, callable)
+            (list, callable, name, span)
         };
         let mut result = Vec::new();
         for value in list.drain(..) {
             machine.push(value)?;
-            machine.call_from_address(callable.address, 1, &callable.name)?;
+            machine.call_from_address(
+                callable.address,
+                callable.span.clone(),
+                1,
+                &callable.name,
+            )?;
             let Some(v) = machine.pop()? else {
                 // TODO: ERROR REPORTING
-                anyhow::bail!("expected value on stack for map")
+                let error = Error::RunTimeError {
+                    span,
+                    name,
+                    message: "expected value on stack for map".to_string(),
+                    code: "".to_string(),
+                    note: None,
+                    help: None,
+                };
+                anyhow::bail!(error)
             };
             result.push(v);
         }
@@ -298,11 +515,20 @@ impl Intrinsic {
         }
 
         let frame = machine.get_current_frame_mut()?;
-        let Some(Value::F64(index)) = frame.args.pop() else {
-            // let scope_name = frame.scope_name.to_string();
-            // let scope = machine.symbol_table.get(&scope_name);
-            // eprintln!("{:?}", scope);
+        let Some(number) = frame.args.pop() else {
+            // I think this error shouldnt happen unless there is a bug in the compiler
             anyhow::bail!("expected number on stack for nth")
+        };
+        let Value::F64(index) = number else {
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected value on stack for nth".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
 
         match frame.args.pop() {
@@ -317,12 +543,30 @@ impl Intrinsic {
             Some(Value::String(mut string)) => {
                 let index = index as usize;
                 if index >= string.len() {
-                    anyhow::bail!("nth index out of range");
+                    let error = Error::RunTimeError {
+                        span: frame.span.clone(),
+                        name: frame.scope_name.to_string(),
+                        message: "index out of range".to_string(),
+                        code: "".to_string(),
+                        note: None,
+                        help: None,
+                    };
+                    anyhow::bail!(error)
                 }
                 let value = string.remove(index);
                 frame.stack.push(Value::String(Box::new(value.to_string())));
             }
-            _ => anyhow::bail!("expected list on stack for nth"),
+            _ => {
+                let error = Error::RunTimeError {
+                    span: frame.span.clone(),
+                    name: frame.scope_name.to_string(),
+                    message: "expected list on stack for nth".to_string(),
+                    code: "".to_string(),
+                    note: None,
+                    help: None,
+                };
+                anyhow::bail!(error)
+            }
         }
         Ok(())
     }
@@ -344,7 +588,17 @@ impl Intrinsic {
                 let string = string.chars().rev().collect::<String>();
                 frame.stack.push(Value::String(Box::new(string)));
             }
-            _ => anyhow::bail!("expected list on stack for reverse"),
+            _ => {
+                let error = Error::RunTimeError {
+                    span: frame.span.clone(),
+                    name: frame.scope_name.to_string(),
+                    message: "expected list on stack for reverse".to_string(),
+                    code: "".to_string(),
+                    note: None,
+                    help: None,
+                };
+                anyhow::bail!(error)
+            }
         }
         Ok(())
     }
@@ -356,10 +610,26 @@ impl Intrinsic {
         }
         let frame = machine.get_current_frame_mut()?;
         let Some(mut rhs) = frame.args.pop() else {
-            anyhow::bail!("expected list on stack for append")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected list on stack for append".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
         let Some(mut lhs) = frame.args.pop() else {
-            anyhow::bail!("expected list on stack for append")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected list on stack for append".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
 
         match (&mut lhs, &mut rhs) {
@@ -373,11 +643,19 @@ impl Intrinsic {
                     .push(Value::String(Box::new(format!("{}{}", lhs, rhs))));
             }
             _ => {
-                anyhow::bail!(
-                    "expected list on stack for append but found {} and {}",
-                    lhs.type_of(),
-                    rhs.type_of()
-                );
+                let error = Error::RunTimeError {
+                    span: frame.span.clone(),
+                    name: frame.scope_name.to_string(),
+                    message: format!(
+                        "expected list on stack for append but found {} and {}",
+                        lhs.type_of(),
+                        rhs.type_of()
+                    ),
+                    code: "".to_string(),
+                    note: None,
+                    help: None,
+                };
+                anyhow::bail!(error)
             }
         }
         Ok(())
@@ -390,7 +668,15 @@ impl Intrinsic {
         }
         let frame = machine.get_current_frame_mut()?;
         let Some(value) = frame.args.pop() else {
-            anyhow::bail!("expected value on stack for last")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected value on stack for last".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
         match &value {
             Value::List(list) if list.is_empty() => {
@@ -401,16 +687,42 @@ impl Intrinsic {
                     frame.stack.push(value.clone());
                     return Ok(());
                 }
-                anyhow::bail!("expected list to have at least 1 for `last`");
+                let error = Error::RunTimeError {
+                    span: frame.span.clone(),
+                    name: frame.scope_name.to_string(),
+                    message: "expected list to have at least 1 for `last`".to_string(),
+                    code: "".to_string(),
+                    note: None,
+                    help: None,
+                };
+                anyhow::bail!(error)
             }
             Value::String(string) => {
                 if let Some(value) = string.chars().last() {
                     frame.stack.push(Value::String(Box::new(value.to_string())));
                     return Ok(());
                 }
-                anyhow::bail!("expected string to have at least 1 for `last`");
+                let error = Error::RunTimeError {
+                    span: frame.span.clone(),
+                    name: frame.scope_name.to_string(),
+                    message: "expected string to have at least 1 for `last`".to_string(),
+                    code: "".to_string(),
+                    note: None,
+                    help: None,
+                };
+                anyhow::bail!(error)
             }
-            _ => anyhow::bail!("expected list on stack for last"),
+            _ => {
+                let error = Error::RunTimeError {
+                    span: frame.span.clone(),
+                    name: frame.scope_name.to_string(),
+                    message: "expected list on stack for last".to_string(),
+                    code: "".to_string(),
+                    note: None,
+                    help: None,
+                };
+                anyhow::bail!(error)
+            }
         }
         Ok(())
     }
@@ -424,7 +736,15 @@ impl Intrinsic {
         let frame = machine.get_current_frame_mut()?;
 
         let Some(value) = frame.args.pop() else {
-            anyhow::bail!("expected value on stack for cdr")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected value on stack for cdr".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
         match &value {
             Value::List(list) if list.is_empty() => {
@@ -433,7 +753,17 @@ impl Intrinsic {
             Value::List(list) => {
                 frame.stack.push(Value::List(Box::new(list[1..].to_vec())));
             }
-            _ => anyhow::bail!("expected list on stack for cdr"),
+            _ => {
+                let error = Error::RunTimeError {
+                    span: frame.span.clone(),
+                    name: frame.scope_name.to_string(),
+                    message: "expected list on stack for cdr".to_string(),
+                    code: "".to_string(),
+                    note: None,
+                    help: None,
+                };
+                anyhow::bail!(error)
+            }
         }
 
         if let Value::List(list) = value {
@@ -451,7 +781,15 @@ impl Intrinsic {
         }
         let frame = machine.get_current_frame_mut()?;
         let Some(value) = frame.args.pop() else {
-            anyhow::bail!("expected value on stack for type?")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected value on stack for type?".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
         frame.stack.push(Value::String(Box::new(value.type_of())));
         Ok(())
@@ -492,7 +830,17 @@ impl Intrinsic {
             Some(Value::List(item)) => {
                 frame.stack.push(Value::F64(item.len() as f64));
             }
-            _ => anyhow::bail!("expected a List on stack for length but found {top:?}"),
+            _ => {
+                let error = Error::RunTimeError {
+                    span: frame.span.clone(),
+                    name: frame.scope_name.to_string(),
+                    message: format!("expected a List on stack for length but found {top:?}"),
+                    code: "".to_string(),
+                    note: None,
+                    help: None,
+                };
+                anyhow::bail!(error)
+            }
         }
         Ok(())
     }
@@ -517,11 +865,27 @@ impl Intrinsic {
 
         let Some(expected) = keys.get(":expected") else {
             // TODO: RUNTIME ERROR
-            anyhow::bail!("expected value to key: :expected")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected value to key: :expected".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
         let Some(actual) = keys.get(":actual") else {
             // TODO: RUNTIME ERROR
-            anyhow::bail!("expected value to key: :actual")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected value to key: :actual".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
 
         let failed = expected != actual;
@@ -547,10 +911,26 @@ impl Intrinsic {
         let frame = machine.get_current_frame_mut()?;
 
         let Some(Value::String(message)) = frame.args.pop() else {
-            anyhow::bail!("expected string on stack for assert")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected string on stack for assert".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
         let Some(Value::Bool(value)) = frame.args.pop() else {
-            anyhow::bail!("expected boolean on stack for assert")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected boolean on stack for assert".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
         if !value {
             eprintln!("assertion failed: {message}");
@@ -576,10 +956,26 @@ impl Intrinsic {
         }
         let frame = machine.get_current_frame_mut()?;
         let Some(Value::List(mut list)) = frame.args.pop() else {
-            anyhow::bail!("expected a List on stack for cons")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected a List on stack for cons".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
         let Some(item) = frame.args.pop() else {
-            anyhow::bail!("expected value on stack for cons")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected value on stack for cons".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
         list.insert(0, item);
         frame.stack.push(Value::List(Box::new(*list)));
@@ -595,7 +991,15 @@ impl Intrinsic {
         let frame = machine.get_current_frame_mut()?;
 
         let Some(Value::List(list)) = frame.args.pop() else {
-            anyhow::bail!("expected a List on stack for car")
+            let error = Error::RunTimeError {
+                span: frame.span.clone(),
+                name: frame.scope_name.to_string(),
+                message: "expected a List on stack for car".to_string(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            };
+            anyhow::bail!(error)
         };
         let item = list.first().cloned().unwrap_or(Value::Bool(false));
 

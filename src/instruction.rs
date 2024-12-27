@@ -1,4 +1,4 @@
-use super::BUILTINS;
+use super::ast::Span;
 use num_derive::{FromPrimitive, ToPrimitive};
 #[derive(Debug, Clone, PartialEq, FromPrimitive, ToPrimitive)]
 #[repr(u8)]
@@ -237,13 +237,15 @@ impl std::fmt::Display for Instruction {
 pub struct RuntimeMetadata {
     pub data: usize,
     pub name: Box<String>,
+    pub span: Span,
 }
 
 impl RuntimeMetadata {
-    pub fn new(data: usize, name: impl Into<String>) -> Self {
+    pub fn new(data: usize, name: impl Into<String>, span: Span) -> Self {
         Self {
             data,
             name: Box::new(name.into()),
+            span,
         }
     }
 
@@ -251,7 +253,9 @@ impl RuntimeMetadata {
         // 4 bytes for address
         // 1 bytes for name length
         // name
-        4 + 1 + self.name.len()
+        // 4 start span
+        // 4 end span
+        4 + 1 + 4 + 4 + self.name.len()
     }
 
     pub fn to_bytecode(&self) -> Vec<u8> {
@@ -262,6 +266,10 @@ impl RuntimeMetadata {
         }
         bytes.extend(&(self.name.len() as u8).to_le_bytes());
         bytes.extend(self.name.as_bytes());
+        let start = self.span.start as u32;
+        bytes.extend(&start.to_le_bytes());
+        let end = self.span.end as u32;
+        bytes.extend(&end.to_le_bytes());
         bytes
     }
 }
@@ -276,13 +284,15 @@ impl std::fmt::Display for RuntimeMetadata {
 pub struct Callable {
     pub address: usize,
     pub name: String,
+    pub span: Span,
 }
 
 impl Callable {
-    pub fn new(address: usize, name: impl Into<String>) -> Self {
+    pub fn new(address: usize, name: impl Into<String>, span: Span) -> Self {
         Self {
             address,
             name: name.into(),
+            span,
         }
     }
 
@@ -291,17 +301,26 @@ impl Callable {
         bytes.extend(&(self.address as u32).to_le_bytes());
         bytes.extend(&(self.name.len() as u32).to_le_bytes());
         bytes.extend(self.name.as_bytes());
+        let start = self.span.start as u32;
+        bytes.extend(&start.to_le_bytes());
+        let end = self.span.end as u32;
+        bytes.extend(&end.to_le_bytes());
         bytes
     }
 
     pub fn size(&self) -> usize {
-        4 + 4 + self.name.len()
+        // 4 address
+        // 4 name length
+        // name length
+        // 4 start span
+        // 4 end span
+        4 + 4 + 4 + 4 + self.name.len()
     }
 }
 
 impl std::fmt::Display for Callable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{}", self.address, self.name)
+        write!(f, "{}:{}:{:?}", self.address, self.name, self.span)
     }
 }
 
@@ -316,7 +335,7 @@ pub enum Value {
     Bool(bool),
     List(Box<Vec<Value>>),
     Callable(Box<Callable>),
-    Builtin(usize),
+    Builtin(Box<Callable>),
     Symbol(Box<String>),
     Keyword(Box<String>),
 }
@@ -379,9 +398,10 @@ impl Value {
                 bytes.extend(callable_bytes);
                 bytes
             }
-            Value::Builtin(index) => {
+            Value::Builtin(callable) => {
                 let mut bytes = vec![Self::CODE_BUILTIN];
-                bytes.extend_from_slice(&(*index as u32).to_le_bytes());
+                let callable_bytes = callable.to_bytecode();
+                bytes.extend(callable_bytes);
                 bytes
             }
             Value::Symbol(v) => {
@@ -412,7 +432,7 @@ impl Value {
             // 4 bytes    4 bytes
             // start......end
             Value::Callable(callable) => callable.size(),
-            Value::Builtin(_) => 4,
+            Value::Builtin(callable) => callable.size(),
             Value::Symbol(v) => 4 + v.len(),
             Value::Keyword(v) => 4 + v.len(),
         };
@@ -460,7 +480,7 @@ impl std::fmt::Display for Value {
                 )
             }
             Self::Callable(data) => write!(f, "<function {data}>"),
-            Self::Builtin(index) => write!(f, "<function {:?}>", BUILTINS[*index]),
+            Self::Builtin(data) => write!(f, "<function {data}>"),
             Self::Symbol(value) => write!(f, "{value}"),
             Self::Keyword(value) => write!(f, "{value}"),
         }
