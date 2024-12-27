@@ -45,5 +45,7 @@ jobs:
       continue-on-error: ${{ matrix.can-fail }}
     - name: Rust Test Build
       run: cargo test
-    - name: Neolisp Test Build
-      run: cargo run -r -- test samples/demo.nl
+    - name: Neolisp Test Demo Build
+      run: |
+        cargo run -r -- test samples/demo.nl
+        cargo run -r -- test samples/test.nl
