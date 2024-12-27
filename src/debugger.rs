@@ -169,7 +169,7 @@ impl<'a> Debugger<'a> {
 
         let data = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(75), Constraint::Percentage(25)].as_ref())
+            .constraints([Constraint::Percentage(55), Constraint::Percentage(45)].as_ref())
             .split(chunks[0]);
 
         let frame_data_block = Layout::default()
@@ -413,13 +413,13 @@ impl<'a> Debugger<'a> {
         for int in self.instructions.iter() {
             let selected = if self.machine.ip == offset {
                 Span::styled(
-                    format!("0x{offset:02X} {offset:>5} "),
+                    format!("0x{offset:06X} {offset:>5} "),
                     Style::default()
                         .fg(Color::Green)
                         .add_modifier(Modifier::UNDERLINED),
                 )
             } else {
-                Span::raw(format!("0x{offset:02X} {offset:>5} "))
+                Span::raw(format!("0x{offset:06X} {offset:>5} "))
             };
 
             let breakpoint = if self.breakpoints.contains(&offset) {
