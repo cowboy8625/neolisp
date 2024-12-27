@@ -666,23 +666,23 @@ mod tests {
             instructions,
             vec![
                 Push(Box::new(F64(1.0))),
-                SetLocal(RuntimeMetadata::new(0, "x", 0..1)),
-                GetLocal(RuntimeMetadata::new(0, "x", 0..1)),
-                SetFree(RuntimeMetadata::new(0, "x", 0..1)),
+                SetLocal(RuntimeMetadata::new(0, "x", 10..20)),
+                GetLocal(RuntimeMetadata::new(0, "x", 10..20)),
+                SetFree(RuntimeMetadata::new(0, "x", 10..20)),
                 Push(Box::new(F64(2.0))),
-                SetLocal(RuntimeMetadata::new(0, "y", 0..1)),
-                GetLocal(RuntimeMetadata::new(0, "y", 0..1)),
-                SetFree(RuntimeMetadata::new(0, "y", 0..1)),
+                SetLocal(RuntimeMetadata::new(0, "y", 25..35)),
+                GetLocal(RuntimeMetadata::new(0, "y", 25..35)),
+                SetFree(RuntimeMetadata::new(0, "y", 25..35)),
                 Push(Box::new(F64(3.0))),
-                SetLocal(RuntimeMetadata::new(0, "z", 0..1)),
+                SetLocal(RuntimeMetadata::new(0, "z", 40..50)),
                 Push(Box::new(String(Box::new("\n".to_string())))),
-                GetLocal(RuntimeMetadata::new(0, "z", 0..1)),
-                GetFree(RuntimeMetadata::new(1, "y", 0..1)),
-                GetFree(RuntimeMetadata::new(0, "x", 0..1)),
+                GetLocal(RuntimeMetadata::new(0, "z", 61..63)),
+                GetFree(RuntimeMetadata::new(1, "y", 59..61)),
+                GetFree(RuntimeMetadata::new(0, "x", 57..59)),
                 Push(Box::new(Builtin(Box::new(CallableData::new(
                     17,
                     "print",
-                    0..1
+                    51..67
                 ))))),
                 Call(4),
             ]
@@ -720,29 +720,29 @@ mod tests {
         assert_eq!(
             instructions,
             vec![
-                Jump(22),
-                GetLocal(RuntimeMetadata::new(1, "x", 0..1)),
-                GetLocal(RuntimeMetadata::new(0, "f", 0..1)),
+                Jump(38),
+                GetLocal(RuntimeMetadata::new(1, "x", 21..22)),
+                GetLocal(RuntimeMetadata::new(0, "f", 19..21)),
                 Call(1),
                 Return,
                 Push(Box::new(Callable(Box::new(CallableData::new(
                     5,
                     "apply",
-                    0..1
+                    2..26
                 ))))),
-                SetGlobal(RuntimeMetadata::new(0, "apply", 0..1)),
+                SetGlobal(RuntimeMetadata::new(0, "apply", 2..26)),
                 Push(Box::new(F64(123.0))),
-                Jump(83),
-                GetLocal(RuntimeMetadata::new(0, "x", 0..1)),
+                Jump(123),
+                GetLocal(RuntimeMetadata::new(0, "x", 48..50)),
                 Push(Box::new(F64(321.0))),
                 Add(2),
                 Return,
                 Push(Box::new(Callable(Box::new(CallableData::new(
-                    63,
+                    95,
                     "lambda_0",
-                    0..1
+                    41..54
                 ))))),
-                GetGlobal(RuntimeMetadata::new(0, "apply", 0..1)),
+                GetGlobal(RuntimeMetadata::new(0, "apply", 27..33)),
                 Call(2)
             ]
         );
@@ -761,29 +761,29 @@ mod tests {
         assert_eq!(
             instructions,
             vec![
-                Jump(95),
-                GetLocal(RuntimeMetadata::new(0, "n", 0..1)),
+                Jump(151),
+                GetLocal(RuntimeMetadata::new(0, "n", 26..28)),
                 Push(Box::new(F64(0.0))),
                 Eq(2),
-                JumpIf(12),
-                GetLocal(RuntimeMetadata::new(1, "a", 0..1)),
-                JumpForward(53),
-                GetLocal(RuntimeMetadata::new(1, "a", 0..1)),
-                GetLocal(RuntimeMetadata::new(2, "b", 0..1)),
+                JumpIf(20),
+                GetLocal(RuntimeMetadata::new(1, "a", 37..45)),
+                JumpForward(93),
+                GetLocal(RuntimeMetadata::new(1, "a", 63..65)),
+                GetLocal(RuntimeMetadata::new(2, "b", 65..66)),
                 Add(2),
-                GetLocal(RuntimeMetadata::new(2, "b", 0..1)),
-                GetLocal(RuntimeMetadata::new(0, "n", 0..1)),
+                GetLocal(RuntimeMetadata::new(2, "b", 58..60)),
+                GetLocal(RuntimeMetadata::new(0, "n", 53..55)),
                 Push(Box::new(F64(1.0))),
                 Sub(2),
-                GetGlobal(RuntimeMetadata::new(0, "fib", 0..1)),
+                GetGlobal(RuntimeMetadata::new(0, "fib", 46..50)),
                 TailCall(3),
                 Return,
                 Push(Box::new(Callable(Box::new(CallableData::new(
                     5,
                     "fib",
-                    0..1
+                    1..72
                 ))))),
-                SetGlobal(RuntimeMetadata::new(0, "fib", 0..1)),
+                SetGlobal(RuntimeMetadata::new(0, "fib", 1..72)),
             ]
         );
     }
@@ -797,7 +797,7 @@ mod tests {
         assert_eq!(
             instructions,
             vec![
-                Jump(48),
+                Jump(66),
                 Push(Box::new(F64(1.0))),
                 Push(Box::new(F64(2.0))),
                 Add(2),
@@ -806,17 +806,17 @@ mod tests {
                 Push(Box::new(Builtin(Box::new(CallableData::new(
                     20,
                     "assert",
-                    0..1
+                    22..42
                 ))))),
                 Call(1),
                 ReturnFromTest,
                 Push(Box::new(Callable(Box::new(CallableData::new(
                     5,
                     "test()test-testing",
-                    0..1
+                    2..46
                 ))))),
-                SetGlobal(RuntimeMetadata::new(0, "test()test-testing", 0..1)),
-                GetGlobal(RuntimeMetadata::new(0, "test()test-testing", 0..1)),
+                SetGlobal(RuntimeMetadata::new(0, "test()test-testing", 2..46)),
+                GetGlobal(RuntimeMetadata::new(0, "test()test-testing", 2..46)),
                 CallTest,
             ]
         );
