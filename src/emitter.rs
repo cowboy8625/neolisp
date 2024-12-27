@@ -666,10 +666,10 @@ mod tests {
                 SetFree(RuntimeMetadata::new(0, "y")),
                 Push(Box::new(F64(3.0))),
                 SetLocal(RuntimeMetadata::new(0, "z")),
-                GetFree(RuntimeMetadata::new(0, "x")),
-                GetFree(RuntimeMetadata::new(1, "y")),
-                GetLocal(RuntimeMetadata::new(0, "z")),
                 Push(Box::new(String(Box::new("\n".to_string())))),
+                GetLocal(RuntimeMetadata::new(0, "z")),
+                GetFree(RuntimeMetadata::new(1, "y")),
+                GetFree(RuntimeMetadata::new(0, "x")),
                 Push(Box::new(Builtin(17))),
                 Call(4),
             ]

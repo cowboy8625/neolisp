@@ -470,7 +470,7 @@ impl Intrinsic {
                 anyhow::bail!("expected value on stack for print")
             };
             write!(&mut output, "{}", value).expect("write failed");
-            if i == 0 {
+            if i == count - 1 {
                 frame.stack.push(value);
             }
         }
