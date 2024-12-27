@@ -298,7 +298,6 @@ impl Intrinsic {
         }
 
         let frame = machine.get_current_frame_mut()?;
-        eprintln!("{:?}", frame.args);
         let Some(Value::F64(index)) = frame.args.pop() else {
             // let scope_name = frame.scope_name.to_string();
             // let scope = machine.symbol_table.get(&scope_name);
