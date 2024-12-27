@@ -458,6 +458,9 @@ impl AstWalker<Program> for Emitter<'_> {
         }
 
         self.walk_expr(program, call.callee);
+        if let Some(Instruction::Call(_)) = program.last() {
+            return;
+        }
         program.push(Instruction::Call(call.args.len()));
     }
 

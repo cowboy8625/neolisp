@@ -276,7 +276,7 @@ impl RuntimeMetadata {
 
 impl std::fmt::Display for RuntimeMetadata {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}:{:?}", self.data, self.name)
+        write!(f, "{}:{:?} {:?}", self.data, self.name, self.span)
     }
 }
 

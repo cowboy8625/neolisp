@@ -667,7 +667,6 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         self.lambda_counter += 1;
         let scope_name = format!("let_{id}|{}", names.join("|"));
         let old_variable_counter = self.variable_counter;
-        self.variable_counter = 0;
         table.enter_scope(&scope_name);
 
         let mut bindings = Vec::new();
@@ -728,7 +727,6 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         // }
 
         table.exit_scope();
-        self.variable_counter = old_variable_counter;
     }
 
     fn handle_call(&mut self, table: &mut SymbolTable, call: &CallExpr) {
