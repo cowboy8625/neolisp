@@ -446,7 +446,7 @@ impl std::fmt::Display for Value {
             Self::U32(value) => write!(f, "{value}"),
             Self::F32(value) => write!(f, "{value}"),
             Self::F64(value) => write!(f, "{value}"),
-            Self::String(value) => write!(f, "{value:?}"),
+            Self::String(value) => write!(f, "{value}"),
             Self::Bool(value) => write!(f, "{value}"),
             Self::List(value) => {
                 write!(

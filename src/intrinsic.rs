@@ -457,7 +457,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_print(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn intrinsic_print(machine: &mut Machine, _: u8) -> Result<()> {
         use std::fmt::Write as FmtWrite;
         use std::io::Write;
         let lock = std::io::stdout().lock();
@@ -465,14 +465,11 @@ impl Intrinsic {
         let mut output = String::new();
 
         let frame = machine.get_current_frame_mut()?;
-        for i in 0..count {
-            let Some(value) = frame.args.pop() else {
-                anyhow::bail!("expected value on stack for print")
-            };
-            write!(&mut output, "{}", value).expect("write failed");
-            if i == count - 1 {
-                frame.stack.push(value);
-            }
+        for arg in frame.args.iter() {
+            write!(&mut output, "{}", arg).expect("write failed");
+        }
+        if let Some(arg) = frame.args.last() {
+            frame.stack.push(arg.clone());
         }
         writer.write_all(output.as_bytes())?;
         writer.flush()?;
