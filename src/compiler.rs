@@ -95,7 +95,7 @@ impl Compiler {
         if self.decompile {
             let mut offset = 0;
             for int in instructions.iter() {
-                eprintln!("{offset:02X} {offset:>2}  {:?}", int);
+                eprintln!("{offset:06X} {offset:>2}  {int}");
                 offset += int.size();
             }
 
