@@ -4,7 +4,7 @@ use super::{
     instruction::{Callable, Instruction, OpCode, RuntimeMetadata, Value},
     symbol_table::SymbolTable,
 };
-use crate::intrinsic::Intrinsic;
+use crate::{intrinsic::Intrinsic, BUILTINS};
 use anyhow::{anyhow, Result};
 use crossterm::style::Stylize;
 use num_traits::FromPrimitive;
@@ -73,7 +73,7 @@ const INTRISICS: [fn(&mut Machine, u8) -> Result<()>; 24] = [
 #[derive(Debug)]
 pub(crate) struct Frame {
     pub return_address: Option<usize>,
-    pub scope_name: Box<String>,
+    pub scope_name: String,
     pub args: Vec<Value>,
     pub stack: Vec<Value>,
 }
@@ -82,7 +82,7 @@ impl Default for Frame {
     fn default() -> Self {
         Self {
             return_address: None,
-            scope_name: Box::new("global".to_string()),
+            scope_name: "global".to_string(),
             args: Vec::with_capacity(256),
             stack: Vec::with_capacity(1024),
         }
@@ -93,7 +93,7 @@ impl Frame {
     fn new(return_address: usize, scope_name: impl Into<String>, args: Vec<Value>) -> Self {
         Self {
             return_address: Some(return_address),
-            scope_name: Box::new(scope_name.into()),
+            scope_name: scope_name.into(),
             args,
             stack: Vec::new(),
         }
@@ -465,6 +465,37 @@ impl Machine {
             .last_mut()
             .map_or_else(|| Err(anyhow!("Stack is empty")), Ok)
     }
+
+    fn buildin_function_call(&mut self, index: usize, count: usize) -> Result<()> {
+        let mut param_values = {
+            let frame = self.get_current_frame_mut()?;
+            let length = frame.stack.len();
+            frame.stack.split_off(length - count)
+        };
+
+        param_values.reverse();
+
+        let name = BUILTINS[index];
+        let new_frame = Frame::new(self.ip, name, param_values);
+        self.stack.push(new_frame);
+        INTRISICS[index](self, count as u8)?;
+
+        let value = {
+            let frame = self.get_current_frame_mut()?;
+            let Some(value) = frame.stack.pop() else {
+                // TODO: ERROR REPORTING
+                anyhow::bail!("missing return value on stack");
+            };
+            if let Some(address) = frame.return_address {
+                self.ip = address;
+            }
+            value
+        };
+        self.stack.pop();
+        let frame = self.get_current_frame_mut()?;
+        frame.stack.push(value);
+        Ok(())
+    }
 }
 
 impl Machine {
@@ -498,7 +529,7 @@ impl Machine {
                 // TODO: ERROR REPORTING
                 anyhow::bail!("missing return value on stack");
             };
-            let test_name = frame.args[0].clone();
+            let test_name = frame.scope_name.clone();
             if let Some(address) = frame.return_address {
                 self.ip = address;
             }
@@ -796,16 +827,16 @@ impl Machine {
             };
             value
         };
-        let callable = match value {
-            Value::Builtin(index) => {
-                INTRISICS[index](self, count as u8)?;
-                return Ok(());
-            }
-            Value::Callable(data) => data,
-            _ => {
-                // TODO: ERROR REPORT;
-                anyhow::bail!("can not call '{}' type", value);
-            }
+
+        if let Value::Builtin(index) = value {
+            self.buildin_function_call(index, count)?;
+            // INTRISICS[index](self, count as u8)?;
+            return Ok(());
+        }
+
+        let Value::Callable(callable) = value else {
+            // TODO: ERROR REPORT;
+            anyhow::bail!("can not call '{}' type", value);
         };
         let mut param_values = {
             let frame = self.get_current_frame_mut()?;
@@ -837,8 +868,7 @@ impl Machine {
             // TODO: ERROR REPORT;
             anyhow::bail!("can not call '{}' type", value);
         };
-        let test_name = Value::String(Box::new(callable.name.to_string()));
-        let new_frame = Frame::new(self.ip, callable.name, vec![test_name]);
+        let new_frame = Frame::new(self.ip, callable.name, Vec::new());
         self.stack.push(new_frame);
         self.ip = callable.address;
         Ok(())
@@ -917,7 +947,12 @@ impl Machine {
             self.global.push(value);
             return Ok(());
         }
-        anyhow::bail!("something in the compiler is wrong with SetGlobal");
+        anyhow::bail!(
+            "something in the compiler is wrong with SetGlobal\nindex: {}\nvalue: {}\nlen: {}",
+            index,
+            value,
+            self.global.len()
+        );
     }
 
     fn instruction_get_global(&mut self) -> Result<()> {

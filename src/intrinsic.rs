@@ -28,7 +28,7 @@ impl Intrinsic {
             anyhow::bail!("atom? only support 1 arg");
         }
         let frame = machine.get_current_frame_mut()?;
-        let Some(item) = frame.stack.pop() else {
+        let Some(item) = frame.args.pop() else {
             anyhow::bail!("expected atom on stack for atom?")
         };
         let result = !matches!(item, Value::List(_) | Value::Callable(_));
@@ -45,7 +45,7 @@ impl Intrinsic {
             anyhow::bail!("number? only support 1 arg");
         }
         let frame = machine.get_current_frame_mut()?;
-        let Some(item) = frame.stack.pop() else {
+        let Some(item) = frame.args.pop() else {
             anyhow::bail!("expected number on stack for number?")
         };
         let result = matches!(
@@ -63,16 +63,18 @@ impl Intrinsic {
             anyhow::bail!("slice only support 3 args");
         }
         let frame = machine.get_current_frame_mut()?;
-        let Some(Value::F64(end)) = frame.stack.pop() else {
+
+        let Some(Value::F64(end)) = frame.args.pop() else {
             anyhow::bail!("expected int on stack for slice")
-        };
-        let Some(Value::F64(start)) = frame.stack.pop() else {
-            anyhow::bail!("expected int on stack for slice")
-        };
-        let Some(item) = frame.stack.pop() else {
-            anyhow::bail!("expected string or list on stack for slice")
         };
 
+        let Some(Value::F64(start)) = frame.args.pop() else {
+            anyhow::bail!("expected int on stack for slice")
+        };
+
+        let Some(item) = frame.args.pop() else {
+            anyhow::bail!("expected string or list on stack for slice")
+        };
         match item {
             Value::String(string) => {
                 let result = string
@@ -125,12 +127,15 @@ impl Intrinsic {
             anyhow::bail!("split only support 2 args");
         }
         let frame = machine.get_current_frame_mut()?;
-        let Some(Value::String(string)) = frame.stack.pop() else {
+
+        let Some(Value::String(string)) = frame.args.pop() else {
             anyhow::bail!("expected string on stack for split")
         };
-        let Some(Value::String(item)) = frame.stack.pop() else {
+
+        let Some(Value::String(item)) = frame.args.pop() else {
             anyhow::bail!("expected string on stack for split")
         };
+
         let result = string
             .split(&*item)
             .map(|i| Value::String(Box::new(i.to_string())))
@@ -148,7 +153,7 @@ impl Intrinsic {
 
         let frame = machine.get_current_frame_mut()?;
 
-        let Some(value) = frame.stack.pop() else {
+        let Some(value) = frame.args.pop() else {
             anyhow::bail!("expected value on stack for to-string")
         };
         frame.stack.push(Value::String(Box::new(value.to_string())));
@@ -163,12 +168,17 @@ impl Intrinsic {
             anyhow::bail!("filter only support 2 args");
         }
 
-        let Some(Value::List(mut list)) = machine.pop()? else {
-            anyhow::bail!("expected list on stack for filter")
+        let (callable, mut list) = {
+            let frame = machine.get_current_frame_mut()?;
+            let Some(Value::List(list)) = frame.args.pop() else {
+                anyhow::bail!("expected list on stack for filter")
+            };
+            let Some(Value::Callable(callable)) = frame.args.pop() else {
+                anyhow::bail!("expected lambda on stack for filter")
+            };
+            (callable, list)
         };
-        let Some(Value::Callable(callable)) = machine.pop()? else {
-            anyhow::bail!("expected lambda on stack for filter")
-        };
+
         let mut result = Vec::new();
         for value in list.drain(..) {
             machine.push(value.clone())?;
@@ -187,14 +197,18 @@ impl Intrinsic {
         if count != 3 {
             anyhow::bail!("fold only support 3 args");
         }
-        let Some(Value::List(mut list)) = machine.pop()? else {
-            anyhow::bail!("expected list on stack for fold")
-        };
-        let Some(Value::Callable(callable)) = machine.pop()? else {
-            anyhow::bail!("expected lambda on stack for fold")
-        };
-        let Some(initial) = machine.pop()? else {
-            anyhow::bail!("expected number on stack for fold")
+        let (mut list, callable, initial) = {
+            let frame = machine.get_current_frame_mut()?;
+            let Some(Value::List(list)) = frame.args.pop() else {
+                anyhow::bail!("expected list on stack for fold-right")
+            };
+            let Some(Value::Callable(callable)) = frame.args.pop() else {
+                anyhow::bail!("expected lambda on stack for fold-right")
+            };
+            let Some(initial) = frame.args.pop() else {
+                anyhow::bail!("expected number on stack for fold-right")
+            };
+            (list, callable, initial)
         };
         let mut result = initial;
         for value in list.drain(..).rev() {
@@ -203,7 +217,7 @@ impl Intrinsic {
             machine.call_from_address(callable.address, 2, &callable.name)?;
             let Some(v) = machine.pop()? else {
                 // TODO: ERROR REPORTING
-                anyhow::bail!("expected value on stack for fold right")
+                anyhow::bail!("expected value on stack for fold-right")
             };
             result = v;
         }
@@ -216,14 +230,18 @@ impl Intrinsic {
         if count != 3 {
             anyhow::bail!("fold only support 3 args");
         }
-        let Some(Value::List(mut list)) = machine.pop()? else {
-            anyhow::bail!("expected list on stack for fold")
-        };
-        let Some(Value::Callable(callable)) = machine.pop()? else {
-            anyhow::bail!("expected lambda on stack for fold")
-        };
-        let Some(initial) = machine.pop()? else {
-            anyhow::bail!("expected number on stack for fold")
+        let (mut list, callable, initial) = {
+            let frame = machine.get_current_frame_mut()?;
+            let Some(Value::List(list)) = frame.args.pop() else {
+                anyhow::bail!("expected list on stack for fold")
+            };
+            let Some(Value::Callable(callable)) = frame.args.pop() else {
+                anyhow::bail!("expected lambda on stack for fold")
+            };
+            let Some(initial) = frame.args.pop() else {
+                anyhow::bail!("expected number on stack for fold")
+            };
+            (list, callable, initial)
         };
         let mut result = initial;
         for value in list.drain(..) {
@@ -246,12 +264,17 @@ impl Intrinsic {
             anyhow::bail!("map only support 2 args");
         }
 
-        let Some(Value::List(mut list)) = machine.pop()? else {
-            anyhow::bail!("expected list on stack for map")
-        };
+        let (mut list, callable) = {
+            let frame = machine.get_current_frame_mut()?;
 
-        let Some(Value::Callable(callable)) = machine.pop()? else {
-            anyhow::bail!("expected lambda on stack for map")
+            let Some(Value::List(list)) = frame.args.pop() else {
+                anyhow::bail!("expected list on stack for map")
+            };
+
+            let Some(Value::Callable(callable)) = frame.args.pop() else {
+                anyhow::bail!("expected lambda on stack for map")
+            };
+            (list, callable)
         };
         let mut result = Vec::new();
         for value in list.drain(..) {
@@ -273,22 +296,35 @@ impl Intrinsic {
         if count != 2 {
             anyhow::bail!("nth only support 2 args");
         }
+
         let frame = machine.get_current_frame_mut()?;
-        let Some(Value::F64(index)) = frame.stack.pop() else {
-            let scope_name = frame.scope_name.to_string();
-            let scope = machine.symbol_table.get(&scope_name);
-            eprintln!("{:#?}", scope);
+        eprintln!("{:?}", frame.args);
+        let Some(Value::F64(index)) = frame.args.pop() else {
+            // let scope_name = frame.scope_name.to_string();
+            // let scope = machine.symbol_table.get(&scope_name);
+            // eprintln!("{:?}", scope);
             anyhow::bail!("expected number on stack for nth")
         };
-        let Some(Value::List(mut list)) = frame.stack.pop() else {
-            anyhow::bail!("expected list on stack for nth")
-        };
-        let index = index as usize;
-        if index >= list.len() {
-            anyhow::bail!("nth index out of range");
+
+        match frame.args.pop() {
+            Some(Value::List(mut list)) => {
+                let index = index as usize;
+                if index >= list.len() {
+                    anyhow::bail!("nth index out of range");
+                }
+                let value = list.remove(index);
+                frame.stack.push(value);
+            }
+            Some(Value::String(mut string)) => {
+                let index = index as usize;
+                if index >= string.len() {
+                    anyhow::bail!("nth index out of range");
+                }
+                let value = string.remove(index);
+                frame.stack.push(Value::String(Box::new(value.to_string())));
+            }
+            _ => anyhow::bail!("expected list on stack for nth"),
         }
-        let value = list.remove(index);
-        frame.stack.push(value);
         Ok(())
     }
 
@@ -300,11 +336,17 @@ impl Intrinsic {
 
         let frame = machine.get_current_frame_mut()?;
 
-        let Some(Value::List(mut list)) = frame.stack.pop() else {
-            anyhow::bail!("expected list on stack for reverse")
-        };
-        list.reverse();
-        frame.stack.push(Value::List(list));
+        match frame.args.pop() {
+            Some(Value::List(mut list)) => {
+                list.reverse();
+                frame.stack.push(Value::List(list));
+            }
+            Some(Value::String(string)) => {
+                let string = string.chars().rev().collect::<String>();
+                frame.stack.push(Value::String(Box::new(string)));
+            }
+            _ => anyhow::bail!("expected list on stack for reverse"),
+        }
         Ok(())
     }
 
@@ -314,10 +356,10 @@ impl Intrinsic {
             anyhow::bail!("append only support 2 args");
         }
         let frame = machine.get_current_frame_mut()?;
-        let Some(mut rhs) = frame.stack.pop() else {
+        let Some(mut rhs) = frame.args.pop() else {
             anyhow::bail!("expected list on stack for append")
         };
-        let Some(mut lhs) = frame.stack.pop() else {
+        let Some(mut lhs) = frame.args.pop() else {
             anyhow::bail!("expected list on stack for append")
         };
 
@@ -348,7 +390,7 @@ impl Intrinsic {
             anyhow::bail!("last only support 1 args");
         }
         let frame = machine.get_current_frame_mut()?;
-        let Some(value) = frame.stack.pop() else {
+        let Some(value) = frame.args.pop() else {
             anyhow::bail!("expected value on stack for last")
         };
         match &value {
@@ -361,6 +403,13 @@ impl Intrinsic {
                     return Ok(());
                 }
                 anyhow::bail!("expected list to have at least 1 for `last`");
+            }
+            Value::String(string) => {
+                if let Some(value) = string.chars().last() {
+                    frame.stack.push(Value::String(Box::new(value.to_string())));
+                    return Ok(());
+                }
+                anyhow::bail!("expected string to have at least 1 for `last`");
             }
             _ => anyhow::bail!("expected list on stack for last"),
         }
@@ -375,7 +424,7 @@ impl Intrinsic {
 
         let frame = machine.get_current_frame_mut()?;
 
-        let Some(value) = frame.stack.pop() else {
+        let Some(value) = frame.args.pop() else {
             anyhow::bail!("expected value on stack for cdr")
         };
         match &value {
@@ -402,7 +451,7 @@ impl Intrinsic {
             anyhow::bail!("type? only support 1 args");
         }
         let frame = machine.get_current_frame_mut()?;
-        let Some(value) = frame.stack.pop() else {
+        let Some(value) = frame.args.pop() else {
             anyhow::bail!("expected value on stack for type?")
         };
         frame.stack.push(Value::String(Box::new(value.type_of())));
@@ -410,28 +459,24 @@ impl Intrinsic {
     }
 
     pub(crate) fn intrinsic_print(machine: &mut Machine, count: u8) -> Result<()> {
+        use std::fmt::Write as FmtWrite;
         use std::io::Write;
         let lock = std::io::stdout().lock();
         let mut writer = std::io::BufWriter::new(lock);
         let mut output = String::new();
 
-        let mut items = Vec::new();
         let frame = machine.get_current_frame_mut()?;
         for i in 0..count {
-            let Some(value) = frame.stack.pop() else {
+            let Some(value) = frame.args.pop() else {
                 anyhow::bail!("expected value on stack for print")
             };
-            output.insert_str(0, &format!("{}", value));
-            if i == count - 1 {
-                items.push(value);
+            write!(&mut output, "{}", value).expect("write failed");
+            if i == 0 {
+                frame.stack.push(value);
             }
         }
         writer.write_all(output.as_bytes())?;
         writer.flush()?;
-
-        for items in items.into_iter().rev() {
-            frame.stack.push(items);
-        }
 
         Ok(())
     }
@@ -443,16 +488,20 @@ impl Intrinsic {
         }
 
         let frame = machine.get_current_frame_mut()?;
-        let top = frame.stack.pop();
-        let Some(Value::List(list)) = top else {
-            anyhow::bail!("expected a List on stack for length but found {top:?}");
-        };
-
-        frame.stack.push(Value::F64(list.len() as f64));
+        let top = frame.args.pop();
+        match top {
+            Some(Value::String(item)) => {
+                frame.stack.push(Value::F64(item.len() as f64));
+            }
+            Some(Value::List(item)) => {
+                frame.stack.push(Value::F64(item.len() as f64));
+            }
+            _ => anyhow::bail!("expected a List on stack for length but found {top:?}"),
+        }
         Ok(())
     }
 
-    pub(crate) fn intrinsic_assert_eq(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn intrinsic_assert_eq<'a>(machine: &'a mut Machine, count: u8) -> Result<()> {
         // (assert-eq :expected 1 :actual 2)
         if count < 2 {
             anyhow::bail!("assert-eq at least 2 args");
@@ -460,11 +509,8 @@ impl Intrinsic {
 
         let frame = machine.get_current_frame_mut()?;
 
-        let index = frame.stack.len() - count as usize;
-        let args = frame.stack.split_off(index);
-
-        let mut keys: HashMap<String, Value> = HashMap::new();
-        let mut iter = args.into_iter();
+        let mut keys: HashMap<String, &'a Value> = HashMap::new();
+        let mut iter = frame.args.iter();
         while let Some(key) = iter.next() {
             let Some(value) = iter.next() else {
                 // TODO: RUNTIME ERROR
@@ -504,10 +550,10 @@ impl Intrinsic {
 
         let frame = machine.get_current_frame_mut()?;
 
-        let Some(Value::String(message)) = frame.stack.pop() else {
+        let Some(Value::String(message)) = frame.args.pop() else {
             anyhow::bail!("expected string on stack for assert")
         };
-        let Some(Value::Bool(value)) = frame.stack.pop() else {
+        let Some(Value::Bool(value)) = frame.args.pop() else {
             anyhow::bail!("expected boolean on stack for assert")
         };
         if !value {
@@ -519,17 +565,11 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_create_list(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn intrinsic_create_list(machine: &mut Machine, _: u8) -> Result<()> {
         // (create-list 1 2 3) => (1 2 3)
-        let mut items = Vec::new();
         let frame = machine.get_current_frame_mut()?;
-        for _ in 0..count {
-            let Some(item) = frame.stack.pop() else {
-                anyhow::bail!("expected value on stack for CreateList")
-            };
-            items.insert(0, item);
-        }
-        frame.stack.push(Value::List(Box::new(items)));
+        let value = frame.args.clone();
+        frame.stack.push(Value::List(Box::new(value)));
         Ok(())
     }
 
@@ -539,10 +579,10 @@ impl Intrinsic {
             anyhow::bail!("cons only support 2 args");
         }
         let frame = machine.get_current_frame_mut()?;
-        let Some(Value::List(mut list)) = frame.stack.pop() else {
+        let Some(Value::List(mut list)) = frame.args.pop() else {
             anyhow::bail!("expected a List on stack for cons")
         };
-        let Some(item) = frame.stack.pop() else {
+        let Some(item) = frame.args.pop() else {
             anyhow::bail!("expected value on stack for cons")
         };
         list.insert(0, item);
@@ -558,7 +598,7 @@ impl Intrinsic {
 
         let frame = machine.get_current_frame_mut()?;
 
-        let Some(Value::List(list)) = frame.stack.pop() else {
+        let Some(Value::List(list)) = frame.args.pop() else {
             anyhow::bail!("expected a List on stack for car")
         };
         let item = list.first().cloned().unwrap_or(Value::Bool(false));

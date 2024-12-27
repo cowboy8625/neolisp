@@ -195,6 +195,44 @@ impl Instruction {
     }
 }
 
+impl std::fmt::Display for Instruction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Instruction::Halt => write!(f, "halt"),
+            Instruction::Return => write!(f, "ret"),
+            Instruction::ReturnFromTest => write!(f, "ret-test"),
+            Instruction::Push(value) => write!(f, "{:<10} {value}", "push"),
+            Instruction::Add(count) => write!(f, "{:<10} {count}", "add"),
+            Instruction::Sub(count) => write!(f, "{:<10} {count}", "sub"),
+            Instruction::Mul(count) => write!(f, "{:<10} {count}", "mul"),
+            Instruction::Div(count) => write!(f, "{:<10} {count}", "div"),
+            Instruction::Eq(count) => write!(f, "eq {count}"),
+            Instruction::GreaterThan(count) => write!(f, "{:<10} {count}", "gt"),
+            Instruction::LessThan(count) => write!(f, "{:<10} {count}", "lt"),
+            Instruction::GreaterThanOrEqual(count) => write!(f, "{:<10} {count}", "gte"),
+            Instruction::LessThanOrEqual(count) => write!(f, "{:<10} {count}", "lte"),
+            Instruction::And(count) => write!(f, "{:<10} {count}", "and"),
+            Instruction::Or(count) => write!(f, "{:<10} {count}", "or"),
+            Instruction::Not => write!(f, "not"),
+            Instruction::Mod => write!(f, "mod"),
+            Instruction::Rot => write!(f, "rot"),
+            Instruction::Call(count) => write!(f, "{:<10} {count}", "call"),
+            Instruction::CallTest => write!(f, "call-test"),
+            Instruction::TailCall(count) => write!(f, "{:<10} {}", "tail-call", count),
+            Instruction::SetLocal(metadata) => write!(f, "{:<10} {metadata}", "set-local"),
+            Instruction::SetGlobal(metadata) => write!(f, "{:<10} {metadata}", "set-global"),
+            Instruction::SetFree(metadata) => write!(f, "{:<10} {metadata}", "set-free"),
+            Instruction::GetLocal(metadata) => write!(f, "{:<10} {metadata}", "get-local"),
+            Instruction::GetGlobal(metadata) => write!(f, "{:<10} {metadata}", "get-global"),
+            Instruction::GetFree(metadata) => write!(f, "{:<10} {metadata}", "get-free"),
+            Instruction::JumpIf(address) => write!(f, "{:<10} {address}", "jump-if"),
+            Instruction::JumpForward(address) => write!(f, "{:<10} {address}", "jump-forward"),
+            Instruction::JumpBackward(address) => write!(f, "{:<10} {address}", "jump-backward"),
+            Instruction::Jump(address) => write!(f, "{:<10} {address}", "jump"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct RuntimeMetadata {
     pub data: usize,
@@ -225,6 +263,12 @@ impl RuntimeMetadata {
         bytes.extend(&(self.name.len() as u8).to_le_bytes());
         bytes.extend(self.name.as_bytes());
         bytes
+    }
+}
+
+impl std::fmt::Display for RuntimeMetadata {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{:?}", self.data, self.name)
     }
 }
 

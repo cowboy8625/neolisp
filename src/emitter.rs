@@ -247,7 +247,7 @@ impl AstWalker<Program> for Emitter<'_> {
 
     fn handle_builtin(&mut self, program: &mut Program, name: &str, args: &[Spanned<Expr>]) {
         const ARGS: usize = 1;
-        for arg in args.iter().skip(ARGS) {
+        for arg in args.iter().skip(ARGS).rev() {
             self.walk_expr(program, arg);
         }
         let Some(id) = BUILTINS.iter().position(|b| b == &name) else {

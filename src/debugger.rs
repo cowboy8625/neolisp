@@ -203,6 +203,7 @@ impl<'a> Debugger<'a> {
             } else {
                 String::from("return address: None")
             };
+            let scope_name = format!("scope name: {}", frame.scope_name);
 
             let mut free = String::from("Free:\n");
             for (i, value) in self.machine.free.iter().enumerate() {
@@ -216,7 +217,7 @@ impl<'a> Debugger<'a> {
             for (i, value) in frame.args.iter().enumerate() {
                 locals += &format!("[{}]: {}\n", i, value);
             }
-            format!("{return_address}\nip: {ip}\n{free}\n{locals}\n{vm_frame_data}")
+            format!("{return_address}\n{scope_name}\nip: {ip}\n{free}\n{locals}\n{vm_frame_data}")
         };
 
         let frame_data = Paragraph::new(vm_frame_data)
@@ -412,13 +413,13 @@ impl<'a> Debugger<'a> {
         for int in self.instructions.iter() {
             let selected = if self.machine.ip == offset {
                 Span::styled(
-                    format!("0x{offset:02X} {offset:>3} "),
+                    format!("0x{offset:02X} {offset:>5} "),
                     Style::default()
                         .fg(Color::Green)
                         .add_modifier(Modifier::UNDERLINED),
                 )
             } else {
-                Span::raw(format!("0x{offset:02X} {offset:>3} "))
+                Span::raw(format!("0x{offset:02X} {offset:>5} "))
             };
 
             let breakpoint = if self.breakpoints.contains(&offset) {
@@ -427,18 +428,12 @@ impl<'a> Debugger<'a> {
                 Span::raw("  ".to_string())
             };
 
-            let bytecode = int
-                .to_bytecode()
-                .into_iter()
-                .fold(String::new(), |acc, i| format!("{acc}{i:02X} "));
-
-            let debug_int = format!("{int:?}");
+            let debug_int = format!("{int}");
 
             let line = Line::from(vec![
                 breakpoint,
                 selected,
                 Span::raw(format!("{debug_int:<20} ")),
-                Span::raw(bytecode.trim().to_string()),
             ]);
 
             result.push(line);
