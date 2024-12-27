@@ -538,7 +538,7 @@ impl Machine {
 
         eprintln!(
             "test {}: {}",
-            test_name.to_string().split("()").collect::<Vec<_>>()[1],
+            test_name.split("()").collect::<Vec<_>>()[1],
             if matches!(value, Value::Bool(true)) {
                 "pass".green()
             } else {
