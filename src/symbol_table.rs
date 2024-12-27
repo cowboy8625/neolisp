@@ -666,7 +666,6 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         let id = self.lambda_counter;
         self.lambda_counter += 1;
         let scope_name = format!("let_{id}|{}", names.join("|"));
-        let old_variable_counter = self.variable_counter;
         table.enter_scope(&scope_name);
 
         let mut bindings = Vec::new();
