@@ -178,8 +178,8 @@ impl<'a> Debugger<'a> {
 
     fn event_handler(&mut self, event: Event) -> Result<()> {
         match &event {
-            Event::FocusGained => eprintln!("focus gained"),
-            Event::FocusLost => eprintln!("focus lost"),
+            Event::FocusGained => {}
+            Event::FocusLost => {}
             Event::Key(key_event) => self.key_handler(key_event)?,
             Event::Mouse(mouse_event) => self.mouse_handler(mouse_event),
             Event::Paste(string) => self.paste_handler(string),
@@ -279,7 +279,6 @@ impl<'a> Debugger<'a> {
     }
 
     fn key_code_handler(&mut self, code: &KeyCode, modifiers: &KeyModifiers) -> Result<()> {
-        eprintln!("{code:?} | {modifiers:?}");
         if *code != KeyCode::Null && self.error_message.is_some() {
             self.error_message = None;
             return Ok(());
@@ -405,9 +404,7 @@ impl<'a> Debugger<'a> {
         self.input_buffer.push_str(string);
     }
 
-    fn resize_handler(&self, w: u16, h: u16) {
-        eprintln!("resizing to {w}x{h}");
-    }
+    fn resize_handler(&self, w: u16, h: u16) {}
 
     fn run_machine_once(&mut self) -> bool {
         match self.machine.run_once() {
