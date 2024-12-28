@@ -1,15 +1,19 @@
 use crate::instruction::Instruction;
 use crate::machine::{Frame as MachineFrame, Machine};
 use anyhow::{anyhow, Ok, Result};
-use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent};
+use crossterm::event::{
+    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers,
+};
 use crossterm::style::Stylize;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
 use crossterm::ExecutableCommand;
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span, Text};
+use ratatui::widgets::{Clear, Widget};
 
+use crate::widgets::{
+    BreakpointsWidget, FrameWidget, GlobalsWidget, InstructionsWidget, PopupWidget,
+};
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Direction, Layout};
 use ratatui::widgets::{Block, Borders, Paragraph};
@@ -18,8 +22,10 @@ use std::collections::HashSet;
 use std::io::{self, stdout};
 use std::time::{Duration, Instant};
 
-const HELP: &str = r#"
-commands <required> [optional]
+const HELP: &str = r#"If no command is given, the last command will be repeated.
+Default command is step.
+
+<commands> [optional]
 q|quit              - quit
 h|help              - show this help message
 s|step              - step
@@ -28,18 +34,28 @@ b|breakpoint <addr> - add breakpoint
 r|run [file]        - run
  |reset             - reset stacks and set ip to 0
 j|jump <addr>       - jump to address
+ |highlight_scope   - toggle highlighting scopes
+
+Keys:
+<- arrow -> to change display data on right side
+ctrl-/ to show this message
+ctrl-n to toggle highlighting scopes
+
+Press Escape to exit
 "#;
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub enum Command {
     Help,
     Quit,
+    #[default]
     Step,
     Continue,
     AddBreakPoint(usize),
     Run(Option<String>),
     Reset,
     Jump(usize),
+    HighlightScope,
 }
 
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -49,34 +65,67 @@ enum State {
     Paused,
 }
 
+#[derive(Debug, Clone, Copy, Default)]
+enum DisplayDataState {
+    #[default]
+    Frame,
+    Global,
+    Breakpoints,
+}
+
+impl DisplayDataState {
+    fn next(&mut self) {
+        *self = match self {
+            Self::Frame => Self::Global,
+            Self::Global => Self::Breakpoints,
+            Self::Breakpoints => Self::Frame,
+        };
+    }
+
+    fn previous(&mut self) {
+        *self = match self {
+            Self::Frame => Self::Breakpoints,
+            Self::Global => Self::Frame,
+            Self::Breakpoints => Self::Global,
+        };
+    }
+}
+
 #[derive(Debug)]
 pub struct Debugger<'a> {
     input_buffer: String,
-    last_command: Option<Command>,
+    last_command: Command,
     last_instruction_pointer: Option<usize>,
     output: String,
     machine: &'a mut Machine,
     state: State,
+    stack_data_state: DisplayDataState,
     error_message: Option<String>,
     instructions: Vec<Instruction>,
     breakpoints: HashSet<usize>,
     is_running: bool,
+    show_help: bool,
+    highlight_scope: bool,
 }
 
 impl<'a> Debugger<'a> {
     pub fn new(machine: &'a mut Machine) -> Result<Self> {
         let instructions = machine.decompile()?;
         Ok(Self {
-            input_buffer: String::new(),
-            last_command: None,
-            last_instruction_pointer: None,
-            output: String::new(),
             machine,
-            state: State::default(),
-            error_message: None,
             instructions,
-            breakpoints: HashSet::new(),
             is_running: true,
+            // Defaults
+            input_buffer: String::default(),
+            last_command: Command::default(),
+            last_instruction_pointer: Option::default(),
+            output: String::default(),
+            state: State::default(),
+            stack_data_state: DisplayDataState::default(),
+            error_message: Option::default(),
+            breakpoints: HashSet::default(),
+            show_help: bool::default(),
+            highlight_scope: bool::default(),
         })
     }
 
@@ -140,24 +189,6 @@ impl<'a> Debugger<'a> {
     }
 
     fn draw(&mut self, f: &mut Frame) {
-        if let Some(error_message) = self.error_message.clone() {
-            self.draw_run_time_error(f, error_message);
-            return;
-        }
-        self.draw_normal(f);
-    }
-
-    fn draw_run_time_error(&mut self, f: &mut Frame, error_message: String) {
-        let size = f.area();
-        let error_annoying_popup_window = Paragraph::new(error_message).block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title("Your Program Is F'ed Up Bro"),
-        );
-        f.render_widget(error_annoying_popup_window, size);
-    }
-
-    fn draw_normal(&mut self, f: &mut Frame) {
         let size = f.area();
 
         // Layout with two sections: input and VM state
@@ -171,19 +202,6 @@ impl<'a> Debugger<'a> {
             .constraints([Constraint::Percentage(55), Constraint::Percentage(45)].as_ref())
             .split(chunks[0]);
 
-        let frame_data_block = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints(
-                [
-                    Constraint::Percentage(50),
-                    Constraint::Percentage(25),
-                    Constraint::Percentage(25),
-                ]
-                .as_ref(),
-            )
-            .split(data[1]);
-
-        // Render user input box
         let input_box = Paragraph::new(self.input_buffer.clone())
             .block(Block::default().borders(Borders::ALL).title("Input"));
 
@@ -191,81 +209,57 @@ impl<'a> Debugger<'a> {
         let y = chunks[1].y + 1;
         f.set_cursor_position((x, y));
 
-        // Render vm frame data
-        let vm_frame_data = 'block: {
-            let ip = self.machine.ip;
-            let Result::Ok(frame) = self.machine.get_current_frame() else {
-                break 'block "Empty VM frame".to_string();
-            };
-            let return_address = if let Some(address) = frame.return_address {
-                format!("return address: {}", address)
-            } else {
-                String::from("return address: None")
-            };
-            let scope_name = format!("scope name: {}", frame.scope_name);
-
-            let mut free = String::from("Free:\n");
-            for (i, value) in self.machine.free.iter().enumerate() {
-                free += &format!("[{}]: {}\n", i, value);
-            }
-            let mut vm_frame_data = String::from("STACK:\n");
-            for (i, value) in frame.stack.iter().enumerate() {
-                vm_frame_data += &format!("[{}]: {}\n", i, value);
-            }
-            let mut locals = String::from("LOCALS:\n");
-            for (i, value) in frame.args.iter().enumerate() {
-                locals += &format!("[{}]: {}\n", i, value);
-            }
-            format!("{return_address}\n{scope_name}\nip: {ip}\n{free}\n{locals}\n{vm_frame_data}")
-        };
-
-        let frame_data = Paragraph::new(vm_frame_data)
-            .block(Block::default().borders(Borders::ALL).title("VM Frame"));
-
-        let globals = self
-            .machine
-            .global
-            .iter()
-            .enumerate()
-            .map(|(i, v)| format!("global[{}]: {}", i, v))
-            .collect::<Vec<_>>()
-            .join("\n");
-        let global_data =
-            Paragraph::new(globals).block(Block::default().borders(Borders::ALL).title("Globals"));
-
-        // Render dummy VM state
-        // 🤮
-        if let Some(last_instruction_pointer) = self.last_instruction_pointer {
-            if last_instruction_pointer != self.machine.ip {
-                self.last_instruction_pointer = Some(self.machine.ip);
-            }
-        } else {
+        if self.last_instruction_pointer != Some(self.machine.ip) {
             self.last_instruction_pointer = Some(self.machine.ip);
         }
-        let text = self.debug();
 
-        let scroll_index = self.get_current_instruction_index().saturating_sub(20);
-        let vm_box = Paragraph::new(text)
-            .block(Block::default().borders(Borders::ALL).title("VM State"))
-            .scroll((scroll_index as u16, 0));
-
-        // TEMP
-        let mut temp_output = String::new();
-        for breakpoint in &self.breakpoints {
-            temp_output += breakpoint.to_string().as_str();
-            temp_output += "\n";
+        let current_function_name = self
+            .machine
+            .get_current_function_name()
+            .unwrap_or("main".to_string());
+        let location = self
+            .machine
+            .symbol_table
+            .get(&current_function_name)
+            .and_then(|symbol| symbol.get_location())
+            .unwrap_or(0..1);
+        InstructionsWidget::new(
+            self.machine.ip,
+            location,
+            &self.instructions,
+            &self.breakpoints,
+            self.highlight_scope,
+        )
+        .render(data[0], f.buffer_mut());
+        match self.stack_data_state {
+            DisplayDataState::Frame => FrameWidget::new(
+                self.machine.ip,
+                &self.machine.free,
+                self.machine
+                    .get_current_frame()
+                    .unwrap_or(&crate::machine::Frame::default()),
+            )
+            .render(data[1], f.buffer_mut()),
+            DisplayDataState::Global => GlobalsWidget::new(self.machine.ip, &self.machine.global)
+                .render(data[1], f.buffer_mut()),
+            DisplayDataState::Breakpoints => {
+                BreakpointsWidget::new(self.machine.ip, &self.breakpoints)
+                    .render(data[1], f.buffer_mut())
+            }
         }
-        temp_output.push_str(&format!("{:?}\n{}", self.state, self.output));
-
-        let temp = Paragraph::new(temp_output)
-            .block(Block::default().borders(Borders::ALL).title("Breakpoints"));
-
-        // Render both input and VM state
-        f.render_widget(vm_box, data[0]);
-        f.render_widget(frame_data, frame_data_block[0]);
-        f.render_widget(global_data, frame_data_block[1]);
-        f.render_widget(temp, frame_data_block[2]);
         f.render_widget(input_box, chunks[1]);
+        if let Some(error_message) = self.error_message.clone() {
+            let popup = PopupWidget::new(&error_message);
+            let area = popup.get_area(size);
+            f.render_widget(Clear, area);
+            popup.render(size, f.buffer_mut());
+        }
+        if self.show_help {
+            let popup = PopupWidget::new(HELP);
+            let area = popup.get_area(size);
+            f.render_widget(Clear, area);
+            popup.render(size, f.buffer_mut());
+        }
     }
 
     fn toggle_breakpoint(&mut self, breakpoint: usize) {
@@ -277,30 +271,44 @@ impl<'a> Debugger<'a> {
     }
 
     fn key_handler(&mut self, key_event: &KeyEvent) -> Result<()> {
-        let KeyEvent { code, .. } = key_event;
-        self.key_code_handler(code)?;
+        let KeyEvent {
+            code, modifiers, ..
+        } = key_event;
+        self.key_code_handler(code, modifiers)?;
         Ok(())
     }
 
-    fn key_code_handler(&mut self, code: &KeyCode) -> Result<()> {
-        if self.error_message.is_some() && code == &KeyCode::Enter {
+    fn key_code_handler(&mut self, code: &KeyCode, modifiers: &KeyModifiers) -> Result<()> {
+        eprintln!("{code:?} | {modifiers:?}");
+        if *code != KeyCode::Null && self.error_message.is_some() {
             self.error_message = None;
             return Ok(());
+        } else if *code != KeyCode::Null && self.show_help {
+            self.show_help = false;
+            return Ok(());
         }
-        if self.error_message.is_some() {
+        if !self.show_help
+            && (matches!(code, KeyCode::Char('/') | KeyCode::Char('7')))
+            && modifiers.contains(KeyModifiers::CONTROL)
+        {
+            self.show_help = true;
+        }
+        if self.error_message.is_some() || self.show_help {
             return Ok(());
         }
         match code {
+            KeyCode::Char('n') if modifiers.contains(KeyModifiers::CONTROL) => {
+                self.highlight_scope = !self.highlight_scope;
+            }
             KeyCode::Char(c) => {
                 self.input_buffer.push(*c);
             }
             KeyCode::Backspace => {
                 self.input_buffer.pop();
             }
+            KeyCode::Esc => self.show_help = false,
             KeyCode::Enter if self.input_buffer.is_empty() => {
-                if let Some(command) = self.last_command.clone() {
-                    self.execute_command(command)?;
-                }
+                self.execute_command(self.last_command.clone())?;
             }
             KeyCode::Enter => {
                 match parse_input(&self.input_buffer) {
@@ -310,15 +318,17 @@ impl<'a> Debugger<'a> {
 
                 self.input_buffer.clear();
             }
+            KeyCode::Right => self.stack_data_state.next(),
+            KeyCode::Left => self.stack_data_state.previous(),
             _ => self.output.push_str(&format!("{:?}\n", code)),
         }
         Ok(())
     }
 
     fn execute_command(&mut self, command: Command) -> Result<()> {
-        self.last_command = Some(command.clone());
+        self.last_command = command.clone();
         match command {
-            Command::Help => self.output = HELP.to_string(),
+            Command::Help => self.show_help = true,
             Command::Quit => self.is_running = false,
             Command::Step => {
                 let _ = self.run_machine_once();
@@ -362,6 +372,9 @@ impl<'a> Debugger<'a> {
             Command::Jump(address) => {
                 self.machine.ip = address;
             }
+            Command::HighlightScope => {
+                self.highlight_scope = !self.highlight_scope;
+            }
         }
         Ok(())
     }
@@ -394,68 +407,6 @@ impl<'a> Debugger<'a> {
 
     fn resize_handler(&self, w: u16, h: u16) {
         eprintln!("resizing to {w}x{h}");
-    }
-
-    fn get_current_instruction_index(&self) -> usize {
-        let current_ip = self.machine.ip;
-        let mut ip = 0;
-        for (i, instruction) in self.instructions.iter().enumerate() {
-            if ip == current_ip {
-                return i;
-            }
-            ip += instruction.size();
-        }
-        0
-    }
-
-    fn debug(&self) -> Text {
-        let mut offset = 0;
-
-        let mut result = Vec::new();
-        let current_function_name = self
-            .machine
-            .get_current_function_name()
-            .unwrap_or("main".to_string());
-        let location = self
-            .machine
-            .symbol_table
-            .get(&current_function_name)
-            .and_then(|symbol| symbol.get_location())
-            .unwrap_or(0..1);
-
-        for int in self.instructions.iter() {
-            let line_style = if self.machine.ip == offset {
-                Style::default()
-                    .fg(Color::Green)
-                    .add_modifier(Modifier::UNDERLINED)
-            } else if location.contains(&offset) {
-                Style::default().fg(Color::White)
-            } else {
-                Style::default().fg(Color::DarkGray)
-            };
-
-            let selected = Span::styled(format!("0x{offset:06X} {offset:>5} "), Style::default());
-
-            let breakpoint = if self.breakpoints.contains(&offset) {
-                Span::raw("🔴".to_string())
-            } else {
-                Span::raw("  ".to_string())
-            };
-
-            let debug_int = format!("{int}");
-
-            let line = Line::from(vec![
-                breakpoint,
-                selected,
-                Span::raw(format!("{debug_int:<20} ")),
-            ])
-            .style(line_style);
-
-            result.push(line);
-            offset += int.size();
-        }
-
-        Text::from(result)
     }
 
     fn run_machine_once(&mut self) -> bool {
@@ -497,6 +448,7 @@ fn parse_input(input: &str) -> Result<Command> {
         "run" | "r" => Ok(Command::Run(None)),
         "reset" => Ok(Command::Reset),
         "jump" | "j" if command.len() == 2 => Ok(Command::Jump(command[1].parse()?)),
+        "highlight-scope" => Ok(Command::HighlightScope),
         _ => Err(anyhow!(format!("Unknown command `{}`", input.red()))),
     }
 }
