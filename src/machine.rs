@@ -84,7 +84,7 @@ impl Default for Frame {
     fn default() -> Self {
         Self {
             return_address: None,
-            scope_name: "global".to_string(),
+            scope_name: "main".to_string(),
             span: Span::default(),
             args: Vec::with_capacity(256),
             stack: Vec::with_capacity(1024),
@@ -299,6 +299,12 @@ impl Machine {
             }
         }
         Ok(())
+    }
+
+    pub(crate) fn get_current_function_name(&self) -> Option<String> {
+        self.get_current_frame()
+            .map(|f| f.scope_name.to_string())
+            .ok()
     }
 }
 

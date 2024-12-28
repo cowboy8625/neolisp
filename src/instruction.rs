@@ -480,7 +480,7 @@ impl std::fmt::Display for Value {
                 )
             }
             Self::Callable(data) => write!(f, "<function {data}>"),
-            Self::Builtin(data) => write!(f, "<function {data}>"),
+            Self::Builtin(data) => write!(f, "<builtin {data}>"),
             Self::Symbol(value) => write!(f, "{value}"),
             Self::Keyword(value) => write!(f, "{value}"),
         }

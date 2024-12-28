@@ -105,9 +105,8 @@ impl<'a> Debugger<'a> {
                         self.state = State::Paused;
                         break;
                     }
-                    if let Err(error) = self.machine.run_once() {
+                    if self.run_machine_once() {
                         terminal.clear()?;
-                        self.error_message = Some(error.to_string());
                         self.state = State::Paused;
                         break;
                     }
@@ -321,11 +320,15 @@ impl<'a> Debugger<'a> {
         match command {
             Command::Help => self.output = HELP.to_string(),
             Command::Quit => self.is_running = false,
-            Command::Step => match self.machine.run_once() {
-                Result::Ok(_) => {}
-                Result::Err(err) => self.error_message = Some(err.to_string()),
-            },
-            Command::Continue => self.state = State::Running,
+            Command::Step => {
+                let _ = self.run_machine_once();
+            }
+            Command::Continue => {
+                self.state = State::Running;
+                if self.run_machine_once() {
+                    self.state = State::Paused;
+                }
+            }
             Command::AddBreakPoint(address) => {
                 self.toggle_breakpoint(address);
             }
@@ -409,18 +412,29 @@ impl<'a> Debugger<'a> {
         let mut offset = 0;
 
         let mut result = Vec::new();
+        let current_function_name = self
+            .machine
+            .get_current_function_name()
+            .unwrap_or("main".to_string());
+        let location = self
+            .machine
+            .symbol_table
+            .get(&current_function_name)
+            .and_then(|symbol| symbol.get_location())
+            .unwrap_or(0..1);
 
         for int in self.instructions.iter() {
-            let selected = if self.machine.ip == offset {
-                Span::styled(
-                    format!("0x{offset:06X} {offset:>5} "),
-                    Style::default()
-                        .fg(Color::Green)
-                        .add_modifier(Modifier::UNDERLINED),
-                )
+            let line_style = if self.machine.ip == offset {
+                Style::default()
+                    .fg(Color::Green)
+                    .add_modifier(Modifier::UNDERLINED)
+            } else if location.contains(&offset) {
+                Style::default().fg(Color::White)
             } else {
-                Span::raw(format!("0x{offset:06X} {offset:>5} "))
+                Style::default().fg(Color::DarkGray)
             };
+
+            let selected = Span::styled(format!("0x{offset:06X} {offset:>5} "), Style::default());
 
             let breakpoint = if self.breakpoints.contains(&offset) {
                 Span::raw("🔴".to_string())
@@ -434,13 +448,24 @@ impl<'a> Debugger<'a> {
                 breakpoint,
                 selected,
                 Span::raw(format!("{debug_int:<20} ")),
-            ]);
+            ])
+            .style(line_style);
 
             result.push(line);
             offset += int.size();
         }
 
         Text::from(result)
+    }
+
+    fn run_machine_once(&mut self) -> bool {
+        match self.machine.run_once() {
+            Result::Ok(_) => false,
+            Result::Err(err) => {
+                self.error_message = Some(err.to_string());
+                true
+            }
+        }
     }
 }
 
