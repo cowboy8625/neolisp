@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand, ValueEnum, ValueHint};
+use clap::{ArgAction, Parser, Subcommand, ValueEnum, ValueHint};
 #[cfg(windows)]
 const HISTORY_PATH: &str = "%TEMP%.history";
 #[cfg(unix)]
@@ -17,14 +17,50 @@ pub struct Cli {
     pub command: Option<Command>,
 }
 
+#[derive(Debug, Default, Clone)]
+pub enum Decompile {
+    #[default]
+    All,
+    Function(String),
+}
+
+impl std::str::FromStr for Decompile {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.is_empty() || s == "all" {
+            Ok(Decompile::All)
+        } else {
+            Ok(Decompile::Function(s.to_string()))
+        }
+    }
+}
+
+impl std::fmt::Display for Decompile {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::All => write!(f, "all"),
+            Self::Function(name) => write!(f, "{name}"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Parser)]
 pub struct Run {
     #[arg(short, long, default_value_t = false)]
     pub repl: bool,
     #[arg(long, help = "IP address to break on", value_delimiter = ',', value_hint = ValueHint::Other)]
     pub breakpoints: Vec<usize>,
-    #[arg(short = 'd', long, default_value_t = false)]
-    pub decompile: bool,
+    #[arg(
+        short,
+        long,
+        help = "empty to decompile all or name to decompile a specific function",
+        value_name = "NAME",
+        value_hint = ValueHint::Other,
+        default_missing_value = "all",
+        num_args(0..=1),
+        action = ArgAction::Set)]
+    pub decompile: Option<Decompile>,
     #[arg(
         long,
         help = "compile with no main function as entry point",
@@ -38,16 +74,32 @@ pub struct Run {
 pub struct Test {
     #[arg(long, help = "IP address to break on", value_delimiter = ',', value_hint = ValueHint::Other)]
     pub breakpoints: Vec<usize>,
-    #[arg(short = 'd', long, default_value_t = false)]
-    pub decompile: bool,
+    #[arg(
+        short,
+        long,
+        help = "empty to decompile all or name to decompile a specific function",
+        value_name = "NAME",
+        value_hint = ValueHint::Other,
+        default_missing_value = "all",
+        num_args(0..=1),
+        action = ArgAction::Set)]
+    pub decompile: Option<Decompile>,
     pub file: Option<String>,
 }
 
 #[derive(Debug, Subcommand, Clone)]
 pub enum Command {
     Build {
-        #[arg(short = 'd', long, default_value_t = false)]
-        decompile: bool,
+        #[arg(
+            short,
+            long,
+            help = "empty to decompile all or name to decompile a specific function",
+            value_name = "NAME",
+            value_hint = ValueHint::Other,
+            default_missing_value = "all",
+            num_args(0..=1),
+            action = ArgAction::Set)]
+        decompile: Option<Decompile>,
         file: Option<String>,
     },
     Run(Run),

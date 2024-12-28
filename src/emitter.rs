@@ -69,7 +69,7 @@ impl<'a> Emitter<'a> {
             let Some(location) = symbol.get_location() else {
                 unreachable!("Main function location should always be set at this point");
             };
-            program.push(Instruction::Jump(location));
+            program.push(Instruction::Jump(location.start));
         }
 
         if !self.errors.is_empty() {
@@ -275,8 +275,6 @@ impl AstWalker<Program> for Emitter<'_> {
             unreachable!("This should never fail as we already checked this in AstWalker");
         };
 
-        self.symbol_table.set_location(name, start);
-
         self.symbol_table.enter_scope(name);
 
         let Some(id) = self.symbol_table.get(name).map(|s| s.id()) else {
@@ -332,6 +330,8 @@ impl AstWalker<Program> for Emitter<'_> {
         program.push(Instruction::Push(Box::new(value)));
         let metadata = RuntimeMetadata::new(id, name, function.span.clone());
         program.push(Instruction::SetGlobal(metadata));
+        let end = self.get_program_size(program);
+        self.symbol_table.set_location(name, start..end);
     }
 
     fn handle_lambda(&mut self, program: &mut Program, lambda: &LambdaExpr) {
@@ -339,7 +339,6 @@ impl AstWalker<Program> for Emitter<'_> {
         let index = program.len() - 1;
         let start = self.get_program_size(program);
         let name = self.get_lambda_name();
-        self.symbol_table.set_location(&name, start);
 
         self.symbol_table.enter_scope(&name);
 
@@ -381,9 +380,11 @@ impl AstWalker<Program> for Emitter<'_> {
 
         program[index] = Instruction::Jump(start + body_size);
 
-        let callable = Callable::new(start, name, lambda.span());
+        let callable = Callable::new(start, &name, lambda.span());
         let value = Value::Callable(Box::new(callable));
         program.push(Instruction::Push(Box::new(value)));
+        let end = self.get_program_size(program);
+        self.symbol_table.set_location(&name, start..end);
     }
 
     fn handle_let_binding(&mut self, program: &mut Program, let_binding: &LetBindingExpr) {

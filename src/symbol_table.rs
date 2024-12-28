@@ -21,7 +21,7 @@ pub struct Test {
     pub span: Span,
     pub name: String,
     pub scope_level: usize,
-    pub location: Option<usize>,
+    pub location: Option<std::ops::Range<usize>>,
 }
 
 impl Test {
@@ -47,7 +47,7 @@ pub struct UnboundVariable {
     pub span: Span,
     pub typeis: Option<Type>,
     pub scope_level: usize,
-    pub location: Option<usize>,
+    pub location: Option<std::ops::Range<usize>>,
 }
 
 impl UnboundVariable {
@@ -70,7 +70,7 @@ pub struct Variable {
     pub span: Span,
     pub typeis: Option<Type>,
     pub scope_level: usize,
-    pub location: Option<usize>,
+    pub location: Option<std::ops::Range<usize>>,
     pub is_recursive: bool,
 }
 
@@ -102,7 +102,7 @@ pub struct Parameter {
     pub typeis: Option<Type>,
     pub is_unbound: bool,
     pub scope_level: usize,
-    pub location: Option<usize>,
+    pub location: Option<std::ops::Range<usize>>,
 }
 
 impl Parameter {
@@ -127,7 +127,7 @@ pub struct Function {
     pub return_type: Option<Type>,
     pub parameters: Vec<Parameter>,
     pub scope_level: usize,
-    pub location: Option<usize>,
+    pub location: Option<std::ops::Range<usize>>,
     pub is_recursive: bool,
 }
 
@@ -160,7 +160,7 @@ pub struct Lambda {
     pub return_type: Option<Type>,
     pub parameters: Vec<Parameter>,
     pub scope_level: usize,
-    pub location: Option<usize>,
+    pub location: Option<std::ops::Range<usize>>,
 }
 
 impl Lambda {
@@ -186,7 +186,7 @@ pub struct Let {
     pub bindings: Vec<Parameter>,
     pub return_type: Option<Type>,
     pub scope_level: usize,
-    pub location: Option<usize>,
+    pub location: Option<std::ops::Range<usize>>,
 }
 
 impl Let {
@@ -244,7 +244,7 @@ impl Symbol {
         }
     }
 
-    pub fn set_location(&mut self, location: usize) {
+    pub fn set_location(&mut self, location: std::ops::Range<usize>) {
         match self {
             Symbol::UnboundVariable(v) => v.location = Some(location),
             Symbol::Variable(v) => v.location = Some(location),
@@ -256,15 +256,15 @@ impl Symbol {
         }
     }
 
-    pub fn get_location(&self) -> Option<usize> {
+    pub fn get_location(&self) -> Option<std::ops::Range<usize>> {
         match self {
-            Symbol::UnboundVariable(v) => v.location,
-            Symbol::Variable(v) => v.location,
-            Symbol::Parameter(v) => v.location,
-            Symbol::Function(v) => v.location,
-            Symbol::Lambda(v) => v.location,
-            Symbol::Let(v) => v.location,
-            Symbol::Test(v) => v.location,
+            Symbol::UnboundVariable(v) => v.location.clone(),
+            Symbol::Variable(v) => v.location.clone(),
+            Symbol::Parameter(v) => v.location.clone(),
+            Symbol::Function(v) => v.location.clone(),
+            Symbol::Lambda(v) => v.location.clone(),
+            Symbol::Let(v) => v.location.clone(),
+            Symbol::Test(v) => v.location.clone(),
         }
     }
 
@@ -370,8 +370,8 @@ pub struct SymbolTable {
 
 impl SymbolTable {
     pub const SEPARATOR: &'static str = "()";
-    pub fn set_location(&mut self, name: &str, location: usize) {
-        self.get_mut(name, |symbol| symbol.set_location(location));
+    pub fn set_location(&mut self, name: &str, location: std::ops::Range<usize>) {
+        self.get_mut(name, |symbol| symbol.set_location(location.clone()));
     }
 
     pub fn get_scope_name(&self) -> String {

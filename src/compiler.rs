@@ -1,4 +1,5 @@
 use super::{
+    cli::Decompile,
     emitter::Emitter,
     error::Error,
     instruction::Instruction,
@@ -29,7 +30,7 @@ impl CompilerOptions {
 #[derive(Debug, Default)]
 pub struct Compiler {
     debug_ast: bool,
-    decompile: bool,
+    decompile: Option<Decompile>,
     no_main: bool,
     test: bool,
     symbol_table: Option<SymbolTable>,
@@ -42,7 +43,7 @@ impl Compiler {
         self
     }
 
-    pub fn decompile(mut self, value: bool) -> Self {
+    pub fn decompile(mut self, value: Option<Decompile>) -> Self {
         self.decompile = value;
         self
     }
@@ -92,19 +93,44 @@ impl Compiler {
             .with_offset(offset)
             .compile(&ast)?;
 
-        if self.decompile {
+        if let Some(Decompile::All) = self.decompile {
+            simple_decompile(&instructions);
+            return Ok(None);
+        } else if let Some(Decompile::Function(name)) = self.decompile {
+            let Some(symbol) = symbol_table.get(&name) else {
+                eprintln!("Function {name} not found");
+                return Ok(None);
+            };
+            let Some(location) = symbol.get_location() else {
+                eprintln!("Function {name} location not found");
+                return Ok(None);
+            };
             let mut offset = 0;
             for int in instructions.iter() {
+                if !location.contains(&offset) {
+                    offset += int.size();
+                    continue;
+                }
                 eprintln!(
-                    "{offset:06X} {offset:>2}  {}",
+                    "{offset:06X} {offset:>6}  {}",
                     int.to_string().replace('\n', "\\n")
                 );
                 offset += int.size();
             }
-
             return Ok(None);
         }
 
         Ok(Some(instructions))
+    }
+}
+
+pub fn simple_decompile(instructions: &[Instruction]) {
+    let mut offset = 0;
+    for int in instructions.iter() {
+        eprintln!(
+            "{offset:06X} {offset:>6}  {}",
+            int.to_string().replace('\n', "\\n")
+        );
+        offset += int.size();
     }
 }
