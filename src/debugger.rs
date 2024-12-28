@@ -404,7 +404,7 @@ impl<'a> Debugger<'a> {
         self.input_buffer.push_str(string);
     }
 
-    fn resize_handler(&self, w: u16, h: u16) {}
+    fn resize_handler(&self, _: u16, _: u16) {}
 
     fn run_machine_once(&mut self) -> bool {
         match self.machine.run_once() {
