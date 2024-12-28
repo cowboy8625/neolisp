@@ -1,12 +1,14 @@
 # NeoLisp
 
-NeoLisp is a simple Lisp-inspired programming language designed for ease of use and extensibility. It is implemented in Rust, offering both performance and safety.
+NeoLisp is a lightweight, Lisp-inspired programming language designed with simplicity and extensibility in mind. It is implemented in Rust, offering a balance between performance and safety. NeoLisp is a functional programming language, featuring first-class functions, closures, and easy extensibility.
 
 ## Features
 
-- **Simple Syntax**: NeoLisp follows a simple syntax inspired by Lisp, making it easy to learn and use.
-- **Functional Programming**: Embrace functional programming paradigms with first-class functions and closures.
-- **Extensibility**: NeoLisp is designed to be easily extensible, allowing users to define their own functions.
+- **Simple Syntax**: NeoLisp features a clean and simple Lisp-inspired syntax, making it easy to learn and use.
+- **Functional Programming**: Supports functional programming paradigms, with first-class functions, recursion, and closures.
+- **Lightweight**: Designed for simplicity and ease of use, making it suitable for quick prototyping and small projects.
+- **Extensibility**: Easily extendable, allowing users to define custom functions and expand the language's features.
+- **Efficient**: Written in Rust for performance and memory safety.
 
 ## Getting Started
 
@@ -53,8 +55,20 @@ To get started with NeoLisp, follow these steps:
 
 '(10 20 30) ;;  -> (10 20 30)
 
+```
+
+## Builtin Testing
+
+NeoLisp comes with a built-in testing framework that allows you to write and run tests for your code.
+
+```lisp
 ;; Builtin testing run with `neolisp test`
 (test add (assert-eq :expected 3 :actual (add 1 2) :description "1 + 2 = 3"))
+```
+By running the `neolisp test` command, NeoLisp will run all the tests in the `src/main.nl` file.
+You can also provide a specific test file as an argument to the `neolisp test` command.
+```bash
+neolisp test
 ```
 
 ## Examples
