@@ -64,7 +64,7 @@ impl<'a> InstructionsWidget<'a> {
                 Style::default()
                     .fg(Color::Green)
                     .add_modifier(Modifier::UNDERLINED)
-            } else if !highlight_scope && location.contains(&offset) {
+            } else if !highlight_scope || location.contains(&offset) {
                 Style::default().fg(Color::White)
             } else {
                 Style::default().fg(Color::DarkGray)
@@ -257,7 +257,7 @@ impl<'a> PopupWidget<'a> {
 
         let width_percent =
             ((max_line_length + 4) as f64 / area.width as f64 * 100.0).ceil() as u16;
-        let height_percent = ((lines + 1) as f64 / area.height as f64 * 100.0).ceil() as u16;
+        let height_percent = ((lines + 2) as f64 / area.height as f64 * 100.0).ceil() as u16;
 
         (width_percent.clamp(10, 90), height_percent.clamp(10, 90))
     }
