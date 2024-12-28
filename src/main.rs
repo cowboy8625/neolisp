@@ -24,7 +24,7 @@ fn main() -> anyhow::Result<()> {
             Ok(())
         }
         Command::Run(r) => {
-            let filename = r.file.unwrap_or("main.nl".to_string());
+            let filename = r.file.unwrap_or("src/main.nl".to_string());
             let src = std::fs::read_to_string(&filename)?;
             let mut symbol_table = SymbolTable::default();
             let compiler = Compiler::default()
