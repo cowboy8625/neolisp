@@ -121,7 +121,7 @@ pub fn parse_or_report(filename: &str, src: &str) -> Vec<Spanned<Expr>> {
         Ok(ast) => ast,
         Err(errors) => {
             errors.into_iter().for_each(|error| {
-                Report::build(ReportKind::Error, filename, error.span().start)
+                Report::build(ReportKind::Error, (filename, error.span().clone()))
                     .with_code(1)
                     .with_message(error.message())
                     .with_label(
@@ -134,7 +134,7 @@ pub fn parse_or_report(filename: &str, src: &str) -> Vec<Spanned<Expr>> {
                         "match".fg(Color::Green)
                     ))
                     .finish()
-                    .eprint(("main.nl", Source::from(src)))
+                    .eprint((filename, Source::from(src)))
                     .unwrap();
             });
             Vec::new()

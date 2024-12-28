@@ -187,7 +187,7 @@ impl Error {
         } else {
             src.to_string()
         };
-        let mut report = Report::build(self.error_kind(), filename, self.span().start)
+        let mut report = Report::build(self.error_kind(), (filename, self.span().clone()))
             .with_code(self.code())
             .with_message(self.message())
             .with_label(
