@@ -392,19 +392,19 @@ impl AstWalker<Program> for Emitter<'_> {
     }
 
     fn handle_let_binding(&mut self, program: &mut Program, let_binding: &LetBindingExpr) {
-        let names = let_binding
-            .bindings
-            .iter()
-            .filter_map(|binding| binding.expr.first_list_item())
-            .map(|item| &item.expr)
-            .map(|expr| match expr {
-                Expr::Symbol(name) => name.clone(),
-                _ => panic!("expected symbol in let binding, got: {expr:?}"),
-            })
-            .collect::<Vec<_>>();
-        let id = self.lambda_counter;
-        self.lambda_counter += 1;
-        let scope_name = format!("let_{id}|{}", names.join("|"));
+        // let names = let_binding
+        //     .bindings
+        //     .iter()
+        //     .filter_map(|binding| binding.expr.first_list_item())
+        //     .map(|item| &item.expr)
+        //     .map(|expr| match expr {
+        //         Expr::Symbol(name) => name.clone(),
+        //         _ => panic!("expected symbol in let binding, got: {expr:?}"),
+        //     })
+        //     .collect::<Vec<_>>();
+        // let id = self.lambda_counter;
+        // self.lambda_counter += 1;
+        // let scope_name = format!("let_{id}|{}", names.join("|"));
         // self.symbol_table.enter_scope(&scope_name);
 
         for spanned in let_binding.bindings.iter() {
