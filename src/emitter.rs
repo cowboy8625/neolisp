@@ -403,7 +403,7 @@ impl AstWalker<Program> for Emitter<'_> {
         //     })
         //     .collect::<Vec<_>>();
         // let id = self.lambda_counter;
-        // self.lambda_counter += 1;
+        self.lambda_counter += 1;
         // let scope_name = format!("let_{id}|{}", names.join("|"));
         // self.symbol_table.enter_scope(&scope_name);
 
