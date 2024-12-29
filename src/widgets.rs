@@ -1,13 +1,16 @@
 use std::collections::HashSet;
 
-// TODO: highlight next instruction to be executed if on screen
-//  Do this for last instruction!  Just need to pipe it to the widget.
-//  Also Wrap the next ip in a Result Enum to change the color if the next ip run is going to fail.
+// TODO:
+//  1. highlight next instruction to be executed if on screen
+//  2. Do this for last instruction!  Just need to pipe it to the widget.
+//  3. Also Wrap the next ip in a Result Enum to change the color if the next ip run is going to fail.
 //
 // TODO: make the call stack scollable.
 // By using the up and down arrow keys you should be able to go
 // up and down the call stack and this should update the local
 // stack and arg stack display
+//
+// TODO: show source code of instruction if it contains a span
 
 use ratatui::{
     buffer::Buffer,
@@ -174,9 +177,9 @@ impl Widget for FrameWidget<'_> {
 
         let line = Line::from(vec![Span::raw("stack trace: ")]);
         lines.push(line);
-        for frame in self.machine.stack.iter() {
+        for (i, frame) in self.machine.stack.iter().enumerate() {
             let line = Line::from(vec![Span::styled(
-                &frame.scope_name,
+                format!("[{i:02X}] {}", frame.scope_name),
                 Style::default().fg(Color::Green),
             )]);
             lines.push(line);
@@ -189,7 +192,7 @@ impl Widget for FrameWidget<'_> {
             lines.push(line);
         }
 
-        let line = Line::from(vec![Span::raw("Local Stack")]);
+        let line = Line::from(vec![Span::raw("Args Stack")]);
         lines.push(line);
         let frame = self.machine.get_current_frame().unwrap();
         for (i, item) in frame.args.iter().enumerate() {
@@ -197,7 +200,7 @@ impl Widget for FrameWidget<'_> {
             lines.push(line);
         }
 
-        let line = Line::from(vec![Span::raw("Frame Stack")]);
+        let line = Line::from(vec![Span::raw("Local Stack")]);
         lines.push(line);
         for (i, item) in frame.stack.iter().enumerate() {
             let line = Line::from(vec![Span::raw(format!("[{}]: {}", i, item))]);

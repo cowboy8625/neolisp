@@ -176,7 +176,7 @@ impl<'a> Debugger<'a> {
                 last_tick = Instant::now();
             }
 
-            if event::poll(Duration::from_millis(1))? {
+            if event::poll(Duration::from_millis(50))? {
                 let event = event::read()?;
                 self.event_handler(event)?;
             }
