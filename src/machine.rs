@@ -275,7 +275,13 @@ impl Machine {
             }
             return Ok(());
         };
-        INSTRUCTION_CALL[opcode as usize](self)?;
+        match INSTRUCTION_CALL[opcode as usize](self) {
+            Ok(_) => (),
+            Err(err) => {
+                self.shutdown();
+                return Err(err);
+            }
+        }
 
         Ok(())
     }

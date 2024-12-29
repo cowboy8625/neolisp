@@ -138,6 +138,12 @@
     :actual (split " " "1 2 3" )
     :description "split \"1 2 3\" \" \" -> (\"1\" \"2\" \"3\")"))
 
+(test join
+  (assert-eq
+    :expected "1,2,3"
+    :actual (join "," '(1 2 3))
+    :description "join \" \" '(1 2 3) -> \"1,2,3\""))
+
 (test to-string-number
   (assert-eq
     :expected "123"
@@ -318,3 +324,19 @@
     :expected 1
     :actual (car '(1 2 3))
     :description "car '(1 2 3) -> 1"))
+
+
+; let binding
+
+(fn get-cell (grid i)
+  (let
+    ((l (length grid))
+    (wrapped (mod (+ i l) l)))
+      ; print will leave a string on the stack but once the function frame is destroyed
+      ; the string will get removed with the stack as its life time is tyed to it
+      (print "get-cell: " i " -> " wrapped "\n")
+      ; return the value we care about
+      wrapped))
+
+(test let-binding (assert-eq :expected 2 :actual (get-cell (list 'a 'b 'c) -1) :description "get-cell list len 3, index -1, returns 2"))
+

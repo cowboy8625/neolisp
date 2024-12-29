@@ -161,18 +161,23 @@ impl Intrinsic {
             anyhow::bail!("join only support 2 args");
         }
         let frame = machine.get_current_frame_mut()?;
-        let Some(Value::List(list)) = frame.stack.pop() else {
+        let list = frame.args.pop();
+        let Some(Value::List(list)) = list else {
+            let ty = list.map(|i| i.type_of()).unwrap_or("NULL".to_string());
             let error = Error::RunTimeError {
                 span: frame.span.clone(),
                 name: frame.scope_name.to_string(),
-                message: "expected list on stack for join".to_string(),
+                message: format!(
+                    "expected list on stack for join as the second arg bug found {:?}",
+                    ty
+                ),
                 code: "".to_string(),
                 note: None,
                 help: None,
             };
             anyhow::bail!(error)
         };
-        let Some(Value::String(string)) = frame.stack.pop() else {
+        let Some(Value::String(string)) = frame.args.pop() else {
             let error = Error::RunTimeError {
                 span: frame.span.clone(),
                 name: frame.scope_name.to_string(),

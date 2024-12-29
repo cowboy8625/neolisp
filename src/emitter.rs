@@ -352,7 +352,11 @@ impl AstWalker<Program> for Emitter<'_> {
 
         for param in params.iter() {
             let Some(symbol) = self.symbol_table.get(&param.name) else {
-                panic!("Variable `{}` should be known at this point", param.name,);
+                self.error(Error::SymbolNotDefined(
+                    param.span.clone(),
+                    param.name.clone(),
+                ));
+                return;
             };
             let Symbol::Parameter(Parameter {
                 is_unbound: true, ..
@@ -401,7 +405,7 @@ impl AstWalker<Program> for Emitter<'_> {
         let id = self.lambda_counter;
         self.lambda_counter += 1;
         let scope_name = format!("let_{id}|{}", names.join("|"));
-        self.symbol_table.enter_scope(&scope_name);
+        // self.symbol_table.enter_scope(&scope_name);
 
         for spanned in let_binding.bindings.iter() {
             let Expr::List(list) = &spanned.expr else {
@@ -432,7 +436,11 @@ impl AstWalker<Program> for Emitter<'_> {
 
         for param in params.iter() {
             let Some(symbol) = self.symbol_table.get(&param.name) else {
-                panic!("Variable `{}` should be known at this point", param.name,);
+                self.error(Error::SymbolNotDefined(
+                    param.span.clone(),
+                    param.name.clone(),
+                ));
+                return;
             };
             let Symbol::Parameter(Parameter {
                 is_unbound: true, ..
@@ -445,12 +453,11 @@ impl AstWalker<Program> for Emitter<'_> {
             program.push(Instruction::SetFree(metadata));
         }
 
-        self.walk_expr(program, let_binding.body);
-        // for spanned in lambda.body.iter() {
-        //     self.walk_expr(program, spanned);
-        // }
+        for spanned in let_binding.body.iter() {
+            self.walk_expr(program, spanned);
+        }
 
-        self.symbol_table.exit_scope();
+        // self.symbol_table.exit_scope();
     }
 
     fn handle_call(&mut self, program: &mut Program, call: &CallExpr) {

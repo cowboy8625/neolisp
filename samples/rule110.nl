@@ -5,6 +5,14 @@
 ; test is a list of assert-eq or assert
 (fn it (tests) (fold false (lambda (acc value) (or acc value)) tests))
 
+; using this map function instead of the builtin map
+; because the builtin map is currently broken
+(fn my-map (f lst)
+  (if (= 0 (length lst))
+    '()
+    (cons (f (car lst))
+      (my-map f (cdr lst)))))
+
 ; ----------------------------------------------------
 
 ; create a list of numbers from 0 to n
@@ -75,6 +83,12 @@
 (fn get-cell (grid i)
   (mod (+ i (length grid)) (length grid)))
 
+; (fn get-cell (grid i)
+;   (let ((l (length grid))
+;         (wrapped (mod (+ i l) l)))
+;     (print "get-cell: " i " -> " wrapped "\n")
+;     wrapped))
+
 (test get-cell
   (it
     (list
@@ -92,11 +106,10 @@
 
 ; Returns the state of the cells next generation
 ; (fn generation-of-cell (grid index)
-;   (is-alive
-;   (cal-rule
-;     (nth grid (get-cell grid (- index 1)))
-;     (nth grid (get-cell grid index))
-;     (nth grid (get-cell grid (+ index 1))))))
+;   (var a (nth grid (get-cell grid (- index 1))))
+;   (var b (nth grid (get-cell grid index)))
+;   (var c (nth grid (get-cell grid (+ index 1))))
+;   (is-alive (cal-rule a b c)))
 
 (fn generation-of-cell (grid index)
   (let
@@ -130,7 +143,7 @@
 
 ; Returns the next generation of the grid
 (fn next-generation (grid)
-  (map
+  (my-map
     (lambda (i) (generation-of-cell grid i))
     (range (length grid))))
 
@@ -145,10 +158,10 @@
 
 (fn main ()
   (let
-    ((grid (append (map (lambda (x) 0) (range 5)) (list 1)))
+    ((grid (append (my-map (lambda (x) 0) (range 119)) (list 1)))
     (is-running true))
     (loop is-running
       (set grid (next-generation grid))
       (let
-        ((line (to-string (map (lambda (x) (if (= x 1) "*" " ")) grid))))
-          (print line "\n")))))
+        (line (my-map (lambda (x) (if (= x 1) "*" " ")) grid))
+          (print (join "" line) "\n")))))

@@ -117,7 +117,7 @@ pub struct IfElseExpr<'a> {
 #[derive(Debug)]
 pub struct LetBindingExpr<'a> {
     pub bindings: &'a [&'a Spanned<Expr>],
-    pub body: &'a Spanned<Expr>,
+    pub body: &'a [&'a Spanned<Expr>],
 }
 
 #[derive(Debug)]
@@ -331,20 +331,10 @@ pub trait AstWalker<T> {
             &mabindings.iter().collect::<Vec<_>>()
         };
 
-        let Some(body_spanned) = &elements.get(BODY) else {
-            self.error(Error::ExpectedFound {
-                span: bindings_spanned.span.clone(),
-                expected: "body after bindings but".to_string(),
-                found: "nothing".to_string(),
-                note: Some("body can be a list or a single expression".to_string()),
-                help: Some("(let <bindings> <body>)".to_string()),
-            });
-            return;
-        };
-
+        let body_list = &elements.iter().skip(BODY).collect::<Vec<_>>();
         let let_binding_expr = LetBindingExpr {
             bindings,
-            body: body_spanned,
+            body: body_list,
         };
         self.handle_let_binding(t, &let_binding_expr);
     }
