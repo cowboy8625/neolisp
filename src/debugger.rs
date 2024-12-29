@@ -1,8 +1,7 @@
 use crate::instruction::Instruction;
-use crate::machine::{Frame as MachineFrame, Machine};
+use crate::machine::Machine;
 use anyhow::{anyhow, Ok, Result};
 use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent};
-use crossterm::style::Stylize;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
 };
