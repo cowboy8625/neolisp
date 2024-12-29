@@ -1,9 +1,7 @@
 use crate::instruction::Instruction;
 use crate::machine::{Frame as MachineFrame, Machine};
 use anyhow::{anyhow, Ok, Result};
-use crossterm::event::{
-    self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers,
-};
+use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent};
 use crossterm::style::Stylize;
 use crossterm::terminal::{
     disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
@@ -15,16 +13,21 @@ use crate::widgets::{
     BreakpointsWidget, FrameWidget, GlobalsWidget, InstructionsWidget, PopupWidget,
 };
 use ratatui::backend::CrosstermBackend;
-use ratatui::layout::{Constraint, Direction, Layout};
-use ratatui::widgets::{Block, Borders, Paragraph};
+use ratatui::layout::{Constraint, Direction, Layout, Rect};
 use ratatui::{Frame, Terminal};
 use std::collections::HashSet;
 use std::io::{self, stdout};
 use std::time::{Duration, Instant};
 
 const HELP: &str = r#"If no command is given, the last command will be repeated.
-Default command is step.
+Keys:
+<- arrow -> to change display data on right side
+Mode Keys Normal:
+?  -  to show this message
+n  -  to toggle highlighting scopes
+:  -  to enter command mode
 
+Default command is step.
 <commands> [optional]
 q|quit              - quit
 h|help              - show this help message
@@ -35,13 +38,6 @@ r|run [file]        - run
  |reset             - reset stacks and set ip to 0
 j|jump <addr>       - jump to address
  |highlight_scope   - toggle highlighting scopes
-
-Keys:
-<- arrow -> to change display data on right side
-ctrl-/ to show this message
-ctrl-n to toggle highlighting scopes
-
-Press Escape to exit
 "#;
 
 #[derive(Default, Debug, Clone)]
@@ -91,11 +87,19 @@ impl DisplayDataState {
     }
 }
 
+#[derive(Debug, Default)]
+enum Mode {
+    #[default]
+    Normal,
+    Input,
+}
+
 #[derive(Debug)]
 pub struct Debugger<'a> {
     input_buffer: String,
     last_command: Command,
     last_instruction_pointer: Option<usize>,
+    next_instruction_pointer: usize,
     output: String,
     machine: &'a mut Machine,
     state: State,
@@ -106,12 +110,14 @@ pub struct Debugger<'a> {
     is_running: bool,
     show_help: bool,
     highlight_scope: bool,
+    mode: Mode,
+    scroll_offset: u16,
 }
 
 impl<'a> Debugger<'a> {
     pub fn new(machine: &'a mut Machine) -> Result<Self> {
         let instructions = machine.decompile()?;
-        Ok(Self {
+        let mut this = Self {
             machine,
             instructions,
             is_running: true,
@@ -119,6 +125,7 @@ impl<'a> Debugger<'a> {
             input_buffer: String::default(),
             last_command: Command::default(),
             last_instruction_pointer: Option::default(),
+            next_instruction_pointer: usize::default(),
             output: String::default(),
             state: State::default(),
             stack_data_state: DisplayDataState::default(),
@@ -126,7 +133,11 @@ impl<'a> Debugger<'a> {
             breakpoints: HashSet::default(),
             show_help: bool::default(),
             highlight_scope: bool::default(),
-        })
+            mode: Mode::default(),
+            scroll_offset: u16::default(),
+        };
+        this.set_next_instruction_pointer();
+        Ok(this)
     }
 
     pub fn with_breakpoints(mut self, breakpoints: Vec<usize>) -> Self {
@@ -146,7 +157,6 @@ impl<'a> Debugger<'a> {
             if self.error_message.is_some() {
                 self.state = State::Paused;
             }
-
             if self.state == State::Running {
                 for _ in 0..100 {
                     if self.breakpoints.contains(&self.machine.ip) {
@@ -188,31 +198,20 @@ impl<'a> Debugger<'a> {
         Ok(())
     }
 
-    fn draw(&mut self, f: &mut Frame) {
-        let size = f.area();
+    fn draw_frame_widget(&self, f: &mut Frame, area: Rect) {
+        FrameWidget::new(self.machine.ip, &self.machine.free, self.machine)
+            .render(area, f.buffer_mut());
+    }
 
-        // Layout with two sections: input and VM state
-        let chunks = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([Constraint::Min(0), Constraint::Length(3)].as_ref())
-            .split(size);
+    fn draw_global_widget(&self, f: &mut Frame, area: Rect) {
+        GlobalsWidget::new(self.machine.ip, &self.machine.global).render(area, f.buffer_mut())
+    }
 
-        let data = Layout::default()
-            .direction(Direction::Horizontal)
-            .constraints([Constraint::Percentage(55), Constraint::Percentage(45)].as_ref())
-            .split(chunks[0]);
+    fn draw_breakpoints_widget(&self, f: &mut Frame, area: Rect) {
+        BreakpointsWidget::new(self.machine.ip, &self.breakpoints).render(area, f.buffer_mut())
+    }
 
-        let input_box = Paragraph::new(self.input_buffer.clone())
-            .block(Block::default().borders(Borders::ALL).title("Input"));
-
-        let x = chunks[1].x + 1 + self.input_buffer.len() as u16;
-        let y = chunks[1].y + 1;
-        f.set_cursor_position((x, y));
-
-        if self.last_instruction_pointer != Some(self.machine.ip) {
-            self.last_instruction_pointer = Some(self.machine.ip);
-        }
-
+    fn draw_instructions_widget(&self, f: &mut Frame, area: Rect) {
         let current_function_name = self
             .machine
             .get_current_function_name()
@@ -225,29 +224,53 @@ impl<'a> Debugger<'a> {
             .unwrap_or(0..1);
         InstructionsWidget::new(
             self.machine.ip,
+            self.next_instruction_pointer,
             location,
             &self.instructions,
             &self.breakpoints,
             self.highlight_scope,
         )
-        .render(data[0], f.buffer_mut());
-        match self.stack_data_state {
-            DisplayDataState::Frame => FrameWidget::new(
-                self.machine.ip,
-                &self.machine.free,
-                self.machine
-                    .get_current_frame()
-                    .unwrap_or(&crate::machine::Frame::default()),
-            )
-            .render(data[1], f.buffer_mut()),
-            DisplayDataState::Global => GlobalsWidget::new(self.machine.ip, &self.machine.global)
-                .render(data[1], f.buffer_mut()),
-            DisplayDataState::Breakpoints => {
-                BreakpointsWidget::new(self.machine.ip, &self.breakpoints)
-                    .render(data[1], f.buffer_mut())
-            }
+        .with_scroll_offset(self.scroll_offset)
+        .render(area, f.buffer_mut());
+    }
+
+    fn draw_input_widget(&self, f: &mut Frame, area: Rect) {
+        let popup = PopupWidget::new(&self.input_buffer)
+            .width_closing_message(false)
+            .with_title("Input")
+            .with_percent_width(50)
+            .with_height(3);
+        let clear_area = popup.get_area(area);
+
+        let x = clear_area.x + 1 + self.input_buffer.len() as u16;
+        let y = clear_area.y + 1;
+
+        f.set_cursor_position((x, y));
+        f.render_widget(Clear, clear_area);
+        popup.render(area, f.buffer_mut());
+    }
+
+    fn draw(&mut self, f: &mut Frame) {
+        let size = f.area();
+
+        let (instruction_area, data_area) = get_instruction_and_data_area(size);
+
+        if self.last_instruction_pointer != Some(self.machine.ip) {
+            self.last_instruction_pointer = Some(self.machine.ip);
         }
-        f.render_widget(input_box, chunks[1]);
+
+        self.draw_instructions_widget(f, instruction_area);
+
+        match self.stack_data_state {
+            DisplayDataState::Frame => self.draw_frame_widget(f, data_area),
+            DisplayDataState::Global => self.draw_global_widget(f, data_area),
+            DisplayDataState::Breakpoints => self.draw_breakpoints_widget(f, data_area),
+        }
+
+        if let Mode::Input = self.mode {
+            self.draw_input_widget(f, size);
+            return;
+        }
         if let Some(error_message) = self.error_message.clone() {
             let popup = PopupWidget::new(&error_message);
             let area = popup.get_area(size);
@@ -271,14 +294,41 @@ impl<'a> Debugger<'a> {
     }
 
     fn key_handler(&mut self, key_event: &KeyEvent) -> Result<()> {
-        let KeyEvent {
-            code, modifiers, ..
-        } = key_event;
-        self.key_code_handler(code, modifiers)?;
+        let KeyEvent { code, .. } = key_event;
+        match self.mode {
+            Mode::Input => match code {
+                KeyCode::Char(c) => {
+                    self.input_buffer.push(*c);
+                }
+                KeyCode::Backspace => {
+                    self.input_buffer.pop();
+                }
+                KeyCode::Esc => {
+                    self.mode = Mode::Normal;
+                    self.input_buffer.clear();
+                }
+                KeyCode::Enter if !self.input_buffer.is_empty() => {
+                    match parse_input(&self.input_buffer) {
+                        Result::Ok(command) => self.execute_command(command)?,
+                        Result::Err(err) => {
+                            self.error_message = Some(format!("error: {}\n", err));
+                        }
+                    }
+
+                    self.input_buffer.clear();
+                    self.mode = Mode::Normal;
+                }
+                KeyCode::Enter => {
+                    self.mode = Mode::Normal;
+                }
+                _ => {}
+            },
+            Mode::Normal => self.key_code_handler(code)?,
+        }
         Ok(())
     }
 
-    fn key_code_handler(&mut self, code: &KeyCode, modifiers: &KeyModifiers) -> Result<()> {
+    fn key_code_handler(&mut self, code: &KeyCode) -> Result<()> {
         if *code != KeyCode::Null && self.error_message.is_some() {
             self.error_message = None;
             return Ok(());
@@ -286,36 +336,25 @@ impl<'a> Debugger<'a> {
             self.show_help = false;
             return Ok(());
         }
-        if !self.show_help
-            && (matches!(code, KeyCode::Char('/') | KeyCode::Char('7')))
-            && modifiers.contains(KeyModifiers::CONTROL)
-        {
-            self.show_help = true;
-        }
         if self.error_message.is_some() || self.show_help {
             return Ok(());
         }
         match code {
-            KeyCode::Char('n') if modifiers.contains(KeyModifiers::CONTROL) => {
+            KeyCode::Char('h') => {
                 self.highlight_scope = !self.highlight_scope;
             }
-            KeyCode::Char(c) => {
-                self.input_buffer.push(*c);
+            KeyCode::Char(':') => {
+                self.mode = Mode::Input;
             }
-            KeyCode::Backspace => {
-                self.input_buffer.pop();
+            KeyCode::Char('?') => {
+                self.show_help = true;
+            }
+            KeyCode::Char('z') => {
+                self.scroll_offset = 0;
             }
             KeyCode::Esc => self.show_help = false,
             KeyCode::Enter if self.input_buffer.is_empty() => {
                 self.execute_command(self.last_command.clone())?;
-            }
-            KeyCode::Enter => {
-                match parse_input(&self.input_buffer) {
-                    Result::Ok(command) => self.execute_command(command)?,
-                    Result::Err(err) => self.output.push_str(&format!("error: {}\n", err)),
-                }
-
-                self.input_buffer.clear();
             }
             KeyCode::Right => self.stack_data_state.next(),
             KeyCode::Left => self.stack_data_state.previous(),
@@ -362,11 +401,11 @@ impl<'a> Debugger<'a> {
                 self.machine.ip = 0x0000;
             }
             Command::Reset => {
-                self.machine.global.clear();
-                self.machine.free.clear();
-                self.machine.stack.clear();
-                self.machine.ip = 0x0000;
-                self.machine.stack.push(MachineFrame::default());
+                let program = self.machine.program.clone();
+                let symbol_table = self.machine.symbol_table.clone();
+                *self.machine = Machine::new(program, symbol_table);
+                self.set_next_instruction_pointer();
+                self.state = State::Paused;
             }
             Command::Jump(address) => {
                 self.machine.ip = address;
@@ -378,26 +417,27 @@ impl<'a> Debugger<'a> {
         Ok(())
     }
 
-    fn mouse_handler(&mut self, _: &event::MouseEvent) {
-
-        // let event::MouseEvent {
-        //     kind,
-        //     ..
-        //     // column,
-        //     // row,
-        //     // modifiers,
-        // } = mouse_event;
-        // let k = match kind {
-        //     event::MouseEventKind::Down(mouse_button) => format!("{mouse_button:?}\n"),
-        //     event::MouseEventKind::Up(mouse_button) => format!("{mouse_button:?}\n"),
-        //     event::MouseEventKind::Drag(mouse_button) => format!("{mouse_button:?}\n"),
-        //     event::MouseEventKind::Moved => String::from("Moved\n"),
-        //     event::MouseEventKind::ScrollDown => String::from("Scroll Down\n"),
-        //     event::MouseEventKind::ScrollUp => String::from("Scroll Up\n"),
-        //     event::MouseEventKind::ScrollLeft => String::from("Scroll Left\n"),
-        //     event::MouseEventKind::ScrollRight => String::from("Scroll Right\n"),
-        // };
-        // self.output.push_str(&k)
+    fn mouse_handler(&mut self, mouse_event: &event::MouseEvent) {
+        let event::MouseEvent {
+            kind,
+            ..
+            // column,
+            // row,
+            // modifiers,
+        } = mouse_event;
+        match kind {
+            // event::MouseEventKind::Down(mouse_button) => format!("{mouse_button:?}\n"),
+            // event::MouseEventKind::Up(mouse_button) => format!("{mouse_button:?}\n"),
+            // event::MouseEventKind::Drag(mouse_button) => format!("{mouse_button:?}\n"),
+            // event::MouseEventKind::Moved => String::from("Moved\n"),
+            event::MouseEventKind::ScrollDown => self.scroll_offset += 1,
+            event::MouseEventKind::ScrollUp => {
+                self.scroll_offset = self.scroll_offset.saturating_sub(1)
+            }
+            // event::MouseEventKind::ScrollLeft => String::from("Scroll Left\n"),
+            // event::MouseEventKind::ScrollRight => String::from("Scroll Right\n"),
+            _ => {}
+        };
     }
 
     fn paste_handler(&mut self, string: &str) {
@@ -406,15 +446,38 @@ impl<'a> Debugger<'a> {
 
     fn resize_handler(&self, _: u16, _: u16) {}
 
+    fn set_next_instruction_pointer(&mut self) {
+        let mut vm = self.machine.clone();
+        if vm.run_once().is_ok() {
+            self.next_instruction_pointer = vm.ip;
+        }
+    }
+
     fn run_machine_once(&mut self) -> bool {
-        match self.machine.run_once() {
+        if !self.machine.is_running {
+            self.state = State::Paused;
+            self.next_instruction_pointer = self.machine.ip;
+            return false;
+        }
+
+        let result = match self.machine.run_once() {
             Result::Ok(_) => false,
             Result::Err(err) => {
                 self.error_message = Some(err.to_string());
-                true
+                return true;
             }
-        }
+        };
+        self.set_next_instruction_pointer();
+        result
     }
+}
+
+fn get_instruction_and_data_area(main: Rect) -> (Rect, Rect) {
+    let instruction_area_data_rect = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(55), Constraint::Percentage(45)].as_ref())
+        .split(main);
+    (instruction_area_data_rect[0], instruction_area_data_rect[1])
 }
 
 impl Drop for Debugger<'_> {
@@ -446,6 +509,9 @@ fn parse_input(input: &str) -> Result<Command> {
         "reset" => Ok(Command::Reset),
         "jump" | "j" if command.len() == 2 => Ok(Command::Jump(command[1].parse()?)),
         "highlight-scope" => Ok(Command::HighlightScope),
-        _ => Err(anyhow!(format!("Unknown command `{}`", input.red()))),
+        _ => Err(anyhow!(format!(
+            "Unknown command `{}`\nPress `?` for help",
+            input
+        ))),
     }
 }

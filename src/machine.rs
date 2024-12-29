@@ -71,7 +71,7 @@ const INTRISICS: [fn(&mut Machine, u8) -> Result<()>; 24] = [
     Intrinsic::intrinsic_car,
 ];
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Frame {
     pub return_address: Option<usize>,
     pub scope_name: String,
@@ -114,16 +114,12 @@ impl Frame {
     }
 }
 
-pub struct StackMetadata {
-    pub name: String,
-}
-
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct MachineOptions {
     pub quiet: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Machine {
     pub(crate) options: MachineOptions,
     pub(crate) program: Vec<u8>,

@@ -15,7 +15,7 @@ pub enum Type {
     Int,
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Test {
     pub id: usize,
     pub span: Span,
@@ -40,7 +40,7 @@ impl Test {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct UnboundVariable {
     pub id: usize,
     pub name: String,
@@ -63,7 +63,7 @@ impl UnboundVariable {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Variable {
     pub id: usize,
     pub name: String,
@@ -119,7 +119,7 @@ impl Parameter {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Function {
     pub id: usize,
     pub name: String,
@@ -153,7 +153,7 @@ impl Function {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Lambda {
     pub id: usize,
     pub span: Span,
@@ -179,7 +179,7 @@ impl Lambda {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Let {
     pub id: usize,
     pub span: Span,
@@ -212,7 +212,7 @@ impl Let {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Symbol {
     UnboundVariable(UnboundVariable),
     Variable(Variable),
@@ -337,7 +337,7 @@ into_symbol!(
     Test
 );
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Scope {
     symbols: HashMap<String, Symbol>,
 }
@@ -362,7 +362,7 @@ impl Scope {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct SymbolTable {
     pub scopes: HashMap<String, Scope>,
     pub scope_stack: Vec<String>,
@@ -653,20 +653,20 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
     }
 
     fn handle_let_binding(&mut self, table: &mut SymbolTable, let_binding: &LetBindingExpr) {
-        let names = let_binding
-            .bindings
-            .iter()
-            .filter_map(|binding| binding.expr.first_list_item())
-            .map(|item| &item.expr)
-            .map(|expr| match expr {
-                Expr::Symbol(name) => name.clone(),
-                _ => panic!("expected symbol in let binding, got: {expr:?}"),
-            })
-            .collect::<Vec<_>>();
+        // let names = let_binding
+        //     .bindings
+        //     .iter()
+        //     .filter_map(|binding| binding.expr.first_list_item())
+        //     .map(|item| &item.expr)
+        //     .map(|expr| match expr {
+        //         Expr::Symbol(name) => name.clone(),
+        //         _ => panic!("expected symbol in let binding, got: {expr:?}"),
+        //     })
+        //     .collect::<Vec<_>>();
         let id = self.lambda_counter;
         self.lambda_counter += 1;
-        let scope_name = format!("let_{id}|{}", names.join("|"));
-        table.enter_scope(&scope_name);
+        // let scope_name = format!("let_{id}|{}", names.join("|"));
+        // table.enter_scope(&scope_name);
 
         let mut bindings = Vec::new();
         for spanned in let_binding.bindings.iter() {
@@ -720,12 +720,11 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
 
         table.push(r#let);
 
-        self.walk_expr(table, let_binding.body);
-        // for spanned in let_binding.body.iter() {
-        //     self.walk_expr(table, spanned);
-        // }
+        for spanned in let_binding.body.iter() {
+            self.walk_expr(table, spanned);
+        }
 
-        table.exit_scope();
+        // table.exit_scope();
     }
 
     fn handle_call(&mut self, table: &mut SymbolTable, call: &CallExpr) {
@@ -788,6 +787,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
 
     fn handle_symbol(&mut self, table: &mut SymbolTable, name: &str, span: Span) {
         let Some(scope) = table.get(&table.get_scope_name()) else {
+            // self.error(Error::SymbolNotDefined(span, name.to_string()));
             return;
         };
         let params = scope.get_parameters();
@@ -799,12 +799,19 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         let mut skip = false;
         table.get_mut(name, |symbol| match symbol {
             Symbol::UnboundVariable(_) => {
+                eprintln!("ub: {name}");
                 skip = true;
             }
             Symbol::Variable(_) => {
+                eprintln!("v: {name}");
                 skip = true;
             }
-            Symbol::Parameter(p) => p.is_unbound = true,
+            Symbol::Parameter(p) => {
+                // p.id = self.unbound_counter;
+                // self.unbound_counter += 1;
+                // eprintln!("p: {name} {}", p.id);
+                p.is_unbound = true;
+            }
             Symbol::Function(f) => {
                 f.is_recursive = f.name == scope_name || f.is_recursive;
                 skip = true;
@@ -816,9 +823,14 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         if skip {
             return;
         }
-        let id = self.unbound_counter;
+        eprintln!("Unbound variable: {}", name);
+        table.push(UnboundVariable::new(
+            self.unbound_counter,
+            name,
+            span,
+            table.scope_level(),
+        ));
         self.unbound_counter += 1;
-        table.push(UnboundVariable::new(id, name, span, table.scope_level()));
     }
 
     // ----------- START NOT USED -----------

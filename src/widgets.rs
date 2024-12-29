@@ -1,5 +1,14 @@
 use std::collections::HashSet;
 
+// TODO: highlight next instruction to be executed if on screen
+//  Do this for last instruction!  Just need to pipe it to the widget.
+//  Also Wrap the next ip in a Result Enum to change the color if the next ip run is going to fail.
+//
+// TODO: make the call stack scollable.
+// By using the up and down arrow keys you should be able to go
+// up and down the call stack and this should update the local
+// stack and arg stack display
+
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Flex, Layout, Rect},
@@ -8,10 +17,11 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Widget},
 };
 
-use crate::{instruction::Instruction, machine::Frame};
+use crate::{instruction::Instruction, machine::Machine};
 
 pub struct InstructionsWidget<'a> {
     pub ip: usize,
+    pub next_ip: usize,
     pub location: std::ops::Range<usize>,
     pub instructions: &'a [Instruction],
     pub breakpoints: &'a HashSet<usize>,
@@ -22,6 +32,7 @@ pub struct InstructionsWidget<'a> {
 impl<'a> InstructionsWidget<'a> {
     pub fn new(
         ip: usize,
+        next_ip: usize,
         location: std::ops::Range<usize>,
         instructions: &'a [Instruction],
         breakpoints: &'a HashSet<usize>,
@@ -29,12 +40,18 @@ impl<'a> InstructionsWidget<'a> {
     ) -> Self {
         Self {
             ip,
+            next_ip,
             location,
             instructions,
             breakpoints,
             scroll_offset: 0,
             highlight_scope,
         }
+    }
+
+    pub fn with_scroll_offset(mut self, scroll_offset: u16) -> Self {
+        self.scroll_offset = scroll_offset;
+        self
     }
 
     fn get_current_instruction_index(current_ip: usize, instructions: &'a [Instruction]) -> usize {
@@ -50,6 +67,7 @@ impl<'a> InstructionsWidget<'a> {
 
     fn format_instruction(
         ip: usize,
+        next_ip: usize,
         location: std::ops::Range<usize>,
         instructions: &'a [Instruction],
         breakpoints: &'a HashSet<usize>,
@@ -63,7 +81,11 @@ impl<'a> InstructionsWidget<'a> {
             let line_style = if ip == offset {
                 Style::default()
                     .fg(Color::Green)
-                    .add_modifier(Modifier::UNDERLINED)
+                    .add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
+            } else if next_ip == offset {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD | Modifier::UNDERLINED)
             } else if !highlight_scope || location.contains(&offset) {
                 Style::default().fg(Color::White)
             } else {
@@ -98,30 +120,37 @@ impl<'a> InstructionsWidget<'a> {
 impl Widget for InstructionsWidget<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let scroll_index = Self::get_current_instruction_index(self.ip, self.instructions)
-            .saturating_sub(area.height as usize / 2);
+            .saturating_sub(area.height as usize / 2) as u16;
         let text = Self::format_instruction(
             self.ip,
+            self.next_ip,
             self.location,
             self.instructions,
             self.breakpoints,
             self.highlight_scope,
         );
+
+        let scroll_x = (scroll_index + self.scroll_offset).min(self.instructions.len() as u16 - 1);
         let paragraph = Paragraph::new(text)
-            .block(Block::default().borders(Borders::ALL).title("VM State"))
-            .scroll((scroll_index as u16, 0));
+            .block(Block::default().borders(Borders::RIGHT).title("VM State"))
+            .scroll((scroll_x, 0));
         paragraph.render(area, buf);
     }
 }
 
 pub(crate) struct FrameWidget<'a> {
     ip: usize,
-    frame: &'a Frame,
+    machine: &'a Machine,
     free: &'a [crate::instruction::Value],
 }
 
 impl<'a> FrameWidget<'a> {
-    pub(crate) fn new(ip: usize, free: &'a [crate::instruction::Value], frame: &'a Frame) -> Self {
-        Self { ip, frame, free }
+    pub(crate) fn new(
+        ip: usize,
+        free: &'a [crate::instruction::Value],
+        machine: &'a Machine,
+    ) -> Self {
+        Self { ip, machine, free }
     }
 }
 
@@ -132,8 +161,10 @@ impl Widget for FrameWidget<'_> {
         let line = Line::from(vec![
             Span::raw("return address: "),
             Span::styled(
-                self.frame
-                    .return_address
+                self.machine
+                    .get_current_frame()
+                    .ok()
+                    .and_then(|m| m.return_address)
                     .map(|a| a.to_string())
                     .unwrap_or("N/A".to_string()),
                 Style::default().fg(Color::Green),
@@ -141,11 +172,15 @@ impl Widget for FrameWidget<'_> {
         ]);
         lines.push(line);
 
-        let line = Line::from(vec![
-            Span::raw("scope name: "),
-            Span::styled(&self.frame.scope_name, Style::default().fg(Color::Green)),
-        ]);
+        let line = Line::from(vec![Span::raw("stack trace: ")]);
         lines.push(line);
+        for frame in self.machine.stack.iter() {
+            let line = Line::from(vec![Span::styled(
+                &frame.scope_name,
+                Style::default().fg(Color::Green),
+            )]);
+            lines.push(line);
+        }
 
         let line = Line::from(vec![Span::raw("Free Stack")]);
         lines.push(line);
@@ -156,14 +191,15 @@ impl Widget for FrameWidget<'_> {
 
         let line = Line::from(vec![Span::raw("Local Stack")]);
         lines.push(line);
-        for (i, item) in self.frame.args.iter().enumerate() {
+        let frame = self.machine.get_current_frame().unwrap();
+        for (i, item) in frame.args.iter().enumerate() {
             let line = Line::from(vec![Span::raw(format!("[{}]: {}", i, item))]);
             lines.push(line);
         }
 
         let line = Line::from(vec![Span::raw("Frame Stack")]);
         lines.push(line);
-        for (i, item) in self.frame.stack.iter().enumerate() {
+        for (i, item) in frame.stack.iter().enumerate() {
             let line = Line::from(vec![Span::raw(format!("[{}]: {}", i, item))]);
             lines.push(line);
         }
@@ -171,7 +207,7 @@ impl Widget for FrameWidget<'_> {
         let text = Text::from(lines);
         let title = format!("Frame: {ip:>4}", ip = self.ip);
         let paragraph =
-            Paragraph::new(text).block(Block::default().borders(Borders::ALL).title(title));
+            Paragraph::new(text).block(Block::default().borders(Borders::NONE).title(title));
         paragraph.render(area, buf);
     }
 }
@@ -199,7 +235,7 @@ impl Widget for GlobalsWidget<'_> {
         let text = Text::from(lines);
         let title = format!("Globals: {ip:>4}", ip = self.ip);
         let paragraph =
-            Paragraph::new(text).block(Block::default().borders(Borders::ALL).title(title));
+            Paragraph::new(text).block(Block::default().borders(Borders::NONE).title(title));
         paragraph.render(area, buf);
     }
 }
@@ -232,57 +268,124 @@ impl Widget for BreakpointsWidget<'_> {
         let text = Text::from(lines);
         let title = format!("Breakpoints: {ip:>4}", ip = self.ip);
         let paragraph =
-            Paragraph::new(text).block(Block::default().borders(Borders::ALL).title(title));
+            Paragraph::new(text).block(Block::default().borders(Borders::NONE).title(title));
         paragraph.render(area, buf);
     }
 }
 
 pub(crate) struct PopupWidget<'a> {
     message: &'a str,
+    width_percent: Option<u16>,
+    height_percent: Option<u16>,
+    width: Option<u16>,
+    height: Option<u16>,
+    title: Option<String>,
+    dont_show_closing_message: bool,
 }
 
 impl<'a> PopupWidget<'a> {
     pub(crate) fn new(message: &'a str) -> Self {
-        Self { message }
+        Self {
+            message,
+            width_percent: None,
+            height_percent: None,
+            width: None,
+            height: None,
+            title: None,
+            dont_show_closing_message: true,
+        }
     }
 
-    fn calculate_popup_size(&self, area: Rect) -> (u16, u16) {
-        let lines = self.message.lines().count() as u16;
-        let max_line_length = self
-            .message
-            .lines()
-            .map(|line| line.len() as u16)
-            .max()
-            .unwrap_or(1);
-
-        let width_percent =
-            ((max_line_length + 4) as f64 / area.width as f64 * 100.0).ceil() as u16;
-        let height_percent = ((lines + 2) as f64 / area.height as f64 * 100.0).ceil() as u16;
-
-        (width_percent.clamp(10, 90), height_percent.clamp(10, 90))
+    pub fn width_closing_message(mut self, flag: bool) -> Self {
+        self.dont_show_closing_message = flag;
+        self
     }
 
-    fn popup_area(&self, area: Rect) -> Rect {
-        let (percent_x, percent_y) = self.calculate_popup_size(area);
+    pub fn _with_width(mut self, width: u16) -> Self {
+        self.width = Some(width);
+        self
+    }
 
-        let vertical = Layout::vertical([Constraint::Percentage(percent_y)]).flex(Flex::Center);
-        let horizontal = Layout::horizontal([Constraint::Percentage(percent_x)]).flex(Flex::Center);
+    pub fn with_height(mut self, height: u16) -> Self {
+        self.height = Some(height);
+        self
+    }
+
+    pub fn with_percent_width(mut self, percent: u16) -> Self {
+        self.width_percent = Some(percent);
+        self
+    }
+
+    pub fn _with_percent_height(mut self, percent: u16) -> Self {
+        self.height_percent = Some(percent);
+        self
+    }
+
+    pub fn with_title(mut self, title: impl Into<String>) -> Self {
+        self.title = Some(title.into());
+        self
+    }
+
+    fn calculate_width(&self, area: Rect) -> u16 {
+        self.width_percent.unwrap_or_else(|| {
+            let max_line_length = self
+                .message
+                .lines()
+                .map(|line| line.len())
+                .max()
+                .unwrap_or(1) as u16;
+            ((max_line_length + 4) as f64 / area.width as f64 * 100.0).ceil() as u16
+        })
+    }
+
+    fn calculate_height(&self, area: Rect) -> u16 {
+        self.height_percent.unwrap_or_else(|| {
+            let lines = self.message.lines().count() as u16;
+            ((lines + 2) as f64 / area.height as f64 * 100.0).ceil() as u16
+        })
+    }
+
+    pub fn get_area(&self, area: Rect) -> Rect {
+        let vertical = if let Some(width) = self.width {
+            Layout::horizontal([Constraint::Max(width)]).flex(Flex::Center)
+        } else {
+            let width_percent = self.calculate_width(area);
+            Layout::horizontal([Constraint::Percentage(width_percent)]).flex(Flex::Center)
+        };
+        let horizontal = if let Some(height) = self.height {
+            Layout::vertical([Constraint::Max(height)]).flex(Flex::Center)
+        } else {
+            let height_percent = self.calculate_height(area);
+            Layout::vertical([Constraint::Percentage(height_percent)]).flex(Flex::Center)
+        };
 
         let [area] = vertical.areas(area);
         let [area] = horizontal.areas(area);
 
         area
     }
-
-    pub fn get_area(&self, area: Rect) -> Rect {
-        self.popup_area(area)
-    }
 }
 
 impl Widget for PopupWidget<'_> {
     fn render(self, area: Rect, buf: &mut Buffer) {
         let area = self.get_area(area);
-        let paragraph = Paragraph::new(self.message).block(Block::default().borders(Borders::ALL));
+        let mut lines = self
+            .message
+            .lines()
+            .map(|line| Line::from(vec![Span::raw(line)]))
+            .collect::<Vec<_>>();
+        if self.dont_show_closing_message {
+            lines.push(Line::from(vec![Span::styled(
+                "Press any key to close",
+                Style::default().fg(Color::Green),
+            )]));
+        }
+        let text = Text::from(lines);
+        let paragraph = Paragraph::new(text).block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(self.title.unwrap_or_default()),
+        );
         paragraph.render(area, buf);
     }
 }
