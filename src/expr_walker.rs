@@ -142,6 +142,7 @@ pub trait AstWalker<T> {
     fn handle_if_else(&mut self, _: &mut T, _: &IfElseExpr);
     fn handle_loop(&mut self, _: &mut T, _: &LoopExpr);
     fn handle_bool(&mut self, _: &mut T, _: bool);
+    fn handle_nil(&mut self, _: &mut T);
     fn handle_string(&mut self, _: &mut T, _: &str);
     fn handle_number(&mut self, _: &mut T, _: f64);
     fn handle_symbol(&mut self, _: &mut T, _: &str, _: Span);
@@ -597,6 +598,7 @@ pub trait AstWalker<T> {
 
     fn walk_expr(&mut self, t: &mut T, spanned: &Spanned<Expr>) {
         match &spanned.expr {
+            Expr::Nil => self.handle_nil(t),
             Expr::Bool(value) => self.handle_bool(t, *value),
             Expr::String(string) => self.handle_string(t, string),
             Expr::Symbol(symbol) if symbol.starts_with(':') => {

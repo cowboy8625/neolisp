@@ -1,5 +1,240 @@
 ; (test sleep ; not sure how to test this
 
+; operator functions
+
+(test add+2
+  (assert-eq
+    :expected 3
+    :actual (+ 1 2)
+    :description "+ 1 2 -> 3"))
+
+(test add+50
+  (assert-eq
+    :expected 1275
+    :actual (+ 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
+               21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37
+               38 39 40 41 42 43 44 45 46 47 48 49 50)
+    :description "+ 1..50 -> 1275"))
+
+(test sub-2
+  (assert-eq
+    :expected -1
+    :actual (- 1 2)
+    :description "- 1 2 -> -1"))
+
+(test sub-50
+  (assert-eq
+    :expected -1273
+    :actual (- 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
+               21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37
+               38 39 40 41 42 43 44 45 46 47 48 49 50)
+    :description "- 1..50 -> -1273"))
+
+(test mul*2
+  (assert-eq
+    :expected 2
+    :actual (* 1 2)
+    :description "* 1 2 -> 2"))
+
+(test mul*50
+  (assert-eq
+    :expected
+    30414093201713376000000000000000000000000000000000000000000000000
+    :actual (* 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
+               21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37
+               38 39 40 41 42 43 44 45 46 47 48 49 50)
+    :description
+    "* 1..50 -> 30414093201713376000000000000000000000000000000000000000000000000"))
+
+(test div/2
+  (assert-eq
+    :expected 0.5
+    :actual (/ 1 2)
+    :description "/ 1 2 -> 0.5"))
+
+(test div/50
+  (assert-eq
+    :expected
+    0.000000000000000000000000000000000000000000000000000000000000000032879494166331576
+    :actual (/ 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
+               21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37
+               38 39 40 41 42 43 44 45 46 47 48 49 50)
+    :description
+    "* 1..50 -> 0.000000000000000000000000000000000000000000000000000000000000000032879494166331576"))
+
+(test equal=2-false
+  (assert-eq
+    :expected false
+    :actual (= 1 2)
+    :description "= 1 2 -> false"))
+
+(test equal=2-true
+  (assert-eq
+    :expected true
+    :actual (= 1 1)
+    :description "= 1 1 -> true"))
+
+(test equal=2-nil
+  (assert-eq
+    :expected nil
+    :actual (= 1 'a)
+    :description "= 1 'a -> nil"))
+
+(test equal=50
+  (assert-eq
+    :expected false
+    :actual (= 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
+               21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37
+               38 39 40 41 42 43 44 45 46 47 48 49 50)
+    :description "* 1..50 -> false"))
+
+(test greater>2-false
+  (assert-eq
+    :expected false
+    :actual (> 1 2)
+    :description "> 1 2 -> false"))
+
+(test greater>2-true
+  (assert-eq
+    :expected true
+    :actual (> 2 1)
+    :description "> 2 1 -> true"))
+
+(test greater>2-nil
+  (assert-eq
+    :expected nil
+    :actual (> 1 'a)
+    :description "> 1 'a -> nil"))
+
+(test greater>50
+  (assert-eq
+    :expected false
+    :actual (> 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
+               21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37
+               38 39 40 41 42 43 44 45 46 47 48 49 50)
+    :description "> 1..50 -> false"))
+
+(test less<2-true
+  (assert-eq
+    :expected true
+    :actual (< 1 2)
+    :description "< 1 2 -> true"))
+
+(test less<2-false
+  (assert-eq
+    :expected false
+    :actual (< 2 1)
+    :description "> 2 1 -> false"))
+
+(test less<2-nil
+  (assert-eq
+    :expected nil
+    :actual (< 1 'a)
+    :description "< 1 'a -> nil"))
+
+(test less<50
+  (assert-eq
+    :expected true
+    :actual (< 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
+               21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37
+               38 39 40 41 42 43 44 45 46 47 48 49 50)
+    :description "> 1..50 -> false"))
+
+(test greater-or-equal>=2-false
+  (assert-eq
+    :expected false
+    :actual (>= 1 2)
+    :description "=> 1 2 -> false"))
+
+(test greater-or-equal>=2-true
+  (assert-eq
+    :expected true
+    :actual (>= 2 1)
+    :description ">= 2 1 -> true"))
+
+(test greater-or-equal>=2-nil
+  (assert-eq
+    :expected nil
+    :actual (>= 1 'a)
+    :description ">= 1 'a -> nil"))
+
+(test greater-or-equal=>50
+  (assert-eq
+    :expected false
+    :actual (>= 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
+               21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37
+               38 39 40 41 42 43 44 45 46 47 48 49 50)
+    :description ">= 1..50 -> false"))
+
+; TODO: not will fail at runtime if a bool is not given
+
+(test not-false-true
+  (assert-eq
+    :expected true
+    :actual (not false)
+    :description "not false -> true"))
+
+(test not-true-false
+  (assert-eq
+    :expected false
+    :actual (not true)
+    :description "not true -> false"))
+
+; TODO: Again and will fail at runtime if a bool is not given
+
+(test and-2-true
+  (assert-eq
+    :expected true
+    :actual (and true true)
+    :description "and true true -> true"))
+
+(test and-2-false
+  (assert-eq
+    :expected false
+    :actual (and true false)
+    :description "and true false -> false"))
+
+(test and-5-true
+  (assert-eq
+    :expected true
+    :actual (and true true true true true)
+    :description "and true true true true true -> true"))
+
+(test and-5-false
+  (assert-eq
+    :expected false
+    :actual (and true true false true true)
+    :description "and true true false true true -> false"))
+
+; TODO: Again or will fail at runtime if a bool is not given
+
+(test or-2-true
+  (assert-eq
+    :expected true
+    :actual (or true false)
+    :description "or true false -> true"))
+
+(test or-2-false
+  (assert-eq
+    :expected false
+    :actual (or false false)
+    :description "and false false -> false"))
+
+(test or-5-true
+  (assert-eq
+    :expected true
+    :actual (or false false false false true)
+    :description "or false false false false true -> true"))
+
+(test or-5-false
+  (assert-eq
+    :expected false
+    :actual (or false false false false false)
+    :description "or false false false false false -> false"))
+
+; ---------- Builtin functions ----------
+
+; This function gets used in the test below
 (fn add (x y) (+ x y))
 
 (test atom?-symbol

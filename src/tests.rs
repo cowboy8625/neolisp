@@ -5,6 +5,7 @@ use pretty_assertions::assert_eq;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TestingExpr {
+    Nil,
     Bool(bool),
     String(String),
     Symbol(String),
@@ -15,6 +16,7 @@ pub enum TestingExpr {
 impl std::fmt::Display for TestingExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Nil => write!(f, "nil"),
             Self::Bool(b) => write!(f, "{b}"),
             Self::String(s) => write!(f, "{s}"),
             Self::Symbol(s) => write!(f, "{s}"),
@@ -100,6 +102,7 @@ fn test_span_simple() {
 
 fn strip_out_spanned(expr: Spanned<Expr>) -> TestingExpr {
     match expr.expr {
+        Expr::Nil => TestingExpr::Nil,
         Expr::Bool(bool) => TestingExpr::Bool(bool),
         Expr::String(string) => TestingExpr::String(string.to_string()),
         Expr::Symbol(symbol) => TestingExpr::Symbol(symbol.to_string()),

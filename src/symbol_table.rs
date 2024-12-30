@@ -834,6 +834,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
     }
 
     // ----------- START NOT USED -----------
+    fn handle_nil(&mut self, _: &mut SymbolTable) {}
     fn handle_bool(&mut self, _: &mut SymbolTable, _: bool) {}
     fn handle_string(&mut self, _: &mut SymbolTable, _: &str) {}
     fn handle_number(&mut self, _: &mut SymbolTable, _: f64) {}

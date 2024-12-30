@@ -524,6 +524,9 @@ impl AstWalker<Program> for Emitter<'_> {
     fn handle_quote(&mut self, program: &mut Program, quote: &QuoteExpr) {
         fn emit_values(values: &mut Vec<Value>, spanned: &Spanned<Expr>) {
             match &spanned.expr {
+                Expr::Nil => {
+                    values.push(Value::Nil);
+                }
                 Expr::Bool(b) => {
                     values.push(Value::Bool(*b));
                 }
@@ -586,6 +589,11 @@ impl AstWalker<Program> for Emitter<'_> {
         program.push(Instruction::Jump(start));
 
         program[jump_instruction_index] = Instruction::JumpIf(self.get_program_size(program));
+    }
+
+    fn handle_nil(&mut self, program: &mut Program) {
+        let value = Value::Nil;
+        program.push(Instruction::Push(Box::new(value)));
     }
 
     fn handle_bool(&mut self, program: &mut Program, b: bool) {

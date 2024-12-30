@@ -326,6 +326,7 @@ impl std::fmt::Display for Callable {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
+    Nil,
     U8(u8),
     I32(i32),
     U32(u32),
@@ -341,21 +342,23 @@ pub enum Value {
 }
 
 impl Value {
-    pub const CODE_U8: u8 = 0x00;
-    pub const CODE_I32: u8 = 0x01;
-    pub const CODE_U32: u8 = 0x02;
-    pub const CODE_F32: u8 = 0x03;
-    pub const CODE_F64: u8 = 0x04;
-    pub const CODE_STRING: u8 = 0x05;
-    pub const CODE_BOOL: u8 = 0x06;
-    pub const CODE_LIST: u8 = 0x07;
-    pub const CODE_CALLABLE: u8 = 0x08;
-    pub const CODE_BUILTIN: u8 = 0x09;
-    pub const CODE_SYMBOL: u8 = 0x0A;
-    pub const CODE_KEYWORD: u8 = 0x0B;
+    pub const CODE_NIL: u8 = 0x00;
+    pub const CODE_U8: u8 = 0x01;
+    pub const CODE_I32: u8 = 0x02;
+    pub const CODE_U32: u8 = 0x03;
+    pub const CODE_F32: u8 = 0x04;
+    pub const CODE_F64: u8 = 0x05;
+    pub const CODE_STRING: u8 = 0x06;
+    pub const CODE_BOOL: u8 = 0x07;
+    pub const CODE_LIST: u8 = 0x08;
+    pub const CODE_CALLABLE: u8 = 0x09;
+    pub const CODE_BUILTIN: u8 = 0x0A;
+    pub const CODE_SYMBOL: u8 = 0x0B;
+    pub const CODE_KEYWORD: u8 = 0x0C;
 
     pub fn to_bytecode(&self) -> Vec<u8> {
         match self {
+            Value::Nil => vec![Self::CODE_NIL],
             Value::U8(v) => vec![Self::CODE_U8, *v],
             Value::I32(v) => {
                 let mut bytes = vec![Self::CODE_I32];
@@ -421,6 +424,7 @@ impl Value {
 
     pub fn size(&self) -> usize {
         let conent_size = match self {
+            Value::Nil => 0,
             Value::U8(_) => 1,
             Value::I32(_) => 4,
             Value::U32(_) => 4,
@@ -442,6 +446,7 @@ impl Value {
 
     pub fn type_of(&self) -> String {
         match self {
+            Self::Nil => "nil".to_string(),
             Self::U8(_) => "u8".to_string(),
             Self::I32(_) => "i32".to_string(),
             Self::U32(_) => "u32".to_string(),
@@ -461,6 +466,7 @@ impl Value {
 impl std::fmt::Display for Value {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Nil => write!(f, "nil"),
             Self::U8(value) => write!(f, "{value}"),
             Self::I32(value) => write!(f, "{value}"),
             Self::U32(value) => write!(f, "{value}"),

@@ -10,6 +10,41 @@ use anyhow::{anyhow, Result};
 use crossterm::style::Stylize;
 use num_traits::FromPrimitive;
 
+macro_rules! generate_instruction_operator {
+    ($name:ident, $token:tt) => {
+        fn $name(&mut self) -> Result<()> {
+            let count = self.get_u8()? as usize;
+            let frame = self.get_current_frame_mut()?;
+            let index = frame.stack.len() - count;
+            let args = frame.stack.split_off(index);
+            let left = &args[0];
+
+            for right in args.iter().skip(1) {
+                match (left, right) {
+                    (Value::U8(l), Value::U8(r)) if l $token r => continue,
+                    (Value::F32(l), Value::F32(r)) if l $token r => continue,
+                    (Value::I32(l), Value::I32(r)) if l $token r => continue,
+                    (Value::F64(l), Value::F64(r)) if l $token r => continue,
+                    (Value::Keyword(l), Value::Keyword(r)) if l $token r => continue,
+                    (Value::Symbol(l), Value::Symbol(r)) if l $token r => continue,
+                    (Value::String(l), Value::String(r)) if l $token r => continue,
+                    (r, l) if l.type_of() != r.type_of() => {
+                        frame.stack.push(Value::Nil);
+                        return Ok(());
+                    }
+                    _ => {
+                        frame.stack.push(Value::Bool(false));
+                        return Ok(());
+                    }
+                }
+            }
+
+            frame.stack.push(Value::Bool(true));
+            Ok(())
+        }
+    };
+}
+
 const INSTRUCTION_CALL: [fn(&mut Machine) -> Result<()>; 31] = [
     Machine::instruction_halt,
     Machine::instruction_return,
@@ -319,6 +354,7 @@ impl Machine {
     fn get_value(&mut self) -> Result<Value> {
         let value_opcode = self.get_u8()?;
         match value_opcode {
+            Value::CODE_NIL => Ok(Value::Nil),
             Value::CODE_U8 => {
                 let value = self.get_u8()?;
                 Ok(Value::U8(value))
@@ -688,91 +724,11 @@ impl Machine {
         Ok(())
     }
 
-    fn instruction_eq(&mut self) -> Result<()> {
-        let count = self.get_u8()? as usize;
-        let frame = self.get_current_frame_mut()?;
-        let index = frame.stack.len() - count;
-        let args = frame.stack.split_off(index);
-        let left = &args[0];
-        let value = args.iter().skip(1).all(|right| match (left, right) {
-            (Value::U8(l), Value::U8(r)) => l == r,
-            (Value::F32(l), Value::F32(r)) => l == r,
-            (Value::I32(l), Value::I32(r)) => l == r,
-            (Value::F64(l), Value::F64(r)) => l == r,
-            (Value::Keyword(l), Value::Keyword(r)) => l == r,
-            (Value::Symbol(l), Value::Symbol(r)) => l == r,
-            (Value::String(l), Value::String(r)) => l == r,
-            // TODO: 🤔 Should we throw an error or just return false
-            _ => false,
-        });
-        frame.stack.push(Value::Bool(value));
-        Ok(())
-    }
-
-    fn instruction_greater_than(&mut self) -> Result<()> {
-        let count = self.get_u8()? as usize;
-        let frame = self.get_current_frame_mut()?;
-        let index = frame.stack.len() - count;
-        let args = frame.stack.split_off(index);
-        let left = &args[0];
-        let value = args.iter().skip(1).all(|right| match (left, right) {
-            (Value::I32(l), Value::I32(r)) => l > r,
-            (Value::F64(l), Value::F64(r)) => l > r,
-            // TODO: 🤔 Should we throw an error or just return false
-            _ => false,
-        });
-        frame.stack.push(Value::Bool(value));
-        Ok(())
-    }
-
-    fn instruction_less_than(&mut self) -> Result<()> {
-        let count = self.get_u8()? as usize;
-        let frame = self.get_current_frame_mut()?;
-        let index = frame.stack.len() - count;
-        let args = frame.stack.split_off(index);
-        let left = &args[0];
-        let value = args.iter().skip(1).all(|right| match (left, right) {
-            (Value::I32(l), Value::I32(r)) => l < r,
-            (Value::F64(l), Value::F64(r)) => l < r,
-            // TODO: 🤔 Should we throw an error or just return false
-            _ => false,
-        });
-        frame.stack.push(Value::Bool(value));
-        Ok(())
-    }
-
-    fn instruction_greater_than_or_equal(&mut self) -> Result<()> {
-        let count = self.get_u8()? as usize;
-        let frame = self.get_current_frame_mut()?;
-        let index = frame.stack.len() - count;
-        let args = frame.stack.split_off(index);
-        let left = &args[0];
-        let value = args.iter().skip(1).all(|right| match (left, right) {
-            (Value::I32(l), Value::I32(r)) => l >= r,
-            (Value::F64(l), Value::F64(r)) => l >= r,
-            // TODO: 🤔 Should we throw an error or just return false
-            _ => false,
-        });
-        frame.stack.push(Value::Bool(value));
-        Ok(())
-    }
-
-    fn instruction_less_than_or_equal(&mut self) -> Result<()> {
-        // (> 3 4 2 2 2 2 2 2 "lskdjfdslkfj")
-        let count = self.get_u8()? as usize;
-        let frame = self.get_current_frame_mut()?;
-        let index = frame.stack.len() - count;
-        let args = frame.stack.split_off(index);
-        let left = &args[0];
-        let value = args.iter().skip(1).all(|right| match (left, right) {
-            (Value::I32(l), Value::I32(r)) => l <= r,
-            (Value::F64(l), Value::F64(r)) => l <= r,
-            // TODO: 🤔 Should we throw an error or just return false
-            _ => false,
-        });
-        frame.stack.push(Value::Bool(value));
-        Ok(())
-    }
+    generate_instruction_operator!(instruction_eq, ==);
+    generate_instruction_operator!(instruction_greater_than, >);
+    generate_instruction_operator!(instruction_less_than, <);
+    generate_instruction_operator!(instruction_greater_than_or_equal, >=);
+    generate_instruction_operator!(instruction_less_than_or_equal, <=);
 
     fn instruction_and(&mut self) -> Result<()> {
         let count = self.get_u8()? as usize;
