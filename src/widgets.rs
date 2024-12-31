@@ -103,7 +103,7 @@ impl<'a> InstructionsWidget<'a> {
                 Span::raw("  ".to_string())
             };
 
-            let debug_int = format!("{int}");
+            let debug_int = int.debugger_display();
 
             let line = Line::from(vec![
                 breakpoint,
@@ -166,10 +166,9 @@ impl Widget for FrameWidget<'_> {
             Span::styled(
                 self.machine
                     .get_current_frame()
-                    .ok()
-                    .and_then(|m| m.return_address)
-                    .map(|a| a.to_string())
-                    .unwrap_or("N/A".to_string()),
+                    .unwrap()
+                    .return_address
+                    .to_string(),
                 Style::default().fg(Color::Green),
             ),
         ]);

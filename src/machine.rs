@@ -116,23 +116,11 @@ const INTRISICS: [fn(&mut Machine, u8) -> Result<()>; 24] = [
 
 #[derive(Debug, Clone)]
 pub(crate) struct Frame {
-    pub return_address: Option<usize>,
+    pub return_address: usize,
     pub scope_name: String,
     pub span: Span,
     pub args: Vec<Value>,
     pub stack: Vec<Value>,
-}
-
-impl Default for Frame {
-    fn default() -> Self {
-        Self {
-            return_address: None,
-            scope_name: "main".to_string(),
-            span: Span::default(),
-            args: Vec::with_capacity(256),
-            stack: Vec::with_capacity(1024),
-        }
-    }
 }
 
 impl Frame {
@@ -143,7 +131,7 @@ impl Frame {
         args: Vec<Value>,
     ) -> Self {
         Self {
-            return_address: Some(return_address),
+            return_address,
             scope_name: scope_name.into(),
             span,
             args,
@@ -215,7 +203,14 @@ impl Machine {
 impl Machine {
     pub fn new(program: Vec<u8>, symbol_table: SymbolTable) -> Self {
         let mut stack = Vec::with_capacity(1024);
-        stack.push(Frame::default());
+        let frame = Frame {
+            return_address: program.len().saturating_sub(1),
+            scope_name: "global".to_string(),
+            span: 0..program.len(),
+            args: Vec::with_capacity(1024),
+            stack: Vec::with_capacity(1024),
+        };
+        stack.push(frame);
         Self {
             ffi_libs: HashMap::new(),
             c_strings: Vec::new(),
@@ -381,11 +376,32 @@ impl Machine {
         #[cfg(any(debug_assertions, test))]
         if !self.options.quiet {
             eprintln!("cycles: {}", self.cycle_count);
+            if !self.global.is_empty() {
+                eprintln!("global:");
+                for (index, value) in self.global.iter().enumerate() {
+                    eprintln!("{}: {}", index, value);
+                }
+            }
             if !self.free.is_empty() {
-                eprintln!("free {:#?}", self.free);
+                eprintln!("free:");
+                for (index, value) in self.free.iter().enumerate() {
+                    eprintln!("{}: {}", index, value.debugger_display());
+                }
             }
             if !self.stack.is_empty() {
-                eprintln!("stack {:#?}", self.stack);
+                eprintln!("frames:");
+                for (index, frame) in self.stack.iter().enumerate() {
+                    eprintln!("{}: {}", index, frame.scope_name);
+                    eprintln!("  return address: {}", frame.return_address);
+                    eprintln!("  args:");
+                    for (index, value) in frame.args.iter().enumerate() {
+                        eprintln!("    {}: {}", index, value.debugger_display());
+                    }
+                    eprintln!("  stack:");
+                    for (index, value) in frame.stack.iter().enumerate() {
+                        eprintln!("    {}: {}", index, value.debugger_display());
+                    }
+                }
             }
         }
         Ok(())
@@ -638,9 +654,7 @@ impl Machine {
                 // TODO: ERROR REPORTING
                 anyhow::bail!("missing return value on stack");
             };
-            if let Some(address) = frame.return_address {
-                self.ip = address;
-            }
+            self.ip = frame.return_address;
             value
         };
         self.stack.pop();
@@ -664,9 +678,7 @@ impl Machine {
                 // TODO: ERROR REPORTING
                 anyhow::bail!("missing return value on stack");
             };
-            if let Some(address) = frame.return_address {
-                self.ip = address;
-            }
+            self.ip = frame.return_address;
             value
         };
         self.stack.pop();
@@ -687,9 +699,7 @@ impl Machine {
                 anyhow::bail!("missing return value on stack");
             };
             let test_name = frame.scope_name.clone();
-            if let Some(address) = frame.return_address {
-                self.ip = address;
-            }
+            self.ip = frame.return_address;
             (value, test_name)
         };
 

@@ -67,10 +67,9 @@ impl<'a> Emitter<'a> {
                 self.error(Error::MainNotDefined);
                 return Err(self.errors);
             };
-            let Some(location) = symbol.get_location() else {
-                unreachable!("Main function location should always be set at this point");
-            };
-            program.push(Instruction::Jump(location.start));
+            let metadata = RuntimeMetadata::new(symbol.id(), "main", symbol.span());
+            program.push(Instruction::GetGlobal(metadata));
+            program.push(Instruction::Call(0));
         }
 
         if !self.errors.is_empty() {
@@ -80,6 +79,7 @@ impl<'a> Emitter<'a> {
         self.symbol_table.exit_scope();
 
         self.compile_tests(&mut program)?;
+        program.push(Instruction::Halt);
         Ok(program)
     }
 
@@ -313,11 +313,7 @@ impl AstWalker<Program> for Emitter<'_> {
             self.walk_expr(program, spanned);
         }
 
-        if name == "main" {
-            program.push(Instruction::Halt);
-        } else {
-            program.push(Instruction::Return);
-        }
+        program.push(Instruction::Return);
 
         self.tail_call_optimization(program, name);
 
@@ -780,6 +776,7 @@ mod tests {
                     51..67
                 ))))),
                 Call(4,),
+                Halt,
             ]
         );
     }
@@ -798,7 +795,8 @@ mod tests {
                 JumpIf(16),
                 Push(Box::new(String(Box::new("then\n".to_string())))),
                 JumpForward(11),
-                Push(Box::new(String(Box::new("else\n".to_string()))))
+                Push(Box::new(String(Box::new("else\n".to_string())))),
+                Halt,
             ]
         );
     }
@@ -838,7 +836,8 @@ mod tests {
                     41..54
                 ))))),
                 GetGlobal(RuntimeMetadata::new(0, "apply", 27..33)),
-                Call(2)
+                Call(2),
+                Halt,
             ]
         );
     }
@@ -879,6 +878,7 @@ mod tests {
                     1..72
                 ))))),
                 SetGlobal(RuntimeMetadata::new(0, "fib", 1..72)),
+                Halt,
             ]
         );
     }
@@ -913,6 +913,7 @@ mod tests {
                 SetGlobal(RuntimeMetadata::new(0, "test()test-testing", 2..46)),
                 GetGlobal(RuntimeMetadata::new(0, "test()test-testing", 2..46)),
                 CallTest,
+                Halt,
             ]
         );
     }

@@ -211,6 +211,13 @@ impl Instruction {
 
         bytes
     }
+
+    pub fn debugger_display(&self) -> String {
+        if let Self::Push(value) = self {
+            return value.debugger_display();
+        }
+        format!("{self}")
+    }
 }
 
 impl std::fmt::Display for Instruction {
@@ -648,6 +655,13 @@ impl Value {
             Self::Symbol(_) => "Symbol".to_string(),
             Self::Keyword(_) => "Keyword".to_string(),
         }
+    }
+
+    pub fn debugger_display(&self) -> String {
+        if let Self::String(value) = self {
+            return format!("{:?}", value);
+        }
+        format!("{}", self)
     }
 }
 

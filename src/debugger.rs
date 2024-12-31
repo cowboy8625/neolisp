@@ -446,7 +446,7 @@ impl<'a> Debugger<'a> {
     fn resize_handler(&self, _: u16, _: u16) {}
 
     fn set_next_instruction_pointer(&mut self) {
-        let mut vm = self.machine.clone();
+        let mut vm = self.machine.save_state();
         if vm.run_once().is_ok() {
             self.next_instruction_pointer = vm.ip;
         }
