@@ -1,0 +1,33 @@
+---
+source: src/tests.rs
+expression: "snapshot_parsing(\"(var x 1)\")"
+---
+Ok(
+    [
+        Spanned {
+            expr: List(
+                [
+                    Spanned {
+                        expr: Symbol(
+                            "var",
+                        ),
+                        span: 1..5,
+                    },
+                    Spanned {
+                        expr: Symbol(
+                            "x",
+                        ),
+                        span: 5..7,
+                    },
+                    Spanned {
+                        expr: Number(
+                            1.0,
+                        ),
+                        span: 7..8,
+                    },
+                ],
+            ),
+            span: 0..9,
+        },
+    ],
+)

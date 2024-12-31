@@ -1,0 +1,77 @@
+---
+source: src/tests.rs
+expression: "snapshot_parsing(\" (x y) (+ x y) (x y z) \")"
+---
+Ok(
+    [
+        Spanned {
+            expr: List(
+                [
+                    Spanned {
+                        expr: Symbol(
+                            "x",
+                        ),
+                        span: 2..4,
+                    },
+                    Spanned {
+                        expr: Symbol(
+                            "y",
+                        ),
+                        span: 4..5,
+                    },
+                ],
+            ),
+            span: 1..7,
+        },
+        Spanned {
+            expr: List(
+                [
+                    Spanned {
+                        expr: Symbol(
+                            "+",
+                        ),
+                        span: 8..10,
+                    },
+                    Spanned {
+                        expr: Symbol(
+                            "x",
+                        ),
+                        span: 10..12,
+                    },
+                    Spanned {
+                        expr: Symbol(
+                            "y",
+                        ),
+                        span: 12..13,
+                    },
+                ],
+            ),
+            span: 7..15,
+        },
+        Spanned {
+            expr: List(
+                [
+                    Spanned {
+                        expr: Symbol(
+                            "x",
+                        ),
+                        span: 16..18,
+                    },
+                    Spanned {
+                        expr: Symbol(
+                            "y",
+                        ),
+                        span: 18..20,
+                    },
+                    Spanned {
+                        expr: Symbol(
+                            "z",
+                        ),
+                        span: 20..21,
+                    },
+                ],
+            ),
+            span: 15..23,
+        },
+    ],
+)

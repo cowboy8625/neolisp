@@ -1,0 +1,21 @@
+---
+source: src/tests.rs
+expression: string
+---
+000000      0  jump       38
+000005      5  get-local  1:"x" 19..20
+000014     20  get-local  0:"f" 17..19
+000023     35  call       1
+000025     37  ret
+000026     38  push       <function 5:apply:0..23>
+00003D     61  set-global 0:"apply" 0..23
+000050     80  push       123
+00005A     90  jump       123
+00005F     95  get-local  0:"x" 45..47
+00006E    110  push       321
+000078    120  add        2
+00007A    122  ret
+00007B    123  push       <function 95:lambda_0:38..51>
+000095    149  get-global 0:"apply" 24..30
+0000A8    168  call       2
+0000AA    170  halt

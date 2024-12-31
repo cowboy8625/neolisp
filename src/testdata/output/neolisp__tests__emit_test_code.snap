@@ -1,0 +1,18 @@
+---
+source: src/tests.rs
+expression: string
+---
+000000      0  jump       66
+000005      5  push       1
+00000F     15  push       2
+000019     25  add        2
+00001B     27  push       3
+000025     37  eq 2
+000027     39  push       <builtin 20:assert:20..40>
+00003F     63  call       1
+000041     65  ret-test
+000042     66  push       <function 5:test()test-testing:0..42>
+000066    102  set-global 0:"test()test-testing" 0..42
+000086    134  get-global 0:"test()test-testing" 0..42
+0000A6    166  call-test
+0000A7    167  halt

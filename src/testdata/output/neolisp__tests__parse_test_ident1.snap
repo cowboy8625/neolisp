@@ -1,0 +1,21 @@
+---
+source: src/tests.rs
+expression: "snapshot_parsing(\"(hello-world)\")"
+---
+Ok(
+    [
+        Spanned {
+            expr: List(
+                [
+                    Spanned {
+                        expr: Symbol(
+                            "hello-world",
+                        ),
+                        span: 1..12,
+                    },
+                ],
+            ),
+            span: 0..13,
+        },
+    ],
+)

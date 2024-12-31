@@ -1,0 +1,21 @@
+---
+source: src/tests.rs
+expression: "snapshot_parsing(\"(*ident*)\")"
+---
+Ok(
+    [
+        Spanned {
+            expr: List(
+                [
+                    Spanned {
+                        expr: Symbol(
+                            "*ident*",
+                        ),
+                        span: 1..8,
+                    },
+                ],
+            ),
+            span: 0..9,
+        },
+    ],
+)

@@ -1,0 +1,10 @@
+---
+source: src/tests.rs
+expression: string
+---
+000000      0  push       true
+000003      3  jump-if    15
+000008      8  push       then
+000012     18  jump-forward 10
+000017     23  push       else
+000021     33  halt

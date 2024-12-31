@@ -8,6 +8,7 @@ use super::{
 };
 
 use chumsky::prelude::Parser;
+use std::fmt::Write;
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub struct CompilerOptions {
@@ -94,7 +95,8 @@ impl Compiler {
             .compile(&ast)?;
 
         if let Some(Decompile::All) = self.decompile {
-            simple_decompile(&instructions);
+            let int = format_instructions(&instructions);
+            eprintln!("{}", int);
             return Ok(None);
         } else if let Some(Decompile::Function(name)) = self.decompile {
             let Some(symbol) = symbol_table.get(&name) else {
@@ -124,13 +126,17 @@ impl Compiler {
     }
 }
 
-pub fn simple_decompile(instructions: &[Instruction]) {
+pub fn format_instructions(instructions: &[Instruction]) -> String {
+    let mut result = String::new();
     let mut offset = 0;
     for int in instructions.iter() {
-        eprintln!(
+        writeln!(
+            &mut result,
             "{offset:06X} {offset:>6}  {}",
-            int.to_string().replace('\n', "\\n")
-        );
+            int.debugger_display()
+        )
+        .expect("Write failed in format_instructions");
         offset += int.size();
     }
+    result
 }

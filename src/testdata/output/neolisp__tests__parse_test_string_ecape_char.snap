@@ -1,0 +1,21 @@
+---
+source: src/tests.rs
+expression: "snapshot_parsing(r#\"(\"\\\"\")\"#)"
+---
+Ok(
+    [
+        Spanned {
+            expr: List(
+                [
+                    Spanned {
+                        expr: String(
+                            "\"",
+                        ),
+                        span: 1..5,
+                    },
+                ],
+            ),
+            span: 0..6,
+        },
+    ],
+)

@@ -214,7 +214,7 @@ impl Instruction {
 
     pub fn debugger_display(&self) -> String {
         if let Self::Push(value) = self {
-            return value.debugger_display();
+            return format!("{:<10} {}", "push", value.debugger_display());
         }
         format!("{self}")
     }

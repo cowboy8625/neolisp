@@ -1,0 +1,21 @@
+---
+source: src/tests.rs
+expression: "snapshot_parsing(r#\"(\"hello\")\"#)"
+---
+Ok(
+    [
+        Spanned {
+            expr: List(
+                [
+                    Spanned {
+                        expr: String(
+                            "hello",
+                        ),
+                        span: 1..8,
+                    },
+                ],
+            ),
+            span: 0..9,
+        },
+    ],
+)

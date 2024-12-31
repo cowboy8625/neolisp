@@ -1,0 +1,21 @@
+---
+source: src/tests.rs
+expression: "snapshot_parsing(\"\n; comment\n(true)\")"
+---
+Ok(
+    [
+        Spanned {
+            expr: List(
+                [
+                    Spanned {
+                        expr: Bool(
+                            true,
+                        ),
+                        span: 12..16,
+                    },
+                ],
+            ),
+            span: 1..17,
+        },
+    ],
+)

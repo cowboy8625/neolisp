@@ -20,6 +20,7 @@ libloading = "0.8.6"
 [dev-dependencies]
 pretty_assertions = "1.4.1"
 criterion = "0.5.1"
+insta = { version = "1.41.1", features = ["yaml"] }
 
 [package.metadata.clippy]
 # Enable additional strict lints

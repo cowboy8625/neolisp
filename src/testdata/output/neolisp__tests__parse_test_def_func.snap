@@ -1,0 +1,71 @@
+---
+source: src/tests.rs
+expression: "snapshot_parsing(\"(fn add (x y) (+ x y))\")"
+---
+Ok(
+    [
+        Spanned {
+            expr: List(
+                [
+                    Spanned {
+                        expr: Symbol(
+                            "fn",
+                        ),
+                        span: 1..4,
+                    },
+                    Spanned {
+                        expr: Symbol(
+                            "add",
+                        ),
+                        span: 4..8,
+                    },
+                    Spanned {
+                        expr: List(
+                            [
+                                Spanned {
+                                    expr: Symbol(
+                                        "x",
+                                    ),
+                                    span: 9..11,
+                                },
+                                Spanned {
+                                    expr: Symbol(
+                                        "y",
+                                    ),
+                                    span: 11..12,
+                                },
+                            ],
+                        ),
+                        span: 8..14,
+                    },
+                    Spanned {
+                        expr: List(
+                            [
+                                Spanned {
+                                    expr: Symbol(
+                                        "+",
+                                    ),
+                                    span: 15..17,
+                                },
+                                Spanned {
+                                    expr: Symbol(
+                                        "x",
+                                    ),
+                                    span: 17..19,
+                                },
+                                Spanned {
+                                    expr: Symbol(
+                                        "y",
+                                    ),
+                                    span: 19..20,
+                                },
+                            ],
+                        ),
+                        span: 14..21,
+                    },
+                ],
+            ),
+            span: 0..22,
+        },
+    ],
+)

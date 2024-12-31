@@ -1,0 +1,10 @@
+---
+source: src/tests.rs
+expression: string
+---
+000000      0  push       0
+00000A     10  set-local  0:"x" 5..11
+000019     25  push       1
+000023     35  get-local  0:"x" 16..17
+000032     50  add        2
+000034     52  halt

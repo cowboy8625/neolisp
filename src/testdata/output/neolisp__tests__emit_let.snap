@@ -1,0 +1,17 @@
+---
+source: src/tests.rs
+expression: string
+---
+000000      0  push       1
+00000A     10  set-local  0:"x" 10..20
+000019     25  push       2
+000023     35  set-local  1:"y" 25..35
+000032     50  push       3
+00003C     60  set-local  2:"z" 40..50
+00004B     75  push       "\n"
+000052     82  get-local  2:"z" 61..63
+000061     97  get-local  1:"y" 59..61
+000070    112  get-local  0:"x" 57..59
+00007F    127  push       <builtin 17:print:51..67>
+000096    150  call       4
+000098    152  halt

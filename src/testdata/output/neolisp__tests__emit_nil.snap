@@ -1,0 +1,6 @@
+---
+source: src/tests.rs
+expression: string
+---
+000000      0  push       nil
+000002      2  halt

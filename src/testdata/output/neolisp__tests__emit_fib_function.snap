@@ -1,0 +1,24 @@
+---
+source: src/tests.rs
+expression: string
+---
+000000      0  jump       151
+000005      5  get-local  0:"n" 25..27
+000014     20  push       0
+00001E     30  eq 2
+000020     32  jump-if    20
+000025     37  get-local  1:"a" 36..44
+000034     52  jump-forward 93
+000039     57  get-local  1:"a" 62..64
+000048     72  get-local  2:"b" 64..65
+000057     87  add        2
+000059     89  get-local  2:"b" 57..59
+000068    104  get-local  0:"n" 52..54
+000077    119  push       1
+000081    129  sub        2
+000083    131  get-global 0:"fib" 45..49
+000094    148  tail-call  3
+000096    150  ret
+000097    151  push       <function 5:fib:0..69>
+0000AC    172  set-global 0:"fib" 0..69
+0000BD    189  halt

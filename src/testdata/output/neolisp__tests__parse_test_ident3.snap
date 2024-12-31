@@ -1,0 +1,21 @@
+---
+source: src/tests.rs
+expression: "snapshot_parsing(\"(<*ident/1234567890*>!?)\")"
+---
+Ok(
+    [
+        Spanned {
+            expr: List(
+                [
+                    Spanned {
+                        expr: Symbol(
+                            "<*ident/1234567890*>!?",
+                        ),
+                        span: 1..23,
+                    },
+                ],
+            ),
+            span: 0..24,
+        },
+    ],
+)

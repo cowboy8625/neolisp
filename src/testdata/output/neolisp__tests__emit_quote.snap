@@ -1,0 +1,6 @@
+---
+source: src/tests.rs
+expression: string
+---
+000000      0  push       (1 2 3)
+000021     33  halt

@@ -1,0 +1,21 @@
+---
+source: src/tests.rs
+expression: "snapshot_parsing(\"(1)\")"
+---
+Ok(
+    [
+        Spanned {
+            expr: List(
+                [
+                    Spanned {
+                        expr: Number(
+                            1.0,
+                        ),
+                        span: 1..2,
+                    },
+                ],
+            ),
+            span: 0..3,
+        },
+    ],
+)

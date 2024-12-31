@@ -1,0 +1,12 @@
+---
+source: src/tests.rs
+expression: string
+---
+000000      0  jump       38
+000005      5  get-local  0:"x" 17..19
+000014     20  get-local  1:"y" 19..20
+000023     35  add        2
+000025     37  ret
+000026     38  push       <function 5:add:0..22>
+00003B     59  set-global 0:"add" 0..22
+00004C     76  halt

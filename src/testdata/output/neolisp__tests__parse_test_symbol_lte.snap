@@ -1,0 +1,33 @@
+---
+source: src/tests.rs
+expression: "snapshot_parsing(\"(<= 1 2)\")"
+---
+Ok(
+    [
+        Spanned {
+            expr: List(
+                [
+                    Spanned {
+                        expr: Symbol(
+                            "<=",
+                        ),
+                        span: 1..4,
+                    },
+                    Spanned {
+                        expr: Number(
+                            1.0,
+                        ),
+                        span: 4..5,
+                    },
+                    Spanned {
+                        expr: Number(
+                            2.0,
+                        ),
+                        span: 6..7,
+                    },
+                ],
+            ),
+            span: 0..8,
+        },
+    ],
+)

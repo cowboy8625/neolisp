@@ -1,0 +1,5 @@
+---
+source: src/tests.rs
+expression: string
+---
+000000      0  halt

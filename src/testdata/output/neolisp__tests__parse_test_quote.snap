@@ -1,0 +1,65 @@
+---
+source: src/tests.rs
+expression: "snapshot_parsing(\"(var x '(1 2 3))\")"
+---
+Ok(
+    [
+        Spanned {
+            expr: List(
+                [
+                    Spanned {
+                        expr: Symbol(
+                            "var",
+                        ),
+                        span: 1..5,
+                    },
+                    Spanned {
+                        expr: Symbol(
+                            "x",
+                        ),
+                        span: 5..7,
+                    },
+                    Spanned {
+                        expr: List(
+                            [
+                                Spanned {
+                                    expr: Symbol(
+                                        "quote",
+                                    ),
+                                    span: 7..15,
+                                },
+                                Spanned {
+                                    expr: List(
+                                        [
+                                            Spanned {
+                                                expr: Number(
+                                                    1.0,
+                                                ),
+                                                span: 9..10,
+                                            },
+                                            Spanned {
+                                                expr: Number(
+                                                    2.0,
+                                                ),
+                                                span: 11..12,
+                                            },
+                                            Spanned {
+                                                expr: Number(
+                                                    3.0,
+                                                ),
+                                                span: 13..14,
+                                            },
+                                        ],
+                                    ),
+                                    span: 8..15,
+                                },
+                            ],
+                        ),
+                        span: 7..15,
+                    },
+                ],
+            ),
+            span: 0..16,
+        },
+    ],
+)
