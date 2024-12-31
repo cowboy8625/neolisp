@@ -1,6 +1,9 @@
+/// Function Operators
 const OPERATORS: &[&str] = &[
     "+", "-", "*", "/", "=", ">", "<", ">=", "<=", "and", "or", "not", "mod",
 ];
+
+/// Builtins functions
 const BUILTINS: &[&str] = &[
     "sleep",
     "atom?",
@@ -27,6 +30,10 @@ const BUILTINS: &[&str] = &[
     "cons",
     "car",
 ];
+
+/// Keywords that are not builtins functions, but are
+/// more of a compile time functionality
+/// i.e. `ffi-bind`
 const KEYWORDS: &[&str] = &[
     "var", "set", "let", "fn", "if", "lambda", "loop", "quote", "test", "ffi-bind",
 ];

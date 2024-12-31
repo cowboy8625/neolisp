@@ -39,10 +39,6 @@ pub fn parse_expr() -> impl Parser<char, Spanned<Expr>, Error = Error> {
             })
             .padded();
 
-        let nil = just("nil")
-            .map_with_span(|_, span| Spanned::from((Expr::Nil, span)))
-            .padded();
-
         let boolean = just("true")
             .map_with_span(|_, span| Spanned::from((Expr::Bool(true), span)))
             .or(just("false").map_with_span(|_, span| (Expr::Bool(false), span).into()))
@@ -83,7 +79,6 @@ pub fn parse_expr() -> impl Parser<char, Spanned<Expr>, Error = Error> {
             });
 
         let atom = number
-            .or(nil)
             .or(string)
             .or(boolean)
             .or(symbol)

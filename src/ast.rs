@@ -51,7 +51,6 @@ where
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr {
-    Nil,
     Bool(bool),
     String(String),
     Symbol(String),
@@ -108,7 +107,6 @@ impl Expr {
 
     pub fn type_of(&self) -> String {
         match self {
-            Self::Nil => "nil".to_string(),
             Self::Bool(_) => "Bool".to_string(),
             Self::String(_) => "String".to_string(),
             Self::Symbol(_) => "Symbol".to_string(),
@@ -121,7 +119,6 @@ impl Expr {
 impl std::fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Nil => write!(f, "nil"),
             Self::Bool(b) => write!(f, "{b}"),
             Self::String(s) => write!(f, "{s}"),
             Self::Symbol(s) => write!(f, "{s}"),

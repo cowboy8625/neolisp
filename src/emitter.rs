@@ -587,9 +587,6 @@ impl AstWalker<Program> for Emitter<'_> {
     fn handle_quote(&mut self, program: &mut Program, quote: &QuoteExpr) {
         fn emit_values(values: &mut Vec<Value>, spanned: &Spanned<Expr>) {
             match &spanned.expr {
-                Expr::Nil => {
-                    values.push(Value::Nil);
-                }
                 Expr::Bool(b) => {
                     values.push(Value::Bool(*b));
                 }

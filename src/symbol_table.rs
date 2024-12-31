@@ -947,7 +947,6 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
                 };
                 typeis
             }
-            Expr::Nil => Type::Nil,
             t => panic!("expected symbol {t:?}"),
         };
 

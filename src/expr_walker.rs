@@ -765,12 +765,12 @@ pub trait AstWalker<T> {
 
     fn walk_expr(&mut self, t: &mut T, spanned: &Spanned<Expr>) {
         match &spanned.expr {
-            Expr::Nil => self.handle_nil(t),
             Expr::Bool(value) => self.handle_bool(t, *value),
             Expr::String(string) => self.handle_string(t, string),
             Expr::Symbol(symbol) if symbol.starts_with(':') => {
                 self.handle_keyword(t, symbol, spanned.span.clone())
             }
+            Expr::Symbol(symbol) if symbol == "nil" => self.handle_nil(t),
             Expr::Symbol(symbol) => self.handle_symbol(t, symbol, spanned.span.clone()),
             Expr::Number(number) => self.handle_number(t, *number),
             Expr::List(vec) => self.walk_list(t, vec, spanned.span.clone()),
