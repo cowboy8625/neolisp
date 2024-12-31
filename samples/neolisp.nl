@@ -1,14 +1,19 @@
+;-----------------------------------
+;         NOT WORKING YET
+;-----------------------------------
+
+
 (fn parse-number (input)
   (let (number '())
-    (loop (and (not (= 0 (length input))) (number? (car input)))
+    (loop (and (not (= 0 (length input))) (number? (nth input 0)))
       (set number
            (append
              number
-             (list (car input))))
+             (list (nth input 0))))
       (set input (cdr input))
       (list (to-string number) input))))
 
-; (assert-eq (parse-number "123") '("123" "") "parse-number failed")
+(test parse-number (assert-eq :expected (parse-number "123") :actual '("123" "") :description "parse-number failed"))
 ; (assert-eq (parse-number "123abc") '("123" "abc") "parse-number failed")
 ; -------------------------------------------------------------------------
 
@@ -16,7 +21,7 @@
     (let
       ((letters "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
       (truth-table (map (lambda (letter) (= letter expected)) letters)))
-        (fold false or truth-table)))
+        (fold false (lambda (acc x) (or acc x)) truth-table)))
 
 ; (assert-eq (letter? "1") false "test letter? failed 1")
 ; (assert-eq (letter? "(") false "test letter? failed 2")
@@ -29,7 +34,7 @@
     (let
       ((punctuations "!$,_-./:?+<=>#%&*@[\\]{|}`^~\"#;") ;"; this is just for my syntax highlighting to kick back in
       (truth-table (map (lambda (p) (= p expected)) punctuations)))
-        (fold false or truth-table)))
+        (fold false (lambda (acc x) (or acc x)) truth-table)))
 
 ; (assert-eq (punctuation? "1") false "test punctuation? failed 1")
 ; (assert-eq (punctuation? "(") false "test punctuation? failed 2")
@@ -50,14 +55,12 @@
 (fn parse-identifier (input)
   "accumulate the identifier in the input and return the parsed identifier and left over input"
   (let
-    ((identifier '()))
-    (do
+    (identifier '())
       (loop (or (> 0 (length input)) (is-identifier? (car input)))
-        (do
-          (set identifier (append identifier (list (car input))))
-          (set input (cdr input))
-          (print "input='" input "'\n")))
-      (list (to-string identifier) input))))
+        (set identifier (append identifier (list (car input))))
+        (set input (cdr input))
+        (print "input='" input "'\n"))
+      (list (to-string identifier) input)))
 
 ; Test cases
 ; (assert-eq (parse-identifier "a123457bc") '("a123457bc" "") "parse-identifier failed")
