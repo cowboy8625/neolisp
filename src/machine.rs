@@ -1,13 +1,19 @@
+use std::{
+    collections::HashMap,
+    ffi::{c_char, CStr, CString},
+};
+
 use super::{
     ast::Span,
     compiler::Compiler,
     error::Error,
-    instruction::{Callable, Instruction, OpCode, RuntimeMetadata, Value},
+    instruction::{Callable, Instruction, LoadLibrary, OpCode, RuntimeMetadata, Value},
     symbol_table::SymbolTable,
 };
-use crate::intrinsic::Intrinsic;
+use crate::{instruction::CallFfi, intrinsic::Intrinsic, symbol_table::Type};
 use anyhow::{anyhow, Result};
 use crossterm::style::Stylize;
+use libloading::Library;
 use num_traits::FromPrimitive;
 
 macro_rules! generate_instruction_operator {
@@ -45,7 +51,7 @@ macro_rules! generate_instruction_operator {
     };
 }
 
-const INSTRUCTION_CALL: [fn(&mut Machine) -> Result<()>; 31] = [
+const INSTRUCTION_CALL: [fn(&mut Machine) -> Result<()>; 33] = [
     Machine::instruction_halt,
     Machine::instruction_return,
     Machine::instruction_return_from_test,
@@ -77,6 +83,8 @@ const INSTRUCTION_CALL: [fn(&mut Machine) -> Result<()>; 31] = [
     Machine::instruction_jump_forward,
     Machine::instruction_jump_backward,
     Machine::instruction_jump,
+    Machine::instruction_load_library,
+    Machine::instruction_call_ffi,
 ];
 
 const INTRISICS: [fn(&mut Machine, u8) -> Result<()>; 24] = [
@@ -154,8 +162,11 @@ pub struct MachineOptions {
     pub quiet: bool,
 }
 
-#[derive(Debug, Clone)]
+/// When Cloning use `save_state` and `load_state`
+#[derive(Debug)]
 pub struct Machine {
+    pub(crate) ffi_libs: HashMap<String, Library>,
+    pub(crate) c_strings: Vec<CString>,
     pub(crate) options: MachineOptions,
     pub(crate) program: Vec<u8>,
     pub(crate) global: Vec<Value>,
@@ -166,6 +177,25 @@ pub struct Machine {
     pub(crate) symbol_table: SymbolTable,
     #[cfg(any(debug_assertions, test))]
     pub(crate) cycle_count: usize,
+}
+
+impl Clone for Machine {
+    fn clone(&self) -> Self {
+        Self {
+            ffi_libs: HashMap::new(),
+            c_strings: Vec::new(),
+            options: self.options.clone(),
+            program: self.program.clone(),
+            global: self.global.clone(),
+            free: self.free.clone(),
+            stack: self.stack.clone(),
+            ip: self.ip,
+            is_running: self.is_running,
+            symbol_table: self.symbol_table.clone(),
+            #[cfg(any(debug_assertions, test))]
+            cycle_count: self.cycle_count,
+        }
+    }
 }
 
 impl Default for Machine {
@@ -187,6 +217,8 @@ impl Machine {
         let mut stack = Vec::with_capacity(1024);
         stack.push(Frame::default());
         Self {
+            ffi_libs: HashMap::new(),
+            c_strings: Vec::new(),
             options: MachineOptions::default(),
             program,
             global: Vec::with_capacity(1024),
@@ -203,6 +235,27 @@ impl Machine {
     pub fn with_program(mut self, program: Vec<u8>) -> Self {
         self.program = program;
         self
+    }
+
+    pub fn save_state(&self) -> Self {
+        let mut new = self.clone();
+        for name in self.ffi_libs.keys() {
+            let lib = unsafe { Library::new(name).unwrap() };
+            new.ffi_libs.insert(name.clone(), lib);
+        }
+        new
+    }
+
+    pub fn load_state(&mut self, state: Machine) {
+        self.ffi_libs = state.ffi_libs;
+        self.options = state.options;
+        self.program = state.program;
+        self.global = state.global;
+        self.free = state.free;
+        self.stack = state.stack;
+        self.ip = state.ip;
+        self.is_running = state.is_running;
+        self.symbol_table = state.symbol_table;
     }
 
     pub fn set_options(&mut self, options: MachineOptions) {
@@ -529,9 +582,29 @@ impl Machine {
         let bytes = self.program[self.ip..self.ip + len].to_vec();
         self.ip += len;
         let name = String::from_utf8(bytes)?;
+        let span = self.get_span()?;
+        Ok(RuntimeMetadata::new(id, &name, span))
+    }
+
+    fn get_span(&mut self) -> Result<Span> {
         let start = self.get_u32()? as usize;
         let end = self.get_u32()? as usize;
-        Ok(RuntimeMetadata::new(id, &name, start..end))
+        Ok(start..end)
+    }
+
+    fn get_call_ffi(&mut self) -> Result<CallFfi> {
+        let lib = self.get_string()?;
+        let ffi_function_name = self.get_string()?;
+        let args_len = self.get_u8()?;
+        let mut args = Vec::new();
+        for _ in 0..args_len {
+            let byte = self.get_u8()?;
+            args.push(Type::from_u8(byte).unwrap());
+        }
+        let ret = Type::from_u8(self.get_u8()?).unwrap();
+
+        let span = self.get_span()?;
+        Ok(CallFfi::new(lib, ffi_function_name, args, ret, span))
     }
 
     pub(crate) fn get_current_frame(&self) -> Result<&Frame> {
@@ -598,6 +671,9 @@ impl Machine {
         };
         self.stack.pop();
         let frame = self.get_current_frame_mut()?;
+        if let Value::Nil = value {
+            return Ok(());
+        }
         frame.stack.push(value);
         Ok(())
     }
@@ -1029,6 +1105,100 @@ impl Machine {
         self.ip = address;
         Ok(())
     }
+
+    fn instruction_load_library(&mut self) -> Result<()> {
+        let library_name = self.get_string()?;
+        let span = self.get_span()?;
+        if self.ffi_libs.contains_key(&library_name) {
+            return Ok(());
+        }
+        let Ok(lib) = (unsafe { Library::new(&library_name) }) else {
+            return Err(anyhow!(
+                "failed to load library {}:{:?}",
+                library_name,
+                span
+            ));
+        };
+        self.ffi_libs.insert(library_name, lib);
+        Ok(())
+    }
+
+    fn instruction_call_ffi(&mut self) -> Result<()> {
+        let call_ffi = self.get_call_ffi()?;
+        if !self.ffi_libs.contains_key(&call_ffi.lib) {
+            anyhow::bail!("library {} not loaded", call_ffi.name);
+        }
+
+        let lib = self.ffi_libs.get(&call_ffi.lib).unwrap();
+        let func_ptr = unsafe {
+            let sym: libloading::Symbol<*const ()> = lib
+                .get(call_ffi.name.as_bytes())
+                .expect("Failed to load symbol");
+            libffi::middle::CodePtr::from_ptr(*sym as *const _)
+        };
+
+        let cif = libffi::middle::Cif::new(call_ffi.get_arg_types(), call_ffi.get_ret_type());
+        let frame = self.get_current_frame_mut()?;
+        frame.args.reverse();
+        let mut args = Vec::new();
+        let mut i32_args = Vec::new();
+        for _ in call_ffi.args.iter() {
+            let frame = self.get_current_frame_mut()?;
+            let Some(item) = frame.args.pop() else {
+                // TODO: ERROR REPORTING
+                anyhow::bail!("no value on the stack for CallFfi");
+            };
+            match item {
+                Value::F64(value) => {
+                    let value: i32 = value as i32;
+                    let idx = i32_args.len();
+                    i32_args.push(value);
+                    let arg = libffi::middle::Arg::new(&i32_args[idx]);
+                    args.push(arg);
+                }
+                Value::Bool(value) => {
+                    let value: i32 = value as i32;
+                    let idx = i32_args.len();
+                    i32_args.push(value);
+                    let arg = libffi::middle::Arg::new(&i32_args[idx]);
+                    args.push(arg);
+                }
+                Value::String(value) => {
+                    let c_string = CString::new(value.as_bytes()).expect("CString::from failed");
+                    let idx = self.c_strings.len();
+                    self.c_strings.push(c_string.clone());
+                    let string: *const c_char = self.c_strings[idx].as_ptr();
+                    let arg = libffi::middle::Arg::new(&string);
+                    args.push(arg);
+                }
+                v => panic!("unsupported argument type for ffi call: {v}"),
+            }
+        }
+
+        let ret_value = match call_ffi.ret {
+            Type::Nil => {
+                let _: () = unsafe { cif.call(func_ptr, &args) };
+                Value::Nil
+            }
+            Type::Bool => {
+                let result: i32 = unsafe { cif.call(func_ptr, &args) };
+                Value::Bool(result != 0)
+            }
+            Type::Int => {
+                let result: i32 = unsafe { cif.call(func_ptr, &args) };
+                Value::F64(result as f64)
+            }
+            Type::String => {
+                let result: *const c_char = unsafe { cif.call(func_ptr, &args) };
+                let result = unsafe { CStr::from_ptr(result) };
+                Value::String(Box::new(result.to_string_lossy().to_string()))
+            }
+        };
+
+        let frame = self.get_current_frame_mut()?;
+        frame.stack.push(ret_value);
+        Ok(())
+    }
 }
 
 // --------------------- Decompiler ---------------------
@@ -1105,6 +1275,15 @@ impl Machine {
                     instructions.push(Instruction::JumpBackward(self.get_u32()? as usize))
                 }
                 OpCode::Jump => instructions.push(Instruction::Jump(self.get_u32()? as usize)),
+                OpCode::LoadLibrary => {
+                    let name = self.get_string()?;
+                    let span = self.get_span()?;
+                    instructions.push(Instruction::LoadLibrary(LoadLibrary::new(name, span)))
+                }
+                OpCode::CallFfi => {
+                    let call_ffi = self.get_call_ffi()?;
+                    instructions.push(Instruction::CallFfi(call_ffi))
+                }
             }
         }
         self.ip = ip_address;

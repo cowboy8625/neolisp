@@ -290,6 +290,7 @@
     :expected false
     :actual (atom? (lambda (x y) (+ x y)))
     :description "atom? (lambda (x y) (+ x y)) -> false"))
+
 (test atom?-function
   (assert-eq
     :expected false
@@ -343,6 +344,7 @@
     :expected false
     :actual (number? (list 1 2 3))
     :description "number? (list 1 2 3) -> false"))
+
 (test number?-lambda
   (assert-eq
     :expected false
@@ -548,6 +550,7 @@
     :expected '(1 2 3)
     :actual (list 1 2 3)
     :description "list 1 2 3 -> (1 2 3)"))
+
 (test cons
   (assert-eq
     :expected '(1 2)
@@ -575,3 +578,6 @@
 
 (test let-binding (assert-eq :expected 2 :actual (get-cell (list 'a 'b 'c) -1) :description "get-cell list len 3, index -1, returns 2"))
 
+(fn main ()
+  (print "This is a test file\n")
+  (print "\x1b[32mRun with `neolisp test test.nl`\x1b[0m\n"))

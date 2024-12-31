@@ -58,6 +58,7 @@ pub fn parse_expr() -> impl Parser<char, Spanned<Expr>, Error = Error> {
                     just("\\t").map(|_| "\t".to_string()),
                     just("\\r").map(|_| "\r".to_string()),
                     just("\\0").map(|_| "\0".to_string()),
+                    just("\\x1b").map(|_| "\x1b".to_string()),
                     just("\\\\").map(|_| "\\".to_string()),
                 ))
                 .repeated(),

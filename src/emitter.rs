@@ -1,4 +1,5 @@
-use crate::instruction::RuntimeMetadata;
+use crate::expr_walker::FfiBindExpr;
+use crate::instruction::{LoadLibrary, RuntimeMetadata};
 use crate::{compiler::CompilerOptions, expr_walker::SetExpr};
 
 use super::{
@@ -519,6 +520,68 @@ impl AstWalker<Program> for Emitter<'_> {
         };
 
         Self::emit_set_instruction(program, symbol);
+    }
+
+    fn handle_ffi_bind(&mut self, program: &mut Program, ffi_bind_expr: &FfiBindExpr) {
+        let Expr::Symbol(name) = &ffi_bind_expr.fn_symbol.1.expr else {
+            unreachable!("This should never fail as we already checked this in SymbolTable");
+        };
+        // This is the function name in code
+        let Some(symbol) = self.symbol_table.get(name) else {
+            unreachable!("This should never fail as we already inserted the symbol in SymbolTable");
+        };
+
+        let Symbol::Function(function) = symbol else {
+            unreachable!("This should never fail as we already checked this in SymbolTable");
+        };
+
+        let Expr::String(lib_name) = &ffi_bind_expr.lib.1.expr else {
+            unreachable!(
+                "This should never fail as we already checked this in SymbolTable {:?}",
+                ffi_bind_expr.lib.1.expr
+            );
+        };
+        let load_library = LoadLibrary::new(lib_name.clone(), ffi_bind_expr.lib.0.span.clone());
+        program.push(Instruction::LoadLibrary(load_library));
+
+        program.push(Instruction::Jump(usize::MAX));
+        let index = program.len() - 1;
+        let start = self.get_program_size(program);
+
+        let Expr::String(ffi_function_name) = &ffi_bind_expr.symbol.1.expr else {
+            unreachable!(
+                "This should never fail as we already checked this in SymbolTable {:?}",
+                ffi_bind_expr.symbol.1.expr
+            );
+        };
+
+        let args = symbol
+            .get_parameters()
+            .iter()
+            .filter_map(|p| p.typeis)
+            .collect();
+        let ret = function.return_type.unwrap();
+        let call_ffi = crate::instruction::CallFfi::new(
+            lib_name,
+            ffi_function_name,
+            args,
+            ret,
+            ffi_bind_expr.symbol.1.span.clone(),
+        );
+        program.push(Instruction::CallFfi(call_ffi));
+        program.push(Instruction::Return);
+
+        let body_size = self.get_program_size(program) - start;
+        program[index] = Instruction::Jump(start + body_size);
+
+        let span = ffi_bind_expr.span.clone();
+        let callable = Callable::new(start, name.to_string(), span.clone());
+        let value = Value::Callable(Box::new(callable));
+        program.push(Instruction::Push(Box::new(value)));
+        let metadata = RuntimeMetadata::new(symbol.id(), name, span);
+        program.push(Instruction::SetGlobal(metadata));
+        let end = self.get_program_size(program);
+        self.symbol_table.set_location(name, start..end);
     }
 
     fn handle_quote(&mut self, program: &mut Program, quote: &QuoteExpr) {

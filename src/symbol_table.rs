@@ -1,4 +1,9 @@
-use crate::{compiler::CompilerOptions, expr_walker::SetExpr};
+use num_derive::{FromPrimitive, ToPrimitive};
+
+use crate::{
+    compiler::CompilerOptions,
+    expr_walker::{FfiBindExpr, SetExpr},
+};
 
 use super::{
     ast::{Ast, Expr, Span, Spanned},
@@ -10,9 +15,37 @@ use super::{
 };
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, FromPrimitive, ToPrimitive)]
+#[repr(u8)]
 pub enum Type {
+    Nil,
+    Bool,
     Int,
+    String,
+}
+
+impl TryFrom<&str> for Type {
+    type Error = ();
+    fn try_from(s: &str) -> Result<Self, Self::Error> {
+        match s {
+            "int" => Ok(Type::Int),
+            "string" => Ok(Type::String),
+            "bool" => Ok(Type::Bool),
+            "nil" => Ok(Type::Nil),
+            _ => Err(()),
+        }
+    }
+}
+
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Type::Nil => "nil",
+            Type::Bool => "bool",
+            Type::Int => "int",
+            Type::String => "string",
+        })
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -117,6 +150,11 @@ impl Parameter {
             location: None,
         }
     }
+
+    pub fn with_type(mut self, typeis: Type) -> Self {
+        self.typeis = Some(typeis);
+        self
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -150,6 +188,11 @@ impl Function {
             location: None,
             is_recursive,
         }
+    }
+
+    pub fn with_return_type(mut self, return_type: Type) -> Self {
+        self.return_type = Some(return_type);
+        self
     }
 }
 
@@ -787,7 +830,6 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
 
     fn handle_symbol(&mut self, table: &mut SymbolTable, name: &str, span: Span) {
         let Some(scope) = table.get(&table.get_scope_name()) else {
-            // self.error(Error::SymbolNotDefined(span, name.to_string()));
             return;
         };
         let params = scope.get_parameters();
@@ -799,17 +841,12 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         let mut skip = false;
         table.get_mut(name, |symbol| match symbol {
             Symbol::UnboundVariable(_) => {
-                eprintln!("ub: {name}");
                 skip = true;
             }
             Symbol::Variable(_) => {
-                eprintln!("v: {name}");
                 skip = true;
             }
             Symbol::Parameter(p) => {
-                // p.id = self.unbound_counter;
-                // self.unbound_counter += 1;
-                // eprintln!("p: {name} {}", p.id);
                 p.is_unbound = true;
             }
             Symbol::Function(f) => {
@@ -823,7 +860,6 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         if skip {
             return;
         }
-        eprintln!("Unbound variable: {}", name);
         table.push(UnboundVariable::new(
             self.unbound_counter,
             name,
@@ -831,6 +867,101 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
             table.scope_level(),
         ));
         self.unbound_counter += 1;
+    }
+
+    fn handle_ffi_bind(&mut self, table: &mut SymbolTable, ffi_bind_expr: &FfiBindExpr) {
+        let id = self.variable_id();
+        let Expr::Symbol(name) = &ffi_bind_expr.fn_symbol.1.expr else {
+            self.error(Error::ExpectedFound {
+                span: ffi_bind_expr.fn_symbol.1.span.clone(),
+                expected: "Symbol".to_string(),
+                found: ffi_bind_expr.fn_symbol.1.expr.type_of(),
+                note: None,
+                help: None,
+            });
+            return;
+        };
+
+        let Expr::List(params) = &ffi_bind_expr.args.1.expr else {
+            self.error(Error::ExpectedFound {
+                span: ffi_bind_expr.args.1.span.clone(),
+                expected: "Symbol".to_string(),
+                found: ffi_bind_expr.fn_symbol.1.expr.type_of(),
+                note: None,
+                help: None,
+            });
+            return;
+        };
+
+        let old_variable_counter = self.variable_counter;
+        self.variable_counter = 0;
+        let mut parameters = Vec::new();
+
+        for spanned in params.iter() {
+            let Expr::Symbol(name) = &spanned.expr else {
+                self.error(Error::ExpectedFound {
+                    span: spanned.span.clone(),
+                    expected: "Symbol".to_string(),
+                    found: spanned.expr.type_of(),
+                    note: None,
+                    help: Some("(ffi-bind .. :args (<symbol>*) ..)".to_string()),
+                });
+                return;
+            };
+
+            let Ok(typeis) = Type::try_from(name.as_str()) else {
+                self.error(Error::ExpectedFound {
+                    span: spanned.span.clone(),
+                    expected: "Type".to_string(),
+                    found: spanned.expr.type_of(),
+                    note: Some("int, float, string, bool".to_string()),
+                    help: None,
+                });
+                return;
+            };
+            let parameter = Parameter::new(
+                self.variable_id(),
+                // HACK: This is the type name not the function param name.
+                // Maybe it should be `:args ((name int) (name float) (name string) (name bool))`
+                // currently it is `:args (int float string bool)`
+                name,
+                spanned.span.clone(),
+                table.scope_level(),
+            )
+            .with_type(typeis);
+            parameters.push(parameter.clone());
+            table.push(parameter);
+        }
+
+        let return_type = match &ffi_bind_expr.return_type.1.expr {
+            Expr::Symbol(name) => {
+                let Ok(typeis) = Type::try_from(name.as_str()) else {
+                    self.error(Error::ExpectedFound {
+                        span: ffi_bind_expr.return_type.1.span.clone(),
+                        expected: "Type".to_string(),
+                        found: ffi_bind_expr.return_type.1.expr.type_of(),
+                        note: None,
+                        help: None,
+                    });
+                    return;
+                };
+                typeis
+            }
+            Expr::Nil => Type::Nil,
+            t => panic!("expected symbol {t:?}"),
+        };
+
+        let function = Function::new(
+            id,
+            name,
+            ffi_bind_expr.fn_symbol.1.span.clone(),
+            parameters,
+            table.scope_level(),
+            false,
+        )
+        .with_return_type(return_type);
+        self.variable_counter = old_variable_counter;
+        table.push(function);
     }
 
     // ----------- START NOT USED -----------

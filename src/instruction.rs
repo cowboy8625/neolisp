@@ -1,5 +1,7 @@
 use super::ast::Span;
+use crate::symbol_table::Type;
 use num_derive::{FromPrimitive, ToPrimitive};
+
 #[derive(Debug, Clone, PartialEq, FromPrimitive, ToPrimitive)]
 #[repr(u8)]
 pub enum OpCode {
@@ -34,6 +36,8 @@ pub enum OpCode {
     JumpForward,
     JumpBackward,
     Jump,
+    LoadLibrary,
+    CallFfi,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -69,6 +73,8 @@ pub enum Instruction {
     JumpForward(usize),
     JumpBackward(usize),
     Jump(usize),
+    LoadLibrary(LoadLibrary),
+    CallFfi(CallFfi),
 }
 
 impl Instruction {
@@ -105,6 +111,8 @@ impl Instruction {
             Self::JumpForward(_) => 5,
             Self::JumpBackward(_) => 5,
             Self::Jump(_) => 5,
+            Self::LoadLibrary(lib) => 1 + lib.size(),
+            Self::CallFfi(call) => 1 + call.size(),
         }
     }
 
@@ -141,6 +149,8 @@ impl Instruction {
             Self::JumpForward(_) => OpCode::JumpForward,
             Self::JumpBackward(_) => OpCode::JumpBackward,
             Self::Jump(_) => OpCode::Jump,
+            Self::LoadLibrary(_) => OpCode::LoadLibrary,
+            Self::CallFfi(_) => OpCode::CallFfi,
         }
     }
 
@@ -189,6 +199,14 @@ impl Instruction {
                 bytes.push(self.opcode() as u8);
                 bytes.extend(&(*address as u32).to_le_bytes());
             }
+            Self::LoadLibrary(lib) => {
+                bytes.push(self.opcode() as u8);
+                bytes.extend(&lib.to_bytecode());
+            }
+            Self::CallFfi(call) => {
+                bytes.push(self.opcode() as u8);
+                bytes.extend(&call.to_bytecode());
+            }
         }
 
         bytes
@@ -198,37 +216,39 @@ impl Instruction {
 impl std::fmt::Display for Instruction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Instruction::Halt => write!(f, "halt"),
-            Instruction::Return => write!(f, "ret"),
-            Instruction::ReturnFromTest => write!(f, "ret-test"),
-            Instruction::Push(value) => write!(f, "{:<10} {value}", "push"),
-            Instruction::Add(count) => write!(f, "{:<10} {count}", "add"),
-            Instruction::Sub(count) => write!(f, "{:<10} {count}", "sub"),
-            Instruction::Mul(count) => write!(f, "{:<10} {count}", "mul"),
-            Instruction::Div(count) => write!(f, "{:<10} {count}", "div"),
-            Instruction::Eq(count) => write!(f, "eq {count}"),
-            Instruction::GreaterThan(count) => write!(f, "{:<10} {count}", "gt"),
-            Instruction::LessThan(count) => write!(f, "{:<10} {count}", "lt"),
-            Instruction::GreaterThanOrEqual(count) => write!(f, "{:<10} {count}", "gte"),
-            Instruction::LessThanOrEqual(count) => write!(f, "{:<10} {count}", "lte"),
-            Instruction::And(count) => write!(f, "{:<10} {count}", "and"),
-            Instruction::Or(count) => write!(f, "{:<10} {count}", "or"),
-            Instruction::Not => write!(f, "not"),
-            Instruction::Mod => write!(f, "mod"),
-            Instruction::Rot => write!(f, "rot"),
-            Instruction::Call(count) => write!(f, "{:<10} {count}", "call"),
-            Instruction::CallTest => write!(f, "call-test"),
-            Instruction::TailCall(count) => write!(f, "{:<10} {}", "tail-call", count),
-            Instruction::SetLocal(metadata) => write!(f, "{:<10} {metadata}", "set-local"),
-            Instruction::SetGlobal(metadata) => write!(f, "{:<10} {metadata}", "set-global"),
-            Instruction::SetFree(metadata) => write!(f, "{:<10} {metadata}", "set-free"),
-            Instruction::GetLocal(metadata) => write!(f, "{:<10} {metadata}", "get-local"),
-            Instruction::GetGlobal(metadata) => write!(f, "{:<10} {metadata}", "get-global"),
-            Instruction::GetFree(metadata) => write!(f, "{:<10} {metadata}", "get-free"),
-            Instruction::JumpIf(address) => write!(f, "{:<10} {address}", "jump-if"),
-            Instruction::JumpForward(address) => write!(f, "{:<10} {address}", "jump-forward"),
-            Instruction::JumpBackward(address) => write!(f, "{:<10} {address}", "jump-backward"),
-            Instruction::Jump(address) => write!(f, "{:<10} {address}", "jump"),
+            Self::Halt => write!(f, "halt"),
+            Self::Return => write!(f, "ret"),
+            Self::ReturnFromTest => write!(f, "ret-test"),
+            Self::Push(value) => write!(f, "{:<10} {value}", "push"),
+            Self::Add(count) => write!(f, "{:<10} {count}", "add"),
+            Self::Sub(count) => write!(f, "{:<10} {count}", "sub"),
+            Self::Mul(count) => write!(f, "{:<10} {count}", "mul"),
+            Self::Div(count) => write!(f, "{:<10} {count}", "div"),
+            Self::Eq(count) => write!(f, "eq {count}"),
+            Self::GreaterThan(count) => write!(f, "{:<10} {count}", "gt"),
+            Self::LessThan(count) => write!(f, "{:<10} {count}", "lt"),
+            Self::GreaterThanOrEqual(count) => write!(f, "{:<10} {count}", "gte"),
+            Self::LessThanOrEqual(count) => write!(f, "{:<10} {count}", "lte"),
+            Self::And(count) => write!(f, "{:<10} {count}", "and"),
+            Self::Or(count) => write!(f, "{:<10} {count}", "or"),
+            Self::Not => write!(f, "not"),
+            Self::Mod => write!(f, "mod"),
+            Self::Rot => write!(f, "rot"),
+            Self::Call(count) => write!(f, "{:<10} {count}", "call"),
+            Self::CallTest => write!(f, "call-test"),
+            Self::TailCall(count) => write!(f, "{:<10} {}", "tail-call", count),
+            Self::SetLocal(metadata) => write!(f, "{:<10} {metadata}", "set-local"),
+            Self::SetGlobal(metadata) => write!(f, "{:<10} {metadata}", "set-global"),
+            Self::SetFree(metadata) => write!(f, "{:<10} {metadata}", "set-free"),
+            Self::GetLocal(metadata) => write!(f, "{:<10} {metadata}", "get-local"),
+            Self::GetGlobal(metadata) => write!(f, "{:<10} {metadata}", "get-global"),
+            Self::GetFree(metadata) => write!(f, "{:<10} {metadata}", "get-free"),
+            Self::JumpIf(address) => write!(f, "{:<10} {address}", "jump-if"),
+            Self::JumpForward(address) => write!(f, "{:<10} {address}", "jump-forward"),
+            Self::JumpBackward(address) => write!(f, "{:<10} {address}", "jump-backward"),
+            Self::Jump(address) => write!(f, "{:<10} {address}", "jump"),
+            Self::LoadLibrary(lib) => write!(f, "{:<10} {lib}", "load-library"),
+            Self::CallFfi(call) => write!(f, "{:<10} {call}", "call-ffi"),
         }
     }
 }
@@ -251,11 +271,15 @@ impl RuntimeMetadata {
 
     pub fn size(&self) -> usize {
         // 4 bytes for address
+        4 +
         // 1 bytes for name length
+        1 +
         // name
+        self.name.len() +
         // 4 start span
+        4 +
         // 4 end span
-        4 + 1 + 4 + 4 + self.name.len()
+        4
     }
 
     pub fn to_bytecode(&self) -> Vec<u8> {
@@ -305,22 +329,186 @@ impl Callable {
         bytes.extend(&start.to_le_bytes());
         let end = self.span.end as u32;
         bytes.extend(&end.to_le_bytes());
+        debug_assert_eq!(bytes.len(), self.size());
         bytes
     }
 
     pub fn size(&self) -> usize {
         // 4 address
+        4 +
         // 4 name length
+        4 +
         // name length
+        self.name.len() +
         // 4 start span
+        4 +
         // 4 end span
-        4 + 4 + 4 + 4 + self.name.len()
+        4
     }
 }
 
 impl std::fmt::Display for Callable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}:{}:{:?}", self.address, self.name, self.span)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct LoadLibrary {
+    pub name: String,
+    pub span: Span,
+}
+
+impl LoadLibrary {
+    pub fn new(name: impl Into<String>, span: Span) -> Self {
+        Self {
+            name: name.into(),
+            span,
+        }
+    }
+
+    pub fn to_bytecode(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend(&(self.name.len() as u32).to_le_bytes());
+        bytes.extend(self.name.as_bytes());
+        let start = self.span.start as u32;
+        bytes.extend(&start.to_le_bytes());
+        let end = self.span.end as u32;
+        bytes.extend(&end.to_le_bytes());
+        debug_assert_eq!(bytes.len(), self.size());
+        bytes
+    }
+
+    pub fn size(&self) -> usize {
+        // 4 name length
+        4 +
+        // name length
+        self.name.len() +
+        // 4 start span
+        4 +
+        // 4 end span
+        4
+    }
+}
+
+impl std::fmt::Display for LoadLibrary {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{:?}", self.name, self.span)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CallFfi {
+    pub lib: String,
+    pub name: String,
+    pub args: Vec<Type>,
+    pub ret: Type,
+    pub span: Span,
+}
+
+impl CallFfi {
+    pub fn new(
+        lib: impl Into<String>,
+        name: impl Into<String>,
+        args: Vec<Type>,
+        ret: Type,
+        span: Span,
+    ) -> Self {
+        Self {
+            lib: lib.into(),
+            name: name.into(),
+            args,
+            ret,
+            span,
+        }
+    }
+
+    pub fn to_bytecode(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        // 4 lib length
+        bytes.extend(&(self.lib.len() as u32).to_le_bytes());
+        // lib
+        bytes.extend(self.lib.as_bytes());
+        // 4 name length
+        bytes.extend(&(self.name.len() as u32).to_le_bytes());
+        // name
+        bytes.extend(self.name.as_bytes());
+        // 1 args len
+        let args_len = self.args.len();
+        if args_len > 255 {
+            panic!("Args too long");
+        }
+        bytes.push(args_len as u8);
+        // args
+        for arg in &self.args {
+            bytes.push(*arg as u8);
+        }
+        // ret
+        bytes.push(self.ret as u8);
+        // 4 start span
+        let start = self.span.start as u32;
+        bytes.extend(&start.to_le_bytes());
+        // 4 end span
+        let end = self.span.end as u32;
+        bytes.extend(&end.to_le_bytes());
+        debug_assert_eq!(bytes.len(), self.size());
+        bytes
+    }
+
+    pub fn size(&self) -> usize {
+        // 4 lib length
+        4 +
+        // lib length
+        self.lib.len() +
+        // 4 name length
+        4 +
+        // name length
+        self.name.len() +
+        // 1 length of args u8
+        1 +
+        // 1 arg type
+        self.args.len() +
+        // 1 ret
+        1 +
+        // 4 start span
+        4 +
+        // 4 end span
+        4
+    }
+
+    pub(crate) fn get_arg_types(&self) -> Vec<libffi::middle::Type> {
+        self.args
+            .iter()
+            .map(|t| match t {
+                Type::Nil => libffi::middle::Type::void(),
+                Type::Bool => libffi::middle::Type::i32(),
+                Type::Int => libffi::middle::Type::i32(),
+                Type::String => libffi::middle::Type::pointer(),
+            })
+            .collect()
+    }
+
+    pub(crate) fn get_ret_type(&self) -> libffi::middle::Type {
+        match self.ret {
+            Type::Nil => libffi::middle::Type::void(),
+            Type::Bool => libffi::middle::Type::i32(),
+            Type::Int => libffi::middle::Type::i32(),
+            Type::String => libffi::middle::Type::pointer(),
+        }
+    }
+}
+
+impl std::fmt::Display for CallFfi {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}:{}(", self.lib, self.name)?;
+        for (i, arg) in self.args.iter().enumerate() {
+            if i == self.args.len() - 1 {
+                write!(f, "{}", arg)?;
+                continue;
+            }
+            write!(f, "{}, ", arg)?;
+        }
+        write!(f, ") -> {}:{:?}", self.ret, self.span)
     }
 }
 

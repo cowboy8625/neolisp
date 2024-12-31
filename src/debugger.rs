@@ -466,6 +466,11 @@ impl<'a> Debugger<'a> {
                 return true;
             }
         };
+
+        if !self.machine.ffi_libs.is_empty() {
+            return result;
+        }
+
         self.set_next_instruction_pointer();
         result
     }

@@ -28,7 +28,7 @@ const BUILTINS: &[&str] = &[
     "car",
 ];
 const KEYWORDS: &[&str] = &[
-    "var", "set", "let", "fn", "if", "lambda", "loop", "quote", "test",
+    "var", "set", "let", "fn", "if", "lambda", "loop", "quote", "test", "ffi-bind",
 ];
 
 pub mod ast;
