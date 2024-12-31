@@ -39,6 +39,7 @@ const KEYWORDS: &[&str] = &[
 ];
 
 pub mod ast;
+pub mod builtin;
 pub mod cli;
 pub mod compiler;
 pub mod debugger;
@@ -47,7 +48,6 @@ pub mod emitter;
 pub mod error;
 pub mod expr_walker;
 pub mod instruction;
-pub mod intrinsic;
 pub mod machine;
 pub mod parser;
 pub mod repl;

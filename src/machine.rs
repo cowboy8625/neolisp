@@ -10,7 +10,7 @@ use super::{
     instruction::{Callable, Instruction, LoadLibrary, OpCode, RuntimeMetadata, Value},
     symbol_table::SymbolTable,
 };
-use crate::{instruction::CallFfi, intrinsic::Intrinsic, symbol_table::Type};
+use crate::{builtin::Function, instruction::CallFfi, symbol_table::Type};
 use anyhow::{anyhow, Result};
 use crossterm::style::Stylize;
 use libloading::Library;
@@ -88,30 +88,30 @@ const INSTRUCTION_CALL: [fn(&mut Machine) -> Result<()>; 33] = [
 ];
 
 const INTRISICS: [fn(&mut Machine, u8) -> Result<()>; 24] = [
-    Intrinsic::intrinsic_sleep,
-    Intrinsic::intrinsic_is_atom,
-    Intrinsic::intrinsic_is_number,
-    Intrinsic::intrinsic_slice,
-    Intrinsic::intrinsic_join,
-    Intrinsic::intrinsic_split,
-    Intrinsic::intrinsic_to_string,
-    Intrinsic::intrinsic_filter,
-    Intrinsic::intrinsic_fold_right,
-    Intrinsic::intrinsic_fold,
-    Intrinsic::intrinsic_map,
-    Intrinsic::intrinsic_nth,
-    Intrinsic::intrinsic_reverse,
-    Intrinsic::intrinsic_append,
-    Intrinsic::intrinsic_last,
-    Intrinsic::intrinsic_cdr,
-    Intrinsic::intrinsic_typeof,
-    Intrinsic::intrinsic_print,
-    Intrinsic::intrinsic_length,
-    Intrinsic::intrinsic_assert_eq,
-    Intrinsic::intrinsic_assert,
-    Intrinsic::intrinsic_create_list,
-    Intrinsic::intrinsic_cons,
-    Intrinsic::intrinsic_car,
+    Function::fn_sleep,
+    Function::fn_is_atom,
+    Function::fn_is_number,
+    Function::fn_slice,
+    Function::fn_join,
+    Function::fn_split,
+    Function::fn_to_string,
+    Function::fn_filter,
+    Function::fn_fold_right,
+    Function::fn_fold,
+    Function::fn_map,
+    Function::fn_nth,
+    Function::fn_reverse,
+    Function::fn_append,
+    Function::fn_last,
+    Function::fn_cdr,
+    Function::fn_typeof,
+    Function::fn_print,
+    Function::fn_length,
+    Function::fn_assert_eq,
+    Function::fn_assert,
+    Function::fn_create_list,
+    Function::fn_cons,
+    Function::fn_car,
 ];
 
 #[derive(Debug, Clone)]

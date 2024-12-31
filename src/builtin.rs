@@ -5,9 +5,9 @@ use anyhow::Result;
 use crossterm::style::Stylize;
 use std::collections::HashMap;
 
-pub(crate) struct Intrinsic;
-impl Intrinsic {
-    pub(crate) fn intrinsic_sleep(machine: &mut Machine, _: u8) -> Result<()> {
+pub(crate) struct Function;
+impl Function {
+    pub(crate) fn fn_sleep(machine: &mut Machine, _: u8) -> Result<()> {
         // (sleep 1000) ; -> false
         let frame = machine.get_current_frame_mut()?;
         let Some(Value::F64(value)) = frame.stack.pop() else {
@@ -25,7 +25,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_is_atom(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn fn_is_atom(machine: &mut Machine, count: u8) -> Result<()> {
         // (atom? 10) ; -> true
         // (atom? "10") ; -> true
         // (atom? "abc") ; -> true
@@ -50,7 +50,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_is_number(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn fn_is_number(machine: &mut Machine, count: u8) -> Result<()> {
         // (number? 10) ; -> true
         // (number? "10") ; -> true
         // (number? "abc") ; -> false
@@ -78,7 +78,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_slice(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn fn_slice(machine: &mut Machine, count: u8) -> Result<()> {
         // (slice "abc" 1 2) ; -> "b"
         // (slice (list 1 2 3) 1 2) ; -> (2)
         if count != 3 {
@@ -154,7 +154,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_join(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn fn_join(machine: &mut Machine, count: u8) -> Result<()> {
         // (join " " "abc") ; -> "abc"
         // (join " " (list "1" "2" "3")) ; -> "1 2 3"
         if count != 2 {
@@ -197,7 +197,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_split(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn fn_split(machine: &mut Machine, count: u8) -> Result<()> {
         // (split " " "abc") ; -> ("a" "b" "c")
         // (split " " "(+ 1 1)") ; ->  ("(+" "1" "1)")
         if count != 2 {
@@ -238,7 +238,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_to_string(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn fn_to_string(machine: &mut Machine, count: u8) -> Result<()> {
         // (to-string 1000) => "1000"
         if count != 1 {
             anyhow::bail!("to-string only support 1 args");
@@ -262,7 +262,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_filter(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn fn_filter(machine: &mut Machine, count: u8) -> Result<()> {
         // (filter (lambda (x) (> x 1)) (list 1 2 3)) ; -> (2 3)
 
         if count != 2 {
@@ -314,7 +314,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_fold_right(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn fn_fold_right(machine: &mut Machine, count: u8) -> Result<()> {
         // (fold-right 0 (lambda (x y) (+ x y)) (list 1 2 3)) => 6
         if count != 3 {
             anyhow::bail!("fold only support 3 args");
@@ -376,7 +376,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_fold(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn fn_fold(machine: &mut Machine, count: u8) -> Result<()> {
         // (fold 0 (lambda (x y) (+ x y)) (list 1 2 3)) => 6
         if count != 3 {
             anyhow::bail!("fold only support 3 args");
@@ -449,7 +449,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_map(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn fn_map(machine: &mut Machine, count: u8) -> Result<()> {
         // (map (lambda (x) (+ x 1)) (list 1 2 3)) => (2 3 4)
         if count != 2 {
             anyhow::bail!("map only support 2 args");
@@ -513,7 +513,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_nth(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn fn_nth(machine: &mut Machine, count: u8) -> Result<()> {
         // (nth (list 1 2 3) 1) => 2
         if count != 2 {
             anyhow::bail!("nth only support 2 args");
@@ -576,7 +576,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_reverse(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn fn_reverse(machine: &mut Machine, count: u8) -> Result<()> {
         // (reverse (list 1 2 3)) => (3 2 1)
         if count != 1 {
             anyhow::bail!("reverse only support 1 args");
@@ -608,7 +608,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_append(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn fn_append(machine: &mut Machine, count: u8) -> Result<()> {
         // (append (list 1 2) (list 3 4)) => (1 2 3 4)
         if count != 2 {
             anyhow::bail!("append only support 2 args");
@@ -666,7 +666,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_last(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn fn_last(machine: &mut Machine, count: u8) -> Result<()> {
         // (last (list 1 2 3 4)) => 4
         if count != 1 {
             anyhow::bail!("last only support 1 args");
@@ -732,7 +732,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_cdr(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn fn_cdr(machine: &mut Machine, count: u8) -> Result<()> {
         // (cdr (list 1 2)) => (2)
         if count != 1 {
             anyhow::bail!("cdr only support 1 args");
@@ -779,7 +779,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_typeof(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn fn_typeof(machine: &mut Machine, count: u8) -> Result<()> {
         // (type? 1) => "Number"
         if count != 1 {
             anyhow::bail!("type? only support 1 args");
@@ -800,7 +800,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_print(machine: &mut Machine, _: u8) -> Result<()> {
+    pub(crate) fn fn_print(machine: &mut Machine, _: u8) -> Result<()> {
         use std::fmt::Write as FmtWrite;
         use std::io::Write;
         let lock = std::io::stdout().lock();
@@ -820,7 +820,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_length(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn fn_length(machine: &mut Machine, count: u8) -> Result<()> {
         // (length (list 1 2 3)) -> 3
         if count != 1 {
             anyhow::bail!("length only support 1 args");
@@ -850,7 +850,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_assert_eq<'a>(machine: &'a mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn fn_assert_eq<'a>(machine: &'a mut Machine, count: u8) -> Result<()> {
         // (assert-eq :expected 1 :actual 2)
         if count < 2 {
             anyhow::bail!("assert-eq at least 2 args");
@@ -907,7 +907,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_assert(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn fn_assert(machine: &mut Machine, count: u8) -> Result<()> {
         // (assert (> 1 2) "1 is not greater than 2")
         if count != 2 {
             anyhow::bail!("assert only support 2 args");
@@ -946,7 +946,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_create_list(machine: &mut Machine, _: u8) -> Result<()> {
+    pub(crate) fn fn_create_list(machine: &mut Machine, _: u8) -> Result<()> {
         // (create-list 1 2 3) => (1 2 3)
         let frame = machine.get_current_frame_mut()?;
         let value = frame.args.clone();
@@ -954,7 +954,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_cons(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn fn_cons(machine: &mut Machine, count: u8) -> Result<()> {
         // (cons 1 (list 2 3)) => (1 2 3)
         if count != 2 {
             anyhow::bail!("cons only support 2 args");
@@ -987,7 +987,7 @@ impl Intrinsic {
         Ok(())
     }
 
-    pub(crate) fn intrinsic_car(machine: &mut Machine, count: u8) -> Result<()> {
+    pub(crate) fn fn_car(machine: &mut Machine, count: u8) -> Result<()> {
         // (car (list 1 2)) => 1
         if count != 1 {
             anyhow::bail!("car only support 2 args");
