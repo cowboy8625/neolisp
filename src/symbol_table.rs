@@ -1,16 +1,12 @@
 use num_derive::{FromPrimitive, ToPrimitive};
 
-use crate::{
-    compiler::CompilerOptions,
-    expr_walker::{FfiBindExpr, SetExpr},
-};
-
 use super::{
     ast::{Ast, Expr, Span, Spanned},
+    compiler::CompilerOptions,
     error::Error,
     expr_walker::{
-        AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr, LoopExpr,
-        OperatorExpr, QuoteExpr, TestExpr, VarExpr,
+        AstWalker, CallExpr, FfiBindExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr,
+        LoopExpr, OperatorExpr, QuoteExpr, SetExpr, StructExpr, TestExpr, VarExpr,
     },
 };
 use std::collections::HashMap;
@@ -71,6 +67,17 @@ impl Test {
     pub fn name(&self) -> String {
         self.name.to_string()
     }
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub struct Struct {
+    pub id: usize,
+    pub name: String,
+    pub span: Span,
+    pub field_names: Vec<String>,
+    pub field_values: Vec<Parameter>,
+    pub scope_level: usize,
+    pub location: Option<std::ops::Range<usize>>,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -257,6 +264,7 @@ impl Let {
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Symbol {
+    Struct(Struct),
     UnboundVariable(UnboundVariable),
     Variable(Variable),
     Parameter(Parameter),
@@ -269,6 +277,7 @@ pub enum Symbol {
 impl Symbol {
     pub fn id(&self) -> usize {
         match self {
+            Symbol::Struct(v) => v.id,
             Symbol::UnboundVariable(v) => v.id,
             Symbol::Variable(v) => v.id,
             Symbol::Parameter(v) => v.id,
@@ -289,6 +298,7 @@ impl Symbol {
 
     pub fn set_location(&mut self, location: std::ops::Range<usize>) {
         match self {
+            Symbol::Struct(v) => v.location = Some(location),
             Symbol::UnboundVariable(v) => v.location = Some(location),
             Symbol::Variable(v) => v.location = Some(location),
             Symbol::Parameter(v) => v.location = Some(location),
@@ -301,6 +311,7 @@ impl Symbol {
 
     pub fn get_location(&self) -> Option<std::ops::Range<usize>> {
         match self {
+            Symbol::Struct(v) => v.location.clone(),
             Symbol::UnboundVariable(v) => v.location.clone(),
             Symbol::Variable(v) => v.location.clone(),
             Symbol::Parameter(v) => v.location.clone(),
@@ -313,6 +324,7 @@ impl Symbol {
 
     pub fn is_global(&self) -> bool {
         let level = match self {
+            Symbol::Struct(v) => v.scope_level,
             Symbol::UnboundVariable(v) => v.scope_level,
             Symbol::Variable(v) => v.scope_level,
             Symbol::Parameter(v) => v.scope_level,
@@ -326,6 +338,7 @@ impl Symbol {
 
     pub fn span(&self) -> Span {
         match self {
+            Symbol::Struct(v) => v.span.clone(),
             Symbol::UnboundVariable(v) => v.span.clone(),
             Symbol::Variable(v) => v.span.clone(),
             Symbol::Parameter(v) => v.span.clone(),
@@ -338,6 +351,7 @@ impl Symbol {
 
     pub fn name(&self) -> String {
         match self {
+            Symbol::Struct(v) => v.name.clone(),
             Symbol::UnboundVariable(v) => v.name.clone(),
             Symbol::Variable(v) => v.name.clone(),
             Symbol::Parameter(v) => v.name.clone(),
@@ -371,6 +385,7 @@ macro_rules! into_symbol {
     }
 
 into_symbol!(
+    Struct,
     UnboundVariable,
     Variable,
     Parameter,
@@ -853,6 +868,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
                 f.is_recursive = f.name == scope_name || f.is_recursive;
                 skip = true;
             }
+            Symbol::Struct(_) => todo!("Structs are not supported yet"),
             Symbol::Lambda(_) => todo!("Lambdas are not supported yet"),
             Symbol::Let(_) => todo!("Lets are not supported yet"),
             Symbol::Test(_) => todo!("Tests are not supported yet"),
@@ -867,6 +883,126 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
             table.scope_level(),
         ));
         self.unbound_counter += 1;
+    }
+
+    fn handle_struct(&mut self, table: &mut SymbolTable, struct_expr: &StructExpr) {
+        let Expr::Symbol(name) = &struct_expr.name.expr else {
+            self.error(Error::ExpectedFound {
+                span: struct_expr.name.span.clone(),
+                expected: "Symbol".to_string(),
+                found: struct_expr.name.expr.type_of(),
+                note: None,
+                help: None,
+            });
+            return;
+        };
+        let mut field_names = Vec::new();
+        let mut field_values = Vec::new();
+        let mut fields_iter = struct_expr.fields.iter();
+        let mut id = 0;
+        while let Some(spanned) = fields_iter.next() {
+            let Expr::Symbol(name) = &spanned.expr else {
+                self.error(Error::ExpectedFound {
+                    span: spanned.span.clone(),
+                    expected: "Keyword".to_string(),
+                    found: spanned.expr.type_of(),
+                    note: None,
+                    help: None,
+                });
+                return;
+            };
+            if !name.starts_with(":") {
+                self.error(Error::ExpectedFound {
+                    span: spanned.span.clone(),
+                    expected: "Keyword".to_string(),
+                    found: spanned.expr.type_of(),
+                    note: None,
+                    help: None,
+                });
+                return;
+            };
+            let Some(symbol_type) = fields_iter.next() else {
+                self.error(Error::ExpectedFound {
+                    span: spanned.span.clone(),
+                    expected: "Type".to_string(),
+                    found: spanned.expr.type_of(),
+                    note: None,
+                    help: None,
+                });
+                return;
+            };
+
+            let Expr::Symbol(symbol_type_name) = &symbol_type.expr else {
+                self.error(Error::ExpectedFound {
+                    span: spanned.span.clone(),
+                    expected: "Symbol".to_string(),
+                    found: spanned.expr.type_of(),
+                    note: None,
+                    help: None,
+                });
+                return;
+            };
+
+            let Ok(ty) = Type::try_from(symbol_type_name.as_str()) else {
+                self.error(Error::ExpectedFound {
+                    span: spanned.span.clone(),
+                    expected: "Type".to_string(),
+                    found: spanned.expr.type_of(),
+                    note: None,
+                    help: None,
+                });
+                return;
+            };
+
+            let param =
+                Parameter::new(id, name, spanned.span.clone(), table.scope_level()).with_type(ty);
+            id += 1;
+            field_names.push(name.to_string());
+            field_values.push(param);
+        }
+        let struct_symbol = Struct {
+            // HACK: I think we need a type id
+            id: 0,
+            name: name.clone(),
+            span: struct_expr.span.clone(),
+            field_names,
+            field_values,
+            scope_level: table.scope_level(),
+            location: None,
+        };
+
+        // --- Generate struct constructor
+        let old_variable_counter = self.variable_counter;
+        self.variable_counter = 0;
+        let mut struct_function_new_params = Vec::new();
+        for (name, param) in struct_symbol
+            .field_names
+            .iter()
+            .zip(struct_symbol.field_values.iter())
+        {
+            let param_name = Parameter::new(
+                self.variable_id(),
+                name,
+                param.span.clone(),
+                table.scope_level(),
+            );
+            struct_function_new_params.push(param_name);
+            struct_function_new_params.push(param.clone());
+        }
+        self.variable_counter = old_variable_counter;
+
+        let struct_function_new = Function::new(
+            self.variable_id(),
+            format!("{}:new", name),
+            struct_expr.span.clone(),
+            struct_function_new_params,
+            table.scope_level(),
+            false,
+        );
+        table.push(struct_function_new);
+        // --- END Generate struct constructor
+
+        table.push(struct_symbol);
     }
 
     fn handle_ffi_bind(&mut self, table: &mut SymbolTable, ffi_bind_expr: &FfiBindExpr) {

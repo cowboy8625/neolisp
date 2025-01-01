@@ -157,11 +157,12 @@
 ; ----------------------------------------------------
 
 (fn main ()
+  (var i 0)
+  (var line nil)
   (let
     ((grid (append (my-map (lambda (x) 0) (range 119)) (list 1)))
     (is-running true))
-    (loop is-running
+    (loop (and is-running (< i 10_000))
+      (set i (+ i 1))
       (set grid (next-generation grid))
-      (let
-        (line (my-map (lambda (x) (if (= x 1) "*" " ")) grid))
-          (print (join "" line) "\n")))))
+      (set line (print (join "" (my-map (lambda (x) (if (= x 1) "*" " ")) grid)) "\n")))))

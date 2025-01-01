@@ -38,6 +38,7 @@ pub enum OpCode {
     Jump,
     LoadLibrary,
     CallFfi,
+    StructInit,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -75,6 +76,7 @@ pub enum Instruction {
     Jump(usize),
     LoadLibrary(LoadLibrary),
     CallFfi(CallFfi),
+    StructInit(RuntimeMetadata),
 }
 
 impl Instruction {
@@ -113,6 +115,7 @@ impl Instruction {
             Self::Jump(_) => 5,
             Self::LoadLibrary(lib) => 1 + lib.size(),
             Self::CallFfi(call) => 1 + call.size(),
+            Self::StructInit(md) => 1 + md.size(),
         }
     }
 
@@ -121,18 +124,18 @@ impl Instruction {
             Self::Halt => OpCode::Halt,
             Self::Return => OpCode::Return,
             Self::ReturnFromTest => OpCode::ReturnFromTest,
-            Self::Push(_) => OpCode::Push,
-            Self::Add(_) => OpCode::Add,
-            Self::Sub(_) => OpCode::Sub,
-            Self::Mul(_) => OpCode::Mul,
-            Self::Div(_) => OpCode::Div,
-            Self::Eq(_) => OpCode::Eq,
-            Self::GreaterThan(_) => OpCode::GreaterThan,
-            Self::LessThan(_) => OpCode::LessThan,
+            Self::Push(..) => OpCode::Push,
+            Self::Add(..) => OpCode::Add,
+            Self::Sub(..) => OpCode::Sub,
+            Self::Mul(..) => OpCode::Mul,
+            Self::Div(..) => OpCode::Div,
+            Self::Eq(..) => OpCode::Eq,
+            Self::GreaterThan(..) => OpCode::GreaterThan,
+            Self::LessThan(..) => OpCode::LessThan,
             Self::GreaterThanOrEqual(_) => OpCode::GreaterThanOrEqual,
             Self::LessThanOrEqual(_) => OpCode::LessThanOrEqual,
-            Self::And(_) => OpCode::And,
-            Self::Or(_) => OpCode::Or,
+            Self::And(..) => OpCode::And,
+            Self::Or(..) => OpCode::Or,
             Self::Not => OpCode::Not,
             Self::Mod => OpCode::Mod,
             Self::Rot => OpCode::Rot,
@@ -142,15 +145,16 @@ impl Instruction {
             Self::SetLocal(..) => OpCode::SetLocal,
             Self::SetGlobal(..) => OpCode::SetGlobal,
             Self::SetFree(..) => OpCode::SetFree,
-            Self::GetLocal(_) => OpCode::GetLocal,
-            Self::GetGlobal(_) => OpCode::GetGlobal,
-            Self::GetFree(_) => OpCode::GetFree,
-            Self::JumpIf(_) => OpCode::JumpIf,
-            Self::JumpForward(_) => OpCode::JumpForward,
-            Self::JumpBackward(_) => OpCode::JumpBackward,
-            Self::Jump(_) => OpCode::Jump,
-            Self::LoadLibrary(_) => OpCode::LoadLibrary,
-            Self::CallFfi(_) => OpCode::CallFfi,
+            Self::GetLocal(..) => OpCode::GetLocal,
+            Self::GetGlobal(..) => OpCode::GetGlobal,
+            Self::GetFree(..) => OpCode::GetFree,
+            Self::JumpIf(..) => OpCode::JumpIf,
+            Self::JumpForward(..) => OpCode::JumpForward,
+            Self::JumpBackward(..) => OpCode::JumpBackward,
+            Self::Jump(..) => OpCode::Jump,
+            Self::LoadLibrary(..) => OpCode::LoadLibrary,
+            Self::CallFfi(..) => OpCode::CallFfi,
+            Self::StructInit(..) => OpCode::StructInit,
         }
     }
 
@@ -207,6 +211,10 @@ impl Instruction {
                 bytes.push(self.opcode() as u8);
                 bytes.extend(&call.to_bytecode());
             }
+            Self::StructInit(md) => {
+                bytes.push(self.opcode() as u8);
+                bytes.extend(&md.to_bytecode());
+            }
         }
 
         bytes
@@ -256,6 +264,7 @@ impl std::fmt::Display for Instruction {
             Self::Jump(address) => write!(f, "{:<10} {address}", "jump"),
             Self::LoadLibrary(lib) => write!(f, "{:<10} {lib}", "load-library"),
             Self::CallFfi(call) => write!(f, "{:<10} {call}", "call-ffi"),
+            Self::StructInit(md) => write!(f, "{:<10} {md}", "struct-init"),
         }
     }
 }
@@ -519,6 +528,25 @@ impl std::fmt::Display for CallFfi {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, FromPrimitive, ToPrimitive)]
+#[repr(u8)]
+pub enum ValueKind {
+    Nil,
+    U8,
+    I32,
+    U32,
+    F32,
+    F64,
+    String,
+    Bool,
+    List,
+    Callable,
+    Builtin,
+    Symbol,
+    Keyword,
+    Struct,
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Nil,
@@ -534,56 +562,62 @@ pub enum Value {
     Builtin(Box<Callable>),
     Symbol(Box<String>),
     Keyword(Box<String>),
+    Struct(Box<Struct>),
 }
 
 impl Value {
-    pub const CODE_NIL: u8 = 0x00;
-    pub const CODE_U8: u8 = 0x01;
-    pub const CODE_I32: u8 = 0x02;
-    pub const CODE_U32: u8 = 0x03;
-    pub const CODE_F32: u8 = 0x04;
-    pub const CODE_F64: u8 = 0x05;
-    pub const CODE_STRING: u8 = 0x06;
-    pub const CODE_BOOL: u8 = 0x07;
-    pub const CODE_LIST: u8 = 0x08;
-    pub const CODE_CALLABLE: u8 = 0x09;
-    pub const CODE_BUILTIN: u8 = 0x0A;
-    pub const CODE_SYMBOL: u8 = 0x0B;
-    pub const CODE_KEYWORD: u8 = 0x0C;
+    pub fn kind(&self) -> ValueKind {
+        match self {
+            Self::Nil => ValueKind::Nil,
+            Self::U8(_) => ValueKind::U8,
+            Self::I32(_) => ValueKind::I32,
+            Self::U32(_) => ValueKind::U32,
+            Self::F32(_) => ValueKind::F32,
+            Self::F64(_) => ValueKind::F64,
+            Self::String(_) => ValueKind::String,
+            Self::Bool(_) => ValueKind::Bool,
+            Self::List(_) => ValueKind::List,
+            Self::Callable(_) => ValueKind::Callable,
+            Self::Builtin(_) => ValueKind::Builtin,
+            Self::Symbol(_) => ValueKind::Symbol,
+            Self::Keyword(_) => ValueKind::Keyword,
+            Self::Struct(_) => ValueKind::Struct,
+        }
+    }
 
     pub fn to_bytecode(&self) -> Vec<u8> {
         match self {
-            Value::Nil => vec![Self::CODE_NIL],
-            Value::U8(v) => vec![Self::CODE_U8, *v],
+            Value::Nil => vec![ValueKind::Nil as u8],
+            Value::U8(v) => vec![ValueKind::U8 as u8, *v],
             Value::I32(v) => {
-                let mut bytes = vec![Self::CODE_I32];
+                let mut bytes = vec![ValueKind::I32 as u8];
                 bytes.extend_from_slice(&v.to_le_bytes());
                 bytes
             }
             Value::U32(v) => {
-                let mut bytes = vec![Self::CODE_U32];
+                let mut bytes = vec![ValueKind::U32 as u8];
                 bytes.extend_from_slice(&v.to_le_bytes());
                 bytes
             }
             Value::F32(v) => {
-                let mut bytes = vec![Self::CODE_F32];
+                let mut bytes = vec![ValueKind::F32 as u8];
                 bytes.extend_from_slice(&v.to_le_bytes());
                 bytes
             }
             Value::F64(v) => {
-                let mut bytes = vec![Self::CODE_F64];
+                let mut bytes = vec![ValueKind::F64 as u8];
                 bytes.extend_from_slice(&v.to_le_bytes());
                 bytes
             }
             Value::String(v) => {
-                let mut bytes = vec![Self::CODE_STRING];
+                let mut bytes = vec![ValueKind::String as u8];
                 bytes.extend_from_slice(&(v.len() as u32).to_le_bytes());
                 bytes.extend_from_slice(v.as_bytes());
                 bytes
             }
-            Value::Bool(v) => vec![Self::CODE_BOOL, if *v { 1 } else { 0 }],
+            Value::Bool(v) => vec![ValueKind::Bool as u8, if *v { 1 } else { 0 }],
             Value::List(vec) => {
-                let mut bytes = vec![Self::CODE_LIST];
+                let mut bytes = vec![ValueKind::List as u8];
                 bytes.extend_from_slice(&(vec.len() as u32).to_le_bytes());
                 for v in vec.iter() {
                     bytes.extend(v.to_bytecode());
@@ -591,27 +625,33 @@ impl Value {
                 bytes
             }
             Value::Callable(callable) => {
-                let mut bytes = vec![Self::CODE_CALLABLE];
+                let mut bytes = vec![ValueKind::Callable as u8];
                 let callable_bytes = callable.to_bytecode();
                 bytes.extend(callable_bytes);
                 bytes
             }
             Value::Builtin(callable) => {
-                let mut bytes = vec![Self::CODE_BUILTIN];
+                let mut bytes = vec![ValueKind::Builtin as u8];
                 let callable_bytes = callable.to_bytecode();
                 bytes.extend(callable_bytes);
                 bytes
             }
             Value::Symbol(v) => {
-                let mut bytes = vec![Self::CODE_SYMBOL];
+                let mut bytes = vec![ValueKind::Symbol as u8];
                 bytes.extend_from_slice(&(v.len() as u32).to_le_bytes());
                 bytes.extend_from_slice(v.as_bytes());
                 bytes
             }
             Value::Keyword(v) => {
-                let mut bytes = vec![Self::CODE_KEYWORD];
+                let mut bytes = vec![ValueKind::Keyword as u8];
                 bytes.extend_from_slice(&(v.len() as u32).to_le_bytes());
                 bytes.extend_from_slice(v.as_bytes());
+                bytes
+            }
+            Value::Struct(v) => {
+                let mut bytes = vec![ValueKind::Struct as u8];
+                let struct_bytes = v.to_bytecode();
+                bytes.extend(struct_bytes);
                 bytes
             }
         }
@@ -634,6 +674,7 @@ impl Value {
             Value::Builtin(callable) => callable.size(),
             Value::Symbol(v) => 4 + v.len(),
             Value::Keyword(v) => 4 + v.len(),
+            Value::Struct(v) => v.size(),
         };
         // opcode + content
         1 + conent_size
@@ -654,6 +695,7 @@ impl Value {
             Self::Builtin(_) => "Builtin".to_string(),
             Self::Symbol(_) => "Symbol".to_string(),
             Self::Keyword(_) => "Keyword".to_string(),
+            Self::Struct(data) => data.name.clone(),
         }
     }
 
@@ -691,6 +733,61 @@ impl std::fmt::Display for Value {
             Self::Builtin(data) => write!(f, "<builtin {data}>"),
             Self::Symbol(value) => write!(f, "{value}"),
             Self::Keyword(value) => write!(f, "{value}"),
+            Self::Struct(data) => {
+                write!(f, "({} ", data.name)?;
+                for (name, value) in data.field_names.iter().zip(data.field_values.iter()) {
+                    write!(f, "{} {},", name, value)?;
+                }
+                write!(f, ")")
+            }
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Struct {
+    pub name: String,
+    pub span: Span,
+    pub field_names: Vec<String>,
+    pub field_values: Vec<Value>,
+}
+
+impl Struct {
+    pub fn size(&self) -> usize {
+        // 4 bytes for name length
+        4 +
+        // name length
+        self.name.len() +
+        // 4 start span
+        4 +
+        // 4 end span
+        4 +
+        // 4 field len
+        4 +
+        // field names
+        self.field_names.iter().map(|name| 4 + name.len()).sum::<usize>() +
+        // field values
+        self.field_values.iter().map(|value| value.size()).sum::<usize>()
+    }
+
+    pub fn to_bytecode(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        bytes.extend(&(self.name.len() as u32).to_le_bytes());
+        bytes.extend(self.name.as_bytes());
+        let start = self.span.start as u32;
+        bytes.extend(&start.to_le_bytes());
+        let end = self.span.end as u32;
+        bytes.extend(&end.to_le_bytes());
+        bytes.extend(&(self.field_names.len() as u32).to_le_bytes());
+        for name in self.field_names.iter() {
+            bytes.extend(&(name.len() as u32).to_le_bytes());
+            bytes.extend(name.as_bytes());
+        }
+        bytes.extend(&(self.field_values.len() as u32).to_le_bytes());
+        for value in self.field_values.iter() {
+            bytes.extend(value.to_bytecode());
+        }
+        debug_assert_eq!(bytes.len(), self.size());
+        bytes
     }
 }

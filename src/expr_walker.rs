@@ -149,6 +149,17 @@ pub struct FfiBindExpr<'a> {
     pub span: Span,
 }
 
+#[derive(Debug)]
+pub struct StructExpr<'a> {
+    /// struct keyword
+    pub struct_keyword: &'a Spanned<Expr>,
+    /// struct name
+    pub name: &'a Spanned<Expr>,
+    /// struct fields
+    pub fields: &'a [&'a Spanned<Expr>],
+    pub span: Span,
+}
+
 pub trait AstWalker<T> {
     fn error(&mut self, _: Error);
     fn get_lambda_name(&mut self) -> String;
@@ -170,6 +181,7 @@ pub trait AstWalker<T> {
     fn handle_symbol(&mut self, _: &mut T, _: &str, _: Span);
     fn handle_quote(&mut self, _: &mut T, _: &QuoteExpr);
     fn handle_ffi_bind(&mut self, _: &mut T, _: &FfiBindExpr);
+    fn handle_struct(&mut self, _: &mut T, _: &StructExpr);
     fn handle_keyword(&mut self, _: &mut T, _: &str, _: Span);
 
     fn walk_list(&mut self, t: &mut T, exprs: &[Spanned<Expr>], span: Span) {
@@ -242,8 +254,43 @@ pub trait AstWalker<T> {
             "let" => self.walk_let_binding(t, exprs),
             "quote" => self.walk_quote(t, exprs, span),
             "ffi-bind" => self.walk_ffi_bind(t, exprs, span),
+            "struct" => self.walk_struct(t, exprs),
             _ => panic!("Unknown keyword: {name}"),
         }
+    }
+
+    fn walk_struct(&mut self, t: &mut T, elements: &[Spanned<Expr>]) {
+        const STRUCT_KEYWORD: usize = 0;
+        const STRUCT_NAME: usize = STRUCT_KEYWORD + 1;
+        const FIELDS: usize = STRUCT_NAME + 1;
+        const HELP: &str = "(struct <symbol> <(<symbol> <expr>)*>)";
+
+        let struct_keyword = &elements[STRUCT_KEYWORD];
+        let start_span = struct_keyword.span.clone();
+        let Some(struct_name) = elements.get(STRUCT_NAME) else {
+            self.error(Error::ExpectedFound {
+                span: start_span.clone(),
+                expected: "<symbol>".to_string(),
+                found: "nothing".to_string(),
+                note: None,
+                help: Some(HELP.to_string()),
+            });
+            return;
+        };
+
+        let fields = &elements.iter().skip(FIELDS).collect::<Vec<_>>();
+        let end_span = fields
+            .last()
+            .map(|f| f.span.clone())
+            .unwrap_or(start_span.clone());
+
+        let struct_expr = StructExpr {
+            struct_keyword,
+            name: struct_name,
+            fields,
+            span: start_span.start..end_span.end,
+        };
+        self.handle_struct(t, &struct_expr);
     }
 
     fn walk_ffi_bind(&mut self, t: &mut T, elements: &[Spanned<Expr>], span: Span) {

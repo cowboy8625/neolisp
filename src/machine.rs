@@ -5,12 +5,16 @@ use std::{
 
 use super::{
     ast::Span,
+    builtin::Function,
     compiler::Compiler,
     error::Error,
-    instruction::{Callable, Instruction, LoadLibrary, OpCode, RuntimeMetadata, Value},
+    instruction::{
+        CallFfi, Callable, Instruction, LoadLibrary, OpCode, RuntimeMetadata, Struct, Value,
+        ValueKind,
+    },
     symbol_table::SymbolTable,
+    symbol_table::Type,
 };
-use crate::{builtin::Function, instruction::CallFfi, symbol_table::Type};
 use anyhow::{anyhow, Result};
 use crossterm::style::Stylize;
 use libloading::Library;
@@ -51,7 +55,7 @@ macro_rules! generate_instruction_operator {
     };
 }
 
-const INSTRUCTION_CALL: [fn(&mut Machine) -> Result<()>; 33] = [
+const INSTRUCTION_CALL: [fn(&mut Machine) -> Result<()>; 34] = [
     Machine::instruction_halt,
     Machine::instruction_return,
     Machine::instruction_return_from_test,
@@ -85,6 +89,7 @@ const INSTRUCTION_CALL: [fn(&mut Machine) -> Result<()>; 33] = [
     Machine::instruction_jump,
     Machine::instruction_load_library,
     Machine::instruction_call_ffi,
+    Machine::instruction_struct_init,
 ];
 
 const INTRISICS: [fn(&mut Machine, u8) -> Result<()>; 24] = [
@@ -422,37 +427,40 @@ impl Machine {
 
     fn get_value(&mut self) -> Result<Value> {
         let value_opcode = self.get_u8()?;
-        match value_opcode {
-            Value::CODE_NIL => Ok(Value::Nil),
-            Value::CODE_U8 => {
+        let Some(value_kind) = ValueKind::from_u8(value_opcode) else {
+            return Err(anyhow!("Unknown value `{}`", value_opcode));
+        };
+        match value_kind {
+            ValueKind::Nil => Ok(Value::Nil),
+            ValueKind::U8 => {
                 let value = self.get_u8()?;
                 Ok(Value::U8(value))
             }
-            Value::CODE_I32 => {
+            ValueKind::I32 => {
                 let value = self.get_i32()?;
                 Ok(Value::I32(value))
             }
-            Value::CODE_U32 => {
+            ValueKind::U32 => {
                 let value = self.get_u32()?;
                 Ok(Value::U32(value))
             }
-            Value::CODE_F32 => {
+            ValueKind::F32 => {
                 let value = self.get_f32()?;
                 Ok(Value::F32(value))
             }
-            Value::CODE_F64 => {
+            ValueKind::F64 => {
                 let value = self.get_f64()?;
                 Ok(Value::F64(value))
             }
-            Value::CODE_STRING => {
+            ValueKind::String => {
                 let value = self.get_string()?;
                 Ok(Value::String(Box::new(value)))
             }
-            Value::CODE_BOOL => {
+            ValueKind::Bool => {
                 let value = self.get_u8()? != 0;
                 Ok(Value::Bool(value))
             }
-            Value::CODE_LIST => {
+            ValueKind::List => {
                 let length = self.get_u32()?;
                 let mut values = Vec::new();
                 for _ in 0..length {
@@ -460,7 +468,7 @@ impl Machine {
                 }
                 Ok(Value::List(Box::new(values)))
             }
-            Value::CODE_CALLABLE => {
+            ValueKind::Callable => {
                 let index = self.get_u32()? as usize;
                 let name = self.get_string()?;
                 // TODO: use leb128 at some point.
@@ -472,7 +480,7 @@ impl Machine {
                     start..end,
                 ))))
             }
-            Value::CODE_BUILTIN => {
+            ValueKind::Builtin => {
                 let index = self.get_u32()? as usize;
                 let name = self.get_string()?;
                 // TODO: use leb128 at some point.
@@ -484,15 +492,18 @@ impl Machine {
                     start..end,
                 ))))
             }
-            Value::CODE_SYMBOL => {
+            ValueKind::Symbol => {
                 let value = self.get_string()?;
                 Ok(Value::Symbol(Box::new(value)))
             }
-            Value::CODE_KEYWORD => {
+            ValueKind::Keyword => {
                 let value = self.get_string()?;
                 Ok(Value::Keyword(Box::new(value)))
             }
-            _ => Err(anyhow!("Unknown value `{}`", self.program[self.ip])),
+            ValueKind::Struct => {
+                let value_struct = self.get_struct()?;
+                Ok(Value::Struct(Box::new(value_struct)))
+            }
         }
     }
 
@@ -621,6 +632,28 @@ impl Machine {
 
         let span = self.get_span()?;
         Ok(CallFfi::new(lib, ffi_function_name, args, ret, span))
+    }
+
+    fn get_struct(&mut self) -> Result<Struct> {
+        let name = self.get_string()?;
+        let span = self.get_span()?;
+        let fields_len = self.get_u32()? as usize;
+        let mut field_names = Vec::new();
+        for _ in 0..fields_len {
+            let field_name = self.get_string()?;
+            field_names.push(field_name);
+        }
+        let mut field_values = Vec::new();
+        for _ in 0..fields_len {
+            let value = self.get_value()?;
+            field_values.push(value);
+        }
+        Ok(Struct {
+            name,
+            span,
+            field_names,
+            field_values,
+        })
     }
 
     pub(crate) fn get_current_frame(&self) -> Result<&Frame> {
@@ -924,6 +957,7 @@ impl Machine {
             // TODO: ERROR REPORT;
             anyhow::bail!("can not call '{}' type", value);
         };
+
         self.symbol_table.enter_scope(&callable.name);
         let mut param_values = {
             let frame = self.get_current_frame_mut()?;
@@ -1209,6 +1243,38 @@ impl Machine {
         frame.stack.push(ret_value);
         Ok(())
     }
+
+    fn instruction_struct_init(&mut self) -> Result<()> {
+        let metadata = self.get_metadata()?;
+        let frame = self.get_current_frame_mut()?;
+        let mut field_names = Vec::new();
+        let mut field_values = Vec::new();
+        for _ in 0..frame.args.len() / 2 {
+            let Some(value) = frame.args.pop() else {
+                // TODO: ERROR REPORTING
+                anyhow::bail!("no value on the stack for StructInit");
+            };
+            let Some(stack_value_name) = frame.args.pop() else {
+                // TODO: ERROR REPORTING
+                anyhow::bail!("no value on the stack for StructInit");
+            };
+            let Value::Keyword(value_name) = stack_value_name else {
+                // TODO: ERROR REPORTING
+                anyhow::bail!("expected keyword on the stack for StructInit");
+            };
+            field_names.push(value_name.to_string());
+            field_values.push(value);
+        }
+        let value_struct = Struct {
+            name: metadata.name.to_string(),
+            span: metadata.span,
+            field_names,
+            field_values,
+        };
+        let value = Value::Struct(Box::new(value_struct));
+        frame.stack.push(value);
+        Ok(())
+    }
 }
 
 // --------------------- Decompiler ---------------------
@@ -1293,6 +1359,10 @@ impl Machine {
                 OpCode::CallFfi => {
                     let call_ffi = self.get_call_ffi()?;
                     instructions.push(Instruction::CallFfi(call_ffi))
+                }
+                OpCode::StructInit => {
+                    let metadata = self.get_metadata()?;
+                    instructions.push(Instruction::StructInit(metadata))
                 }
             }
         }

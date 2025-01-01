@@ -1,15 +1,12 @@
-use crate::expr_walker::FfiBindExpr;
-use crate::instruction::{LoadLibrary, RuntimeMetadata};
-use crate::{compiler::CompilerOptions, expr_walker::SetExpr};
-
 use super::{
     ast::{Expr, Span, Spanned},
+    compiler::CompilerOptions,
     error::Error,
     expr_walker::{
-        AstWalker, CallExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr, LoopExpr,
-        OperatorExpr, QuoteExpr, TestExpr, VarExpr,
+        AstWalker, CallExpr, FfiBindExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr,
+        LoopExpr, OperatorExpr, QuoteExpr, SetExpr, StructExpr, TestExpr, VarExpr,
     },
-    instruction::{Callable, Instruction, Value},
+    instruction::{Callable, Instruction, LoadLibrary, RuntimeMetadata, Value},
     symbol_table::{
         Function, Lambda, Let, Parameter, Symbol, SymbolTable, Test, UnboundVariable, Variable,
     },
@@ -125,6 +122,9 @@ impl<'a> Emitter<'a> {
             }
             Symbol::Let(Let { .. }) => todo!("Let not implemented in emit_set_instruction"),
             Symbol::Test(Test { .. }) => todo!("Test not implemented in emit_set_instruction"),
+            Symbol::Struct(_) => {
+                todo!("Struct not implemented in emit_set_instruction")
+            }
         };
         program.push(instruction);
     }
@@ -518,6 +518,67 @@ impl AstWalker<Program> for Emitter<'_> {
         Self::emit_set_instruction(program, symbol);
     }
 
+    fn handle_struct(&mut self, program: &mut Program, struct_expr: &StructExpr) {
+        {
+            // ---- Generate the struct constructor ----
+            let index = program.len();
+            program.push(Instruction::Jump(usize::MAX));
+            let start = self.get_program_size(program);
+            let Expr::Symbol(name) = &struct_expr.name.expr else {
+                unreachable!("This should never fail as we already checked this in AstWalker");
+            };
+            let Some(type_symbol) = self.symbol_table.get(name) else {
+                unreachable!("This should never fail as we already checked this in AstWalker");
+            };
+            let constructor_name = format!("{}:new", name);
+            let Some(constructor_symbol) = self.symbol_table.get(&constructor_name) else {
+                unreachable!("This should never fail as we already checked this in AstWalker");
+            };
+            // ----
+            let type_metadata = RuntimeMetadata::new(type_symbol.id(), name, type_symbol.span());
+            let constructor_metadata = RuntimeMetadata::new(
+                constructor_symbol.id(),
+                &constructor_name,
+                constructor_symbol.span(),
+            );
+            program.push(Instruction::StructInit(type_metadata));
+            program.push(Instruction::Return);
+            let end = self.get_program_size(program);
+            let callable = Callable::new(start, constructor_name, constructor_symbol.span());
+            let value = Value::Callable(Box::new(callable));
+            program.push(Instruction::Push(Box::new(value)));
+            program.push(Instruction::SetGlobal(constructor_metadata));
+            program[index] = Instruction::Jump(end);
+            self.symbol_table.set_location(name, start..end);
+            // ---- END Generate the struct constructor ----
+        }
+        // ---- Generate the struct getter ----
+        {
+            // let index = program.len();
+            // program.push(Instruction::Jump(usize::MAX));
+            // let start = self.get_program_size(program);
+            // let Expr::Symbol(name) = &struct_expr.name.expr else {
+            //     unreachable!("This should never fail as we already checked this in AstWalker");
+            // };
+            //     // ----
+            //
+            //
+            //
+            //     // ----
+            // program.push(Instruction::Return);
+            // let end = self.get_program_size(program);
+            // let callable = Callable::new(start, name, symbol.span());
+            // let value = Value::Callable(Box::new(callable));
+            // program.push(Instruction::Push(Box::new(value)));
+            // program.push(Instruction::SetGlobal(metadata));
+            // program[index] = Instruction::Jump(end);
+            // self.symbol_table.set_location(name, start..end);
+        }
+        // ---- END Generate the struct getter ----
+        // ---- Generate the struct setter ----
+        // ---- END Generate the struct setter ----
+    }
+
     fn handle_ffi_bind(&mut self, program: &mut Program, ffi_bind_expr: &FfiBindExpr) {
         let Expr::Symbol(name) = &ffi_bind_expr.fn_symbol.1.expr else {
             unreachable!("This should never fail as we already checked this in SymbolTable");
@@ -677,13 +738,14 @@ impl AstWalker<Program> for Emitter<'_> {
         let metadata = RuntimeMetadata::new(symbol.id(), name, span);
         let instruction = match symbol {
             Symbol::UnboundVariable(UnboundVariable { .. }) => GetFree(metadata),
-            Symbol::Variable(Variable { .. }) if symbol.is_global() => GetGlobal(metadata),
-            Symbol::Variable(Variable { .. }) => GetLocal(metadata),
-            Symbol::Parameter(Parameter { .. }) => GetLocal(metadata),
-            Symbol::Function(Function { .. }) => GetGlobal(metadata),
-            Symbol::Lambda(Lambda { .. }) => todo!("Lambdas are not supported yet in symbol"),
-            Symbol::Let(Let { .. }) => todo!("Lets are not supported yet in symbol"),
-            Symbol::Test(Test { .. }) => todo!("Tests are not supported yet in symbol"),
+            Symbol::Variable(_) if symbol.is_global() => GetGlobal(metadata),
+            Symbol::Variable(_) => GetLocal(metadata),
+            Symbol::Parameter(_) => GetLocal(metadata),
+            Symbol::Function(_) => GetGlobal(metadata),
+            Symbol::Lambda(_) => todo!("Lambdas are not supported yet in symbol"),
+            Symbol::Let(_) => todo!("Lets are not supported yet in symbol"),
+            Symbol::Test(_) => todo!("Tests are not supported yet in symbol"),
+            Symbol::Struct(_) => GetGlobal(metadata),
         };
         program.push(instruction);
     }
