@@ -162,7 +162,8 @@
   (let
     ((grid (append (my-map (lambda (x) 0) (range 119)) (list 1)))
     (is-running true))
-    (loop (and is-running (< i 10_000))
+    (loop (and is-running (< i 10))
       (set i (+ i 1))
       (set grid (next-generation grid))
-      (set line (print (join "" (my-map (lambda (x) (if (= x 1) "*" " ")) grid)) "\n")))))
+      (set line (join "" (my-map (lambda (x) (if (= x 1) "*" " ")) grid)))
+      (print line "\n"))))

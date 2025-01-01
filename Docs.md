@@ -161,7 +161,7 @@
 ```
 
 ### and
-- returns true if all the arguments are true
+- returns `Nil`
 - arguments type: `Bool`
 - example:
 ```lisp
@@ -465,6 +465,40 @@
 (slice (list 1 2 3) 1 2) ; -> (2)
 ```
 
+### ffi-bind
+- creates a binding to a dll/so file
+- example:
+```lisp
+(ffi-bind
+   :libname "./libname.so"
+   :symbol "function_name_in_lib"
+   :fn name-you-want-to-bind-to
+   :args (int float string)
+   :return int)
+
+(ffi-bind
+   :libname "./libname.so"
+   :symbol "function_name_in_lib"
+   :struct Foo
+   :fields (:baz int :bar int)
+
+
+(fn main ()
+   (var foo (Foo :baz 10 :bar 20))
+   (name-you-want-to-bind-to 10 20.0 "hello"))
+```
+
+### struct
+- creates a struct type with getters and setters
+- example:
+```lisp
+(struct Person :name string :age int)
+
+(fn main ()
+   (var person (Person :name "John" :age 20))
+   (Person:set person :name "John Doe")
+   (var name (Person:get person :name)))
+```
 
 
 ## Adding Help message to function

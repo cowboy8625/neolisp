@@ -83,4 +83,6 @@ fn test_load_doc() {
     assert!(doc.contains_key("filter"));
     assert!(doc.contains_key("assert"));
     assert!(doc.contains_key("number?"));
+    assert!(doc.contains_key("ffi-bind"));
+    assert!(doc.contains_key("struct"));
 }

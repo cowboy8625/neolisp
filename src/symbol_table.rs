@@ -583,6 +583,66 @@ impl SymbolTableBuilder {
         );
         table.push(struct_function_new);
     }
+
+    fn struct_create_setter(&mut self, table: &mut SymbolTable, struct_symbol: &Struct) {
+        self.variable_save_state();
+        let mut struct_function_new_params = Vec::new();
+        for (name, param) in struct_symbol
+            .field_names
+            .iter()
+            .zip(struct_symbol.field_values.iter())
+        {
+            let param_name = Parameter::new(
+                self.variable_id(),
+                name,
+                param.span.clone(),
+                table.scope_level(),
+            );
+            struct_function_new_params.push(param_name);
+            struct_function_new_params.push(param.clone());
+        }
+        self.variable_restore_state();
+
+        let struct_function_new = Function::new(
+            self.variable_id(),
+            format!("{}:set", struct_symbol.name),
+            struct_symbol.span.clone(),
+            struct_function_new_params,
+            table.scope_level(),
+            false,
+        );
+        table.push(struct_function_new);
+    }
+
+    fn struct_create_getter(&mut self, table: &mut SymbolTable, struct_symbol: &Struct) {
+        self.variable_save_state();
+        let mut struct_function_new_params = Vec::new();
+        for (name, param) in struct_symbol
+            .field_names
+            .iter()
+            .zip(struct_symbol.field_values.iter())
+        {
+            let param_name = Parameter::new(
+                self.variable_id(),
+                name,
+                param.span.clone(),
+                table.scope_level(),
+            );
+            struct_function_new_params.push(param_name);
+            struct_function_new_params.push(param.clone());
+        }
+        self.variable_restore_state();
+
+        let struct_function_new = Function::new(
+            self.variable_id(),
+            format!("{}:get", struct_symbol.name),
+            struct_symbol.span.clone(),
+            struct_function_new_params,
+            table.scope_level(),
+            false,
+        );
+        table.push(struct_function_new);
+    }
 }
 
 impl AstWalker<SymbolTable> for SymbolTableBuilder {
@@ -1010,6 +1070,8 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
             location: None,
         };
         self.struct_create_constructor(table, &struct_symbol);
+        self.struct_create_setter(table, &struct_symbol);
+        self.struct_create_getter(table, &struct_symbol);
 
         table.push(struct_symbol);
     }

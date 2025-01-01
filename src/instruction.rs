@@ -1,3 +1,5 @@
+use std::{cell::RefCell, rc::Rc};
+
 use super::ast::Span;
 use crate::symbol_table::Type;
 use num_derive::{FromPrimitive, ToPrimitive};
@@ -39,6 +41,8 @@ pub enum OpCode {
     LoadLibrary,
     CallFfi,
     StructInit,
+    StructSet,
+    StructGet,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -77,6 +81,8 @@ pub enum Instruction {
     LoadLibrary(LoadLibrary),
     CallFfi(CallFfi),
     StructInit(RuntimeMetadata),
+    StructSet(RuntimeMetadata),
+    StructGet(RuntimeMetadata),
 }
 
 impl Instruction {
@@ -116,6 +122,8 @@ impl Instruction {
             Self::LoadLibrary(lib) => 1 + lib.size(),
             Self::CallFfi(call) => 1 + call.size(),
             Self::StructInit(md) => 1 + md.size(),
+            Self::StructSet(md) => 1 + md.size(),
+            Self::StructGet(md) => 1 + md.size(),
         }
     }
 
@@ -155,6 +163,8 @@ impl Instruction {
             Self::LoadLibrary(..) => OpCode::LoadLibrary,
             Self::CallFfi(..) => OpCode::CallFfi,
             Self::StructInit(..) => OpCode::StructInit,
+            Self::StructSet(..) => OpCode::StructSet,
+            Self::StructGet(..) => OpCode::StructGet,
         }
     }
 
@@ -215,6 +225,14 @@ impl Instruction {
                 bytes.push(self.opcode() as u8);
                 bytes.extend(&md.to_bytecode());
             }
+            Self::StructSet(md) => {
+                bytes.push(self.opcode() as u8);
+                bytes.extend(&md.to_bytecode());
+            }
+            Self::StructGet(md) => {
+                bytes.push(self.opcode() as u8);
+                bytes.extend(&md.to_bytecode());
+            }
         }
 
         bytes
@@ -265,6 +283,8 @@ impl std::fmt::Display for Instruction {
             Self::LoadLibrary(lib) => write!(f, "{:<10} {lib}", "load-library"),
             Self::CallFfi(call) => write!(f, "{:<10} {call}", "call-ffi"),
             Self::StructInit(md) => write!(f, "{:<10} {md}", "struct-init"),
+            Self::StructSet(md) => write!(f, "{:<10} {md}", "struct-set"),
+            Self::StructGet(md) => write!(f, "{:<10} {md}", "struct-get"),
         }
     }
 }
@@ -572,7 +592,7 @@ pub enum Value {
     Builtin(Box<Callable>),
     Symbol(Box<String>),
     Keyword(Box<String>),
-    Struct(Box<Struct>),
+    Struct(Rc<RefCell<Struct>>),
 }
 
 impl Value {
@@ -660,7 +680,7 @@ impl Value {
             }
             Value::Struct(v) => {
                 let mut bytes = vec![ValueKind::Struct as u8];
-                let struct_bytes = v.to_bytecode();
+                let struct_bytes = v.borrow().to_bytecode();
                 bytes.extend(struct_bytes);
                 bytes
             }
@@ -684,7 +704,7 @@ impl Value {
             Value::Builtin(callable) => callable.size(),
             Value::Symbol(v) => 4 + v.len(),
             Value::Keyword(v) => 4 + v.len(),
-            Value::Struct(v) => v.size(),
+            Value::Struct(v) => v.borrow().size(),
         };
         // opcode + content
         1 + conent_size
@@ -705,7 +725,7 @@ impl Value {
             Self::Builtin(_) => "Builtin".to_string(),
             Self::Symbol(_) => "Symbol".to_string(),
             Self::Keyword(_) => "Keyword".to_string(),
-            Self::Struct(data) => data.name.clone(),
+            Self::Struct(data) => data.borrow().name.clone(),
         }
     }
 
@@ -744,9 +764,19 @@ impl std::fmt::Display for Value {
             Self::Symbol(value) => write!(f, "{value}"),
             Self::Keyword(value) => write!(f, "{value}"),
             Self::Struct(data) => {
-                write!(f, "({} ", data.name)?;
-                for (name, value) in data.field_names.iter().zip(data.field_values.iter()) {
-                    write!(f, "{} {},", name, value)?;
+                write!(f, "({} ", data.borrow().name)?;
+                for (i, (name, value)) in data
+                    .borrow()
+                    .field_names
+                    .iter()
+                    .zip(data.borrow().field_values.iter())
+                    .enumerate()
+                {
+                    if i == data.borrow().field_names.len() - 1 {
+                        write!(f, "{} {}", name, value)?;
+                        continue;
+                    }
+                    write!(f, "{} {} ", name, value)?;
                 }
                 write!(f, ")")
             }

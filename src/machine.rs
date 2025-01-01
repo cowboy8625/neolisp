@@ -1,6 +1,8 @@
 use std::{
+    cell::RefCell,
     collections::HashMap,
     ffi::{c_char, CStr, CString},
+    rc::Rc,
 };
 
 use super::{
@@ -55,7 +57,7 @@ macro_rules! generate_instruction_operator {
     };
 }
 
-const INSTRUCTION_CALL: [fn(&mut Machine) -> Result<()>; 34] = [
+const INSTRUCTION_CALL: [fn(&mut Machine) -> Result<()>; 36] = [
     Machine::instruction_halt,
     Machine::instruction_return,
     Machine::instruction_return_from_test,
@@ -90,6 +92,8 @@ const INSTRUCTION_CALL: [fn(&mut Machine) -> Result<()>; 34] = [
     Machine::instruction_load_library,
     Machine::instruction_call_ffi,
     Machine::instruction_struct_init,
+    Machine::instruction_struct_setter,
+    Machine::instruction_struct_getter,
 ];
 
 const INTRISICS: [fn(&mut Machine, u8) -> Result<()>; 24] = [
@@ -502,7 +506,7 @@ impl Machine {
             }
             ValueKind::Struct => {
                 let value_struct = self.get_struct()?;
-                Ok(Value::Struct(Box::new(value_struct)))
+                Ok(Value::Struct(Rc::new(RefCell::new(value_struct))))
             }
         }
     }
@@ -683,14 +687,17 @@ impl Machine {
 
         let value = {
             let frame = self.get_current_frame_mut()?;
-            let Some(value) = frame.stack.pop() else {
-                // TODO: ERROR REPORTING
-                anyhow::bail!("missing return value on stack");
+            let value = match frame.stack.pop() {
+                Some(value) => value,
+                None => Value::Nil,
             };
             self.ip = frame.return_address;
             value
         };
         self.stack.pop();
+        if let Value::Nil = value {
+            return Ok(());
+        }
         let frame = self.get_current_frame_mut()?;
         frame.stack.push(value);
         Ok(())
@@ -707,9 +714,9 @@ impl Machine {
         self.symbol_table.exit_scope();
         let value = {
             let frame = self.get_current_frame_mut()?;
-            let Some(value) = frame.stack.pop() else {
-                // TODO: ERROR REPORTING
-                anyhow::bail!("missing return value on stack");
+            let value = match frame.stack.pop() {
+                Some(value) => value,
+                None => Value::Nil,
             };
             self.ip = frame.return_address;
             value
@@ -1271,7 +1278,81 @@ impl Machine {
             field_names,
             field_values,
         };
-        let value = Value::Struct(Box::new(value_struct));
+        let value = Value::Struct(Rc::new(RefCell::new(value_struct)));
+        frame.stack.push(value);
+        Ok(())
+    }
+    fn instruction_struct_setter(&mut self) -> Result<()> {
+        let metatadata = self.get_metadata()?;
+        let frame = self.get_current_frame_mut()?;
+        let Some(value) = frame.args.pop() else {
+            // TODO: ERROR REPORTING
+            anyhow::bail!("no value on the stack for StructSetter");
+        };
+        let Some(Value::Keyword(name)) = frame.args.pop() else {
+            // TODO: ERROR REPORTING
+            anyhow::bail!("no value on the stack for StructSetter");
+        };
+        let Some(Value::Struct(struct_value)) = frame.args.pop() else {
+            // TODO: ERROR REPORTING
+            anyhow::bail!("no value on the stack for StructSetter");
+        };
+        if struct_value.borrow().name != *metatadata.name {
+            // TODO: ERROR REPORTING
+            anyhow::bail!(
+                "miss match struct setter function called on struct '{}' with '{}'",
+                metatadata.name,
+                struct_value.borrow().name,
+            );
+        }
+        let Some(index) = struct_value
+            .borrow()
+            .field_names
+            .iter()
+            .position(|x| x == &*name)
+        else {
+            // TODO: ERROR REPORTING
+            anyhow::bail!(
+                "no value named '{name}' in struct '{}' found",
+                struct_value.borrow().name
+            );
+        };
+        struct_value.borrow_mut().field_values[index] = value;
+        frame.stack.push(Value::Nil);
+        Ok(())
+    }
+    fn instruction_struct_getter(&mut self) -> Result<()> {
+        let metatadata = self.get_metadata()?;
+        let frame = self.get_current_frame_mut()?;
+        let Some(Value::Keyword(name)) = frame.args.pop() else {
+            // TODO: ERROR REPORTING
+            anyhow::bail!("no value on the stack for StructSetter");
+        };
+        let Some(Value::Struct(struct_value)) = frame.args.pop() else {
+            // TODO: ERROR REPORTING
+            anyhow::bail!("no value on the stack for StructSetter");
+        };
+        if struct_value.borrow().name != *metatadata.name {
+            // TODO: ERROR REPORTING
+            anyhow::bail!(
+                "miss match struct getter function called on struct '{}' with '{}'",
+                metatadata.name,
+                struct_value.borrow().name,
+            );
+        }
+        let Some(index) = struct_value
+            .borrow()
+            .field_names
+            .iter()
+            .position(|x| x == &*name)
+        else {
+            // TODO: ERROR REPORTING
+            anyhow::bail!(
+                "no value named '{name}' in struct '{}' found",
+                struct_value.borrow().name
+            );
+        };
+        let value = struct_value.borrow().field_values[index].clone();
         frame.stack.push(value);
         Ok(())
     }
@@ -1363,6 +1444,14 @@ impl Machine {
                 OpCode::StructInit => {
                     let metadata = self.get_metadata()?;
                     instructions.push(Instruction::StructInit(metadata))
+                }
+                OpCode::StructSet => {
+                    let metadata = self.get_metadata()?;
+                    instructions.push(Instruction::StructSet(metadata))
+                }
+                OpCode::StructGet => {
+                    let metadata = self.get_metadata()?;
+                    instructions.push(Instruction::StructGet(metadata))
                 }
             }
         }

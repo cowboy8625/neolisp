@@ -811,12 +811,11 @@ impl Function {
         for arg in frame.args.iter() {
             write!(&mut output, "{}", arg).expect("write failed");
         }
-        if let Some(arg) = frame.args.first() {
-            frame.stack.push(arg.clone());
-        }
+
         writer.write_all(output.as_bytes())?;
         writer.flush()?;
 
+        frame.stack.push(Value::Nil);
         Ok(())
     }
 

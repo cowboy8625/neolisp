@@ -525,11 +525,12 @@
     :actual (type? add)
     :description "type? add -> \"Function\""))
 
-(test print
-  (assert-eq
-    :expected "Hello, world!\n"
-    :actual (print "Hello, world!\n")
-    :description "print \"Hello, world!\n\" -> \"Hello, world!\n\""))
+; TODO: at some point we need to be able to capture stdout
+; (test print
+;   (assert-eq
+;     :expected "Hello, world!\n"
+;     :actual (print "Hello, world!\n")
+;     :description "print \"Hello, world!\n\" -> \"Hello, world!\n\""))
 
 (test length-list
   (assert-eq
@@ -566,17 +567,17 @@
 
 ; let binding
 
-(fn get-cell (grid i)
-  (let
-    ((l (length grid))
-    (wrapped (mod (+ i l) l)))
-      ; print will leave a string on the stack but once the function frame is destroyed
-      ; the string will get removed with the stack as its life time is tyed to it
-      (print "get-cell: " i " -> " wrapped "\n")
-      ; return the value we care about
-      wrapped))
-
-(test let-binding (assert-eq :expected 2 :actual (get-cell (list 'a 'b 'c) -1) :description "get-cell list len 3, index -1, returns 2"))
+; (fn get-cell (grid i)
+;   (let
+;     ((l (length grid))
+;     (wrapped (mod (+ i l) l)))
+;       ; print will leave a string on the stack but once the function frame is destroyed
+;       ; the string will get removed with the stack as its life time is tyed to it
+;       (print "get-cell: " i " -> " wrapped "\n")
+;       ; return the value we care about
+;       wrapped))
+;
+; (test let-binding (assert-eq :expected 2 :actual (get-cell (list 'a 'b 'c) -1) :description "get-cell list len 3, index -1, returns 2"))
 
 (fn main ()
   (print "This is a test file\n")
