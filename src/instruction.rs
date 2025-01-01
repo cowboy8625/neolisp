@@ -276,6 +276,16 @@ pub struct RuntimeMetadata {
     pub span: Span,
 }
 
+impl From<&crate::symbol_table::Struct> for RuntimeMetadata {
+    fn from(value: &crate::symbol_table::Struct) -> Self {
+        Self {
+            data: value.id,
+            name: Box::new(value.name.to_string()),
+            span: value.span.clone(),
+        }
+    }
+}
+
 impl RuntimeMetadata {
     pub fn new(data: usize, name: impl Into<String>, span: Span) -> Self {
         Self {

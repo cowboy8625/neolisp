@@ -176,6 +176,36 @@ impl<'a> Emitter<'a> {
         }
         Ok(())
     }
+
+    fn emit_struct_constructor(&mut self, program: &mut Program, name: &str) {
+        let Some(Symbol::Struct(type_symbol)) = self.symbol_table.get(name) else {
+            unreachable!("This should never fail as we already checked this in AstWalker");
+        };
+
+        let index = program.len();
+        program.push(Instruction::Jump(usize::MAX));
+        // ----
+        let start = self.get_program_size(program);
+        let constructor_name = format!("{}:new", type_symbol.name);
+        let Some(constructor_symbol) = self.symbol_table.get(&constructor_name) else {
+            unreachable!("This should never fail as we already checked this in AstWalker");
+        };
+        let type_metadata = RuntimeMetadata::from(type_symbol);
+        let constructor_metadata = RuntimeMetadata::new(
+            constructor_symbol.id(),
+            &constructor_name,
+            constructor_symbol.span(),
+        );
+        program.push(Instruction::StructInit(type_metadata));
+        program.push(Instruction::Return);
+        let end = self.get_program_size(program);
+        let callable = Callable::new(start, constructor_name, constructor_symbol.span());
+        let value = Value::Callable(Box::new(callable));
+        program.push(Instruction::Push(Box::new(value)));
+        program.push(Instruction::SetGlobal(constructor_metadata));
+        program[index] = Instruction::Jump(end);
+        self.symbol_table.set_location(name, start..end);
+    }
 }
 
 impl AstWalker<Program> for Emitter<'_> {
@@ -519,39 +549,10 @@ impl AstWalker<Program> for Emitter<'_> {
     }
 
     fn handle_struct(&mut self, program: &mut Program, struct_expr: &StructExpr) {
-        {
-            // ---- Generate the struct constructor ----
-            let index = program.len();
-            program.push(Instruction::Jump(usize::MAX));
-            let start = self.get_program_size(program);
-            let Expr::Symbol(name) = &struct_expr.name.expr else {
-                unreachable!("This should never fail as we already checked this in AstWalker");
-            };
-            let Some(type_symbol) = self.symbol_table.get(name) else {
-                unreachable!("This should never fail as we already checked this in AstWalker");
-            };
-            let constructor_name = format!("{}:new", name);
-            let Some(constructor_symbol) = self.symbol_table.get(&constructor_name) else {
-                unreachable!("This should never fail as we already checked this in AstWalker");
-            };
-            // ----
-            let type_metadata = RuntimeMetadata::new(type_symbol.id(), name, type_symbol.span());
-            let constructor_metadata = RuntimeMetadata::new(
-                constructor_symbol.id(),
-                &constructor_name,
-                constructor_symbol.span(),
-            );
-            program.push(Instruction::StructInit(type_metadata));
-            program.push(Instruction::Return);
-            let end = self.get_program_size(program);
-            let callable = Callable::new(start, constructor_name, constructor_symbol.span());
-            let value = Value::Callable(Box::new(callable));
-            program.push(Instruction::Push(Box::new(value)));
-            program.push(Instruction::SetGlobal(constructor_metadata));
-            program[index] = Instruction::Jump(end);
-            self.symbol_table.set_location(name, start..end);
-            // ---- END Generate the struct constructor ----
-        }
+        let Expr::Symbol(name) = &struct_expr.name.expr else {
+            unreachable!("This should never fail as we already checked this in AstWalker");
+        };
+        self.emit_struct_constructor(program, name);
         // ---- Generate the struct getter ----
         {
             // let index = program.len();

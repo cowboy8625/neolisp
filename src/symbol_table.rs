@@ -515,6 +515,7 @@ pub struct SymbolTableBuilder {
     lambda_counter: usize,
     unbound_counter: usize,
     variable_counter: usize,
+    variable_last_counter: usize,
     errors: Vec<Error>,
     options: CompilerOptions,
 }
@@ -543,6 +544,44 @@ impl SymbolTableBuilder {
         let id = self.variable_counter;
         self.variable_counter += 1;
         id
+    }
+
+    fn variable_save_state(&mut self) {
+        self.variable_last_counter = self.variable_counter;
+    }
+
+    fn variable_restore_state(&mut self) {
+        self.variable_counter = self.variable_last_counter;
+    }
+
+    fn struct_create_constructor(&mut self, table: &mut SymbolTable, struct_symbol: &Struct) {
+        self.variable_save_state();
+        let mut struct_function_new_params = Vec::new();
+        for (name, param) in struct_symbol
+            .field_names
+            .iter()
+            .zip(struct_symbol.field_values.iter())
+        {
+            let param_name = Parameter::new(
+                self.variable_id(),
+                name,
+                param.span.clone(),
+                table.scope_level(),
+            );
+            struct_function_new_params.push(param_name);
+            struct_function_new_params.push(param.clone());
+        }
+        self.variable_restore_state();
+
+        let struct_function_new = Function::new(
+            self.variable_id(),
+            format!("{}:new", struct_symbol.name),
+            struct_symbol.span.clone(),
+            struct_function_new_params,
+            table.scope_level(),
+            false,
+        );
+        table.push(struct_function_new);
     }
 }
 
@@ -970,37 +1009,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
             scope_level: table.scope_level(),
             location: None,
         };
-
-        // --- Generate struct constructor
-        let old_variable_counter = self.variable_counter;
-        self.variable_counter = 0;
-        let mut struct_function_new_params = Vec::new();
-        for (name, param) in struct_symbol
-            .field_names
-            .iter()
-            .zip(struct_symbol.field_values.iter())
-        {
-            let param_name = Parameter::new(
-                self.variable_id(),
-                name,
-                param.span.clone(),
-                table.scope_level(),
-            );
-            struct_function_new_params.push(param_name);
-            struct_function_new_params.push(param.clone());
-        }
-        self.variable_counter = old_variable_counter;
-
-        let struct_function_new = Function::new(
-            self.variable_id(),
-            format!("{}:new", name),
-            struct_expr.span.clone(),
-            struct_function_new_params,
-            table.scope_level(),
-            false,
-        );
-        table.push(struct_function_new);
-        // --- END Generate struct constructor
+        self.struct_create_constructor(table, &struct_symbol);
 
         table.push(struct_symbol);
     }
