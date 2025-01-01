@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::{
     ast::{Expr, Span, Spanned},
     error::Error,
@@ -128,7 +130,29 @@ pub struct QuoteExpr<'a> {
 }
 
 #[derive(Debug)]
-pub struct FfiBindExpr<'a> {
+pub struct FfiBindFnExpr<'a> {
+    /// ffi-bind keyword
+    pub name: &'a Spanned<Expr>,
+    /// library name symbol is in
+    /// :library "libname"
+    pub lib: &'a Spanned<Expr>,
+    /// symbol name in the library
+    /// :symbol "symbolname"
+    pub symbol: &'a Spanned<Expr>,
+    /// name of function in source code aka neolisp
+    /// :fn 'function-name-in-source
+    pub fn_symbol: &'a Spanned<Expr>,
+    /// arguments to the function in library
+    /// :args '(int int)
+    pub args: &'a Spanned<Expr>,
+    /// return type of the function
+    /// :return 'int
+    pub return_type: &'a Spanned<Expr>,
+    pub span: Span,
+}
+
+#[derive(Debug)]
+pub struct FfiBindStructExpr<'a> {
     /// ffi-bind keyword
     pub name: &'a Spanned<Expr>,
     /// library name symbol is in
@@ -137,15 +161,12 @@ pub struct FfiBindExpr<'a> {
     /// symbol name in the library
     /// :symbol "symbolname"
     pub symbol: (&'a Spanned<Expr>, &'a Spanned<Expr>),
+    /// name of function in source code aka neolisp
+    /// :struct 'struct-name-in-source
+    pub struct_symbol: (&'a Spanned<Expr>, &'a Spanned<Expr>),
     /// arguments to the function in library
     /// :args '(int int)
-    pub args: (&'a Spanned<Expr>, &'a Spanned<Expr>),
-    /// return type of the function
-    /// :return 'int
-    pub return_type: (&'a Spanned<Expr>, &'a Spanned<Expr>),
-    /// name of function in source code aka neolisp
-    /// :fn 'function-name-in-source
-    pub fn_symbol: (&'a Spanned<Expr>, &'a Spanned<Expr>),
+    pub fields: &'a [(&'a Spanned<Expr>, &'a Spanned<Expr>)],
     pub span: Span,
 }
 
@@ -180,7 +201,7 @@ pub trait AstWalker<T> {
     fn handle_number(&mut self, _: &mut T, _: f64);
     fn handle_symbol(&mut self, _: &mut T, _: &str, _: Span);
     fn handle_quote(&mut self, _: &mut T, _: &QuoteExpr);
-    fn handle_ffi_bind(&mut self, _: &mut T, _: &FfiBindExpr);
+    fn handle_ffi_bind_fn(&mut self, _: &mut T, _: &FfiBindFnExpr);
     fn handle_struct(&mut self, _: &mut T, _: &StructExpr);
     fn handle_keyword(&mut self, _: &mut T, _: &str, _: Span);
 
@@ -294,28 +315,36 @@ pub trait AstWalker<T> {
     }
 
     fn walk_ffi_bind(&mut self, t: &mut T, elements: &[Spanned<Expr>], span: Span) {
-        // NOTE: This is hard coding the structure of the ffi-bind expression
-        // This makes it easier to parse but not as flexible in user land.
-        const FFI_BIND_NAME: usize = 0;
-        const LIB_KEYWORD: usize = FFI_BIND_NAME + 1;
-        const LIB_VALUE: usize = LIB_KEYWORD + 1;
-        const SYMBOL_KEYWORD: usize = LIB_VALUE + 1;
-        const SYMBOL_VALUE: usize = SYMBOL_KEYWORD + 1;
-        const FN_KEYWORD: usize = SYMBOL_VALUE + 1;
-        const FN_VALUE: usize = FN_KEYWORD + 1;
-        const ARGS_KEYWORD: usize = FN_VALUE + 1;
-        const ARGS_VALUE: usize = ARGS_KEYWORD + 1;
-        const RET_KEYWORD: usize = ARGS_VALUE + 1;
-        const RET_VALUE: usize = RET_KEYWORD + 1;
         const HELP : &str = "(ffi-bind :library <string> :symbol <string>  :fn <symbol> <args> '(<symbol>) :return <symbol>)";
-
-        let Some(name) = elements.get(FFI_BIND_NAME) else {
-            unreachable!("checked before walk_ffi_bind was called");
-        };
-
-        let Some(lib_keyword) = elements.get(LIB_KEYWORD) else {
+        let mut items = HashMap::new();
+        let mut element_iters = elements.iter().skip(1);
+        while let Some(ele) = element_iters.next() {
+            let Expr::Symbol(symbol) = &ele.expr else {
+                self.error(Error::ExpectedFound {
+                    span: ele.span.clone(),
+                    expected: "Symbol".to_string(),
+                    found: ele.expr.type_of(),
+                    note: None,
+                    help: Some(HELP.to_string()),
+                });
+                return;
+            };
+            let Some(value) = element_iters.next() else {
+                self.error(Error::ExpectedFound {
+                    span: ele.span.clone(),
+                    expected: "Value".to_string(),
+                    found: ele.expr.type_of(),
+                    note: None,
+                    help: Some(HELP.to_string()),
+                });
+                return;
+            };
+            items.insert(symbol, value);
+        }
+        #[allow(clippy::unnecessary_to_owned)]
+        let Some(lib) = items.get(&":library".to_string()) else {
             self.error(Error::ExpectedFound {
-                span: name.span.clone(),
+                span: span.clone(),
                 expected: ":library".to_string(),
                 found: "nothing".to_string(),
                 note: None,
@@ -323,21 +352,10 @@ pub trait AstWalker<T> {
             });
             return;
         };
-
-        let Some(lib_value) = elements.get(LIB_VALUE) else {
+        #[allow(clippy::unnecessary_to_owned)]
+        let Some(symbol) = items.get(&":symbol".to_string()) else {
             self.error(Error::ExpectedFound {
-                span: lib_keyword.span.clone(),
-                expected: "library name".to_string(),
-                found: "nothing".to_string(),
-                note: None,
-                help: Some(HELP.to_string()),
-            });
-            return;
-        };
-
-        let Some(symbol_keyword) = elements.get(SYMBOL_KEYWORD) else {
-            self.error(Error::ExpectedFound {
-                span: lib_value.span.clone(),
+                span: span.clone(),
                 expected: ":symbol".to_string(),
                 found: "nothing".to_string(),
                 note: None,
@@ -345,21 +363,10 @@ pub trait AstWalker<T> {
             });
             return;
         };
-
-        let Some(symbol_value) = elements.get(SYMBOL_VALUE) else {
+        #[allow(clippy::unnecessary_to_owned)]
+        let Some(fn_symbol) = items.get(&":fn".to_string()) else {
             self.error(Error::ExpectedFound {
-                span: symbol_keyword.span.clone(),
-                expected: "symbol name".to_string(),
-                found: "nothing".to_string(),
-                note: None,
-                help: Some(HELP.to_string()),
-            });
-            return;
-        };
-
-        let Some(fn_keyword) = elements.get(FN_KEYWORD) else {
-            self.error(Error::ExpectedFound {
-                span: symbol_value.span.clone(),
+                span: span.clone(),
                 expected: ":fn".to_string(),
                 found: "nothing".to_string(),
                 note: None,
@@ -367,21 +374,21 @@ pub trait AstWalker<T> {
             });
             return;
         };
-
-        let Some(fn_value) = elements.get(FN_VALUE) else {
+        #[allow(clippy::unnecessary_to_owned)]
+        let Some(args) = items.get(&":args".to_string()) else {
             self.error(Error::ExpectedFound {
-                span: fn_keyword.span.clone(),
-                expected: "function name".to_string(),
+                span: span.clone(),
+                expected: ":args".to_string(),
                 found: "nothing".to_string(),
                 note: None,
                 help: Some(HELP.to_string()),
             });
             return;
         };
-
-        let Some(args_keyword) = elements.get(ARGS_KEYWORD) else {
+        #[allow(clippy::unnecessary_to_owned)]
+        let Some(return_type) = items.get(&":return".to_string()) else {
             self.error(Error::ExpectedFound {
-                span: fn_value.span.clone(),
+                span: span.clone(),
                 expected: ":args".to_string(),
                 found: "nothing".to_string(),
                 note: None,
@@ -390,50 +397,16 @@ pub trait AstWalker<T> {
             return;
         };
 
-        let Some(args_value) = elements.get(ARGS_VALUE) else {
-            self.error(Error::ExpectedFound {
-                span: args_keyword.span.clone(),
-                expected: "arguments".to_string(),
-                found: "nothing".to_string(),
-                note: None,
-                help: Some(HELP.to_string()),
-            });
-            return;
-        };
-
-        let Some(ret_keyword) = elements.get(RET_KEYWORD) else {
-            self.error(Error::ExpectedFound {
-                span: args_value.span.clone(),
-                expected: ":return".to_string(),
-                found: "nothing".to_string(),
-                note: None,
-                help: Some(HELP.to_string()),
-            });
-            return;
-        };
-
-        let Some(ret_value) = elements.get(RET_VALUE) else {
-            self.error(Error::ExpectedFound {
-                span: ret_keyword.span.clone(),
-                expected: "return type".to_string(),
-                found: "nothing".to_string(),
-                note: None,
-                help: Some(HELP.to_string()),
-            });
-            return;
-        };
-
-        let ffi_bind_expr = FfiBindExpr {
-            name,
-            lib: (lib_keyword, lib_value),
-            symbol: (symbol_keyword, symbol_value),
-            fn_symbol: (fn_keyword, fn_value),
-            args: (args_keyword, args_value),
-            return_type: (ret_keyword, ret_value),
+        let ffi_bind_expr = FfiBindFnExpr {
+            name: elements.first().unwrap(),
+            lib,
+            symbol,
+            fn_symbol,
+            args,
+            return_type,
             span,
         };
-
-        self.handle_ffi_bind(t, &ffi_bind_expr);
+        self.handle_ffi_bind_fn(t, &ffi_bind_expr);
     }
 
     fn walk_quote(&mut self, t: &mut T, elements: &[Spanned<Expr>], span: Span) {

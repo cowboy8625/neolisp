@@ -3,7 +3,7 @@ use super::{
     compiler::CompilerOptions,
     error::Error,
     expr_walker::{
-        AstWalker, CallExpr, FfiBindExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr,
+        AstWalker, CallExpr, FfiBindFnExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr,
         LoopExpr, OperatorExpr, QuoteExpr, SetExpr, StructExpr, TestExpr, VarExpr,
     },
     instruction::{Callable, Instruction, LoadLibrary, RuntimeMetadata, Value},
@@ -620,8 +620,8 @@ impl AstWalker<Program> for Emitter<'_> {
         self.emit_struct_getter(program, name);
     }
 
-    fn handle_ffi_bind(&mut self, program: &mut Program, ffi_bind_expr: &FfiBindExpr) {
-        let Expr::Symbol(name) = &ffi_bind_expr.fn_symbol.1.expr else {
+    fn handle_ffi_bind_fn(&mut self, program: &mut Program, ffi_bind_expr: &FfiBindFnExpr) {
+        let Expr::Symbol(name) = &ffi_bind_expr.fn_symbol.expr else {
             unreachable!("This should never fail as we already checked this in SymbolTable");
         };
         // This is the function name in code
@@ -633,23 +633,23 @@ impl AstWalker<Program> for Emitter<'_> {
             unreachable!("This should never fail as we already checked this in SymbolTable");
         };
 
-        let Expr::String(lib_name) = &ffi_bind_expr.lib.1.expr else {
+        let Expr::String(lib_name) = &ffi_bind_expr.lib.expr else {
             unreachable!(
                 "This should never fail as we already checked this in SymbolTable {:?}",
-                ffi_bind_expr.lib.1.expr
+                ffi_bind_expr.lib.expr
             );
         };
-        let load_library = LoadLibrary::new(lib_name.clone(), ffi_bind_expr.lib.0.span.clone());
+        let load_library = LoadLibrary::new(lib_name.clone(), ffi_bind_expr.lib.span.clone());
         program.push(Instruction::LoadLibrary(load_library));
 
         program.push(Instruction::Jump(usize::MAX));
         let index = program.len() - 1;
         let start = self.get_program_size(program);
 
-        let Expr::String(ffi_function_name) = &ffi_bind_expr.symbol.1.expr else {
+        let Expr::String(ffi_function_name) = &ffi_bind_expr.symbol.expr else {
             unreachable!(
                 "This should never fail as we already checked this in SymbolTable {:?}",
-                ffi_bind_expr.symbol.1.expr
+                ffi_bind_expr.symbol.expr
             );
         };
 
@@ -664,7 +664,7 @@ impl AstWalker<Program> for Emitter<'_> {
             ffi_function_name,
             args,
             ret,
-            ffi_bind_expr.symbol.1.span.clone(),
+            ffi_bind_expr.symbol.span.clone(),
         );
         program.push(Instruction::CallFfi(call_ffi));
         program.push(Instruction::Return);

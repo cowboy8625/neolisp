@@ -5,7 +5,7 @@ use super::{
     compiler::CompilerOptions,
     error::Error,
     expr_walker::{
-        AstWalker, CallExpr, FfiBindExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr,
+        AstWalker, CallExpr, FfiBindFnExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr,
         LoopExpr, OperatorExpr, QuoteExpr, SetExpr, StructExpr, TestExpr, VarExpr,
     },
 };
@@ -1076,24 +1076,24 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         table.push(struct_symbol);
     }
 
-    fn handle_ffi_bind(&mut self, table: &mut SymbolTable, ffi_bind_expr: &FfiBindExpr) {
+    fn handle_ffi_bind_fn(&mut self, table: &mut SymbolTable, ffi_bind_expr: &FfiBindFnExpr) {
         let id = self.variable_id();
-        let Expr::Symbol(name) = &ffi_bind_expr.fn_symbol.1.expr else {
+        let Expr::Symbol(name) = &ffi_bind_expr.fn_symbol.expr else {
             self.error(Error::ExpectedFound {
-                span: ffi_bind_expr.fn_symbol.1.span.clone(),
+                span: ffi_bind_expr.fn_symbol.span.clone(),
                 expected: "Symbol".to_string(),
-                found: ffi_bind_expr.fn_symbol.1.expr.type_of(),
+                found: ffi_bind_expr.fn_symbol.expr.type_of(),
                 note: None,
                 help: None,
             });
             return;
         };
 
-        let Expr::List(params) = &ffi_bind_expr.args.1.expr else {
+        let Expr::List(params) = &ffi_bind_expr.args.expr else {
             self.error(Error::ExpectedFound {
-                span: ffi_bind_expr.args.1.span.clone(),
+                span: ffi_bind_expr.args.span.clone(),
                 expected: "Symbol".to_string(),
-                found: ffi_bind_expr.fn_symbol.1.expr.type_of(),
+                found: ffi_bind_expr.fn_symbol.expr.type_of(),
                 note: None,
                 help: None,
             });
@@ -1140,13 +1140,13 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
             table.push(parameter);
         }
 
-        let return_type = match &ffi_bind_expr.return_type.1.expr {
+        let return_type = match &ffi_bind_expr.return_type.expr {
             Expr::Symbol(name) => {
                 let Ok(typeis) = Type::try_from(name.as_str()) else {
                     self.error(Error::ExpectedFound {
-                        span: ffi_bind_expr.return_type.1.span.clone(),
+                        span: ffi_bind_expr.return_type.span.clone(),
                         expected: "Type".to_string(),
-                        found: ffi_bind_expr.return_type.1.expr.type_of(),
+                        found: ffi_bind_expr.return_type.expr.type_of(),
                         note: None,
                         help: None,
                     });
@@ -1160,7 +1160,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         let function = Function::new(
             id,
             name,
-            ffi_bind_expr.fn_symbol.1.span.clone(),
+            ffi_bind_expr.fn_symbol.span.clone(),
             parameters,
             table.scope_level(),
             false,
