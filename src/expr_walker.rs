@@ -315,7 +315,6 @@ pub trait AstWalker<T> {
     }
 
     fn walk_ffi_bind(&mut self, t: &mut T, elements: &[Spanned<Expr>], span: Span) {
-        const HELP : &str = "(ffi-bind :library <string> :symbol <string>  :fn <symbol> <args> '(<symbol>) :return <symbol>)";
         let mut items = HashMap::new();
         let mut element_iters = elements.iter().skip(1);
         while let Some(ele) = element_iters.next() {
@@ -325,7 +324,7 @@ pub trait AstWalker<T> {
                     expected: "Symbol".to_string(),
                     found: ele.expr.type_of(),
                     note: None,
-                    help: Some(HELP.to_string()),
+                    help: None,
                 });
                 return;
             };
@@ -335,12 +334,31 @@ pub trait AstWalker<T> {
                     expected: "Value".to_string(),
                     found: ele.expr.type_of(),
                     note: None,
-                    help: Some(HELP.to_string()),
+                    help: None,
                 });
                 return;
             };
             items.insert(symbol, value);
         }
+
+        let name = elements.first().unwrap();
+
+        #[allow(clippy::unnecessary_to_owned)]
+        if items.contains_key(&":struct".to_string()) {
+            self.walk_ffi_bind_struct(t, &items, name, span);
+            return;
+        }
+        self.walk_ffi_bind_fn(t, &items, name, span);
+    }
+
+    fn walk_ffi_bind_fn(
+        &mut self,
+        t: &mut T,
+        items: &HashMap<&String, &Spanned<Expr>>,
+        name: &Spanned<Expr>,
+        span: Span,
+    ) {
+        const HELP : &str = "(ffi-bind :library <string> :symbol <string>  :fn <symbol> <args> (<symbol>*) :return <symbol>)";
         #[allow(clippy::unnecessary_to_owned)]
         let Some(lib) = items.get(&":library".to_string()) else {
             self.error(Error::ExpectedFound {
@@ -398,7 +416,7 @@ pub trait AstWalker<T> {
         };
 
         let ffi_bind_expr = FfiBindFnExpr {
-            name: elements.first().unwrap(),
+            name,
             lib,
             symbol,
             fn_symbol,
@@ -407,6 +425,17 @@ pub trait AstWalker<T> {
             span,
         };
         self.handle_ffi_bind_fn(t, &ffi_bind_expr);
+    }
+
+    fn walk_ffi_bind_struct(
+        &mut self,
+        _: &mut T,
+        items: &HashMap<&String, &Spanned<Expr>>,
+        name: &Spanned<Expr>,
+        span: Span,
+    ) {
+        const HELP : &str = "(ffi-bind :library <string> :symbol <string>  :struct <symbol> :fields (<symbol> <type>))";
+        todo!("{}{:?}{:?}{:?}", HELP, items, name, span)
     }
 
     fn walk_quote(&mut self, t: &mut T, elements: &[Spanned<Expr>], span: Span) {
