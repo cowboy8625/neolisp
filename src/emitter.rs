@@ -3,8 +3,9 @@ use super::{
     compiler::CompilerOptions,
     error::Error,
     expr_walker::{
-        AstWalker, CallExpr, FfiBindFnExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr,
-        LoopExpr, OperatorExpr, QuoteExpr, SetExpr, StructExpr, TestExpr, VarExpr,
+        AstWalker, CallExpr, FfiBindFnExpr, FfiBindStructExpr, FunctionExpr, IfElseExpr,
+        LambdaExpr, LetBindingExpr, LoopExpr, OperatorExpr, QuoteExpr, SetExpr, StructExpr,
+        TestExpr, VarExpr,
     },
     instruction::{Callable, Instruction, LoadLibrary, RuntimeMetadata, Value},
     symbol_table::{
@@ -680,6 +681,15 @@ impl AstWalker<Program> for Emitter<'_> {
         program.push(Instruction::SetGlobal(metadata));
         let end = self.get_program_size(program);
         self.symbol_table.set_location(name, start..end);
+    }
+
+    fn handle_ffi_bind_struct(&mut self, program: &mut Program, ffi_bind_expr: &FfiBindStructExpr) {
+        let Expr::Symbol(name) = &ffi_bind_expr.struct_symbol.expr else {
+            unreachable!("This should never fail as we already checked this in AstWalker");
+        };
+        self.emit_struct_constructor(program, name);
+        self.emit_struct_setter(program, name);
+        self.emit_struct_getter(program, name);
     }
 
     fn handle_quote(&mut self, program: &mut Program, quote: &QuoteExpr) {

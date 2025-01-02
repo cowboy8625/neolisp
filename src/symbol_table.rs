@@ -5,8 +5,9 @@ use super::{
     compiler::CompilerOptions,
     error::Error,
     expr_walker::{
-        AstWalker, CallExpr, FfiBindFnExpr, FunctionExpr, IfElseExpr, LambdaExpr, LetBindingExpr,
-        LoopExpr, OperatorExpr, QuoteExpr, SetExpr, StructExpr, TestExpr, VarExpr,
+        AstWalker, CallExpr, FfiBindFnExpr, FfiBindStructExpr, FunctionExpr, IfElseExpr,
+        LambdaExpr, LetBindingExpr, LoopExpr, OperatorExpr, QuoteExpr, SetExpr, StructExpr,
+        TestExpr, VarExpr,
     },
 };
 use std::collections::HashMap;
@@ -75,7 +76,7 @@ pub struct Struct {
     pub name: String,
     pub span: Span,
     pub field_names: Vec<String>,
-    pub field_values: Vec<Parameter>,
+    pub field_params: Vec<Parameter>,
     pub scope_level: usize,
     pub location: Option<std::ops::Range<usize>>,
 }
@@ -552,6 +553,7 @@ impl SymbolTableBuilder {
 
     fn variable_restore_state(&mut self) {
         self.variable_counter = self.variable_last_counter;
+        self.variable_last_counter = usize::MAX;
     }
 
     fn struct_create_constructor(&mut self, table: &mut SymbolTable, struct_symbol: &Struct) {
@@ -560,7 +562,7 @@ impl SymbolTableBuilder {
         for (name, param) in struct_symbol
             .field_names
             .iter()
-            .zip(struct_symbol.field_values.iter())
+            .zip(struct_symbol.field_params.iter())
         {
             let param_name = Parameter::new(
                 self.variable_id(),
@@ -590,7 +592,7 @@ impl SymbolTableBuilder {
         for (name, param) in struct_symbol
             .field_names
             .iter()
-            .zip(struct_symbol.field_values.iter())
+            .zip(struct_symbol.field_params.iter())
         {
             let param_name = Parameter::new(
                 self.variable_id(),
@@ -620,7 +622,7 @@ impl SymbolTableBuilder {
         for (name, param) in struct_symbol
             .field_names
             .iter()
-            .zip(struct_symbol.field_values.iter())
+            .zip(struct_symbol.field_params.iter())
         {
             let param_name = Parameter::new(
                 self.variable_id(),
@@ -996,7 +998,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
             return;
         };
         let mut field_names = Vec::new();
-        let mut field_values = Vec::new();
+        let mut field_params = Vec::new();
         let mut fields_iter = struct_expr.fields.iter();
         let mut id = 0;
         while let Some(spanned) = fields_iter.next() {
@@ -1057,7 +1059,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
                 Parameter::new(id, name, spanned.span.clone(), table.scope_level()).with_type(ty);
             id += 1;
             field_names.push(name.to_string());
-            field_values.push(param);
+            field_params.push(param);
         }
         let struct_symbol = Struct {
             // HACK: I think we need a type id
@@ -1065,7 +1067,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
             name: name.clone(),
             span: struct_expr.span.clone(),
             field_names,
-            field_values,
+            field_params,
             scope_level: table.scope_level(),
             location: None,
         };
@@ -1100,8 +1102,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
             return;
         };
 
-        let old_variable_counter = self.variable_counter;
-        self.variable_counter = 0;
+        self.variable_save_state();
         let mut parameters = Vec::new();
 
         for spanned in params.iter() {
@@ -1166,8 +1167,122 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
             false,
         )
         .with_return_type(return_type);
-        self.variable_counter = old_variable_counter;
+        self.variable_restore_state();
         table.push(function);
+    }
+
+    fn handle_ffi_bind_struct(
+        &mut self,
+        table: &mut SymbolTable,
+        ffi_bind_expr: &FfiBindStructExpr,
+    ) {
+        let Expr::Symbol(name) = &ffi_bind_expr.struct_symbol.expr else {
+            self.error(Error::ExpectedFound {
+                span: ffi_bind_expr.struct_symbol.span.clone(),
+                expected: "Symbol".to_string(),
+                found: ffi_bind_expr.struct_symbol.expr.type_of(),
+                note: None,
+                help: None,
+            });
+            return;
+        };
+
+        let Expr::List(list) = &ffi_bind_expr.fields.expr else {
+            self.error(Error::ExpectedFound {
+                span: ffi_bind_expr.fields.span.clone(),
+                expected: "List".to_string(),
+                found: ffi_bind_expr.fields.expr.type_of(),
+                note: None,
+                help: None,
+            });
+            return;
+        };
+
+        let mut field_names = Vec::new();
+        let mut field_params = Vec::new();
+        self.variable_save_state();
+        let mut fields_iter = list.iter();
+        while let Some(spanned) = fields_iter.next() {
+            let Expr::Symbol(name) = &spanned.expr else {
+                self.error(Error::ExpectedFound {
+                    span: spanned.span.clone(),
+                    expected: "Symbol".to_string(),
+                    found: spanned.expr.type_of(),
+                    note: None,
+                    help: None,
+                });
+                return;
+            };
+            if !name.starts_with(":") {
+                self.error(Error::ExpectedFound {
+                    span: spanned.span.clone(),
+                    expected: "Keyword".to_string(),
+                    found: spanned.expr.type_of(),
+                    note: None,
+                    help: None,
+                });
+                return;
+            };
+            let Some(value_symbol_type) = fields_iter.next() else {
+                self.error(Error::ExpectedFound {
+                    span: spanned.span.clone(),
+                    expected: "Type".to_string(),
+                    found: spanned.expr.type_of(),
+                    note: None,
+                    help: None,
+                });
+                return;
+            };
+
+            let Expr::Symbol(symbol_type) = &value_symbol_type.expr else {
+                self.error(Error::ExpectedFound {
+                    span: spanned.span.clone(),
+                    expected: "Symbol".to_string(),
+                    found: spanned.expr.type_of(),
+                    note: None,
+                    help: None,
+                });
+                return;
+            };
+
+            let Ok(typeis) = Type::try_from(symbol_type.as_str()) else {
+                self.error(Error::ExpectedFound {
+                    span: spanned.span.clone(),
+                    expected: "Type".to_string(),
+                    found: spanned.expr.type_of(),
+                    note: None,
+                    help: None,
+                });
+                return;
+            };
+
+            field_names.push(name.to_string());
+            let parameter = Parameter::new(
+                self.variable_id(),
+                name,
+                spanned.span.clone(),
+                table.scope_level(),
+            )
+            .with_type(typeis);
+            field_params.push(parameter);
+        }
+        self.variable_restore_state();
+
+        let struct_symbol = Struct {
+            // HACK: I think we need a type id
+            id: 0,
+            name: name.clone(),
+            span: ffi_bind_expr.span.clone(),
+            field_names,
+            field_params,
+            scope_level: table.scope_level(),
+            location: None,
+        };
+        self.struct_create_constructor(table, &struct_symbol);
+        self.struct_create_setter(table, &struct_symbol);
+        self.struct_create_getter(table, &struct_symbol);
+
+        table.push(struct_symbol);
     }
 
     // ----------- START NOT USED -----------

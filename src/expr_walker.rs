@@ -157,16 +157,16 @@ pub struct FfiBindStructExpr<'a> {
     pub name: &'a Spanned<Expr>,
     /// library name symbol is in
     /// :library "libname"
-    pub lib: (&'a Spanned<Expr>, &'a Spanned<Expr>),
+    pub lib: &'a Spanned<Expr>,
     /// symbol name in the library
     /// :symbol "symbolname"
-    pub symbol: (&'a Spanned<Expr>, &'a Spanned<Expr>),
+    pub symbol: &'a Spanned<Expr>,
     /// name of function in source code aka neolisp
     /// :struct 'struct-name-in-source
-    pub struct_symbol: (&'a Spanned<Expr>, &'a Spanned<Expr>),
+    pub struct_symbol: &'a Spanned<Expr>,
     /// arguments to the function in library
     /// :args '(int int)
-    pub fields: &'a [(&'a Spanned<Expr>, &'a Spanned<Expr>)],
+    pub fields: &'a Spanned<Expr>,
     pub span: Span,
 }
 
@@ -202,6 +202,7 @@ pub trait AstWalker<T> {
     fn handle_symbol(&mut self, _: &mut T, _: &str, _: Span);
     fn handle_quote(&mut self, _: &mut T, _: &QuoteExpr);
     fn handle_ffi_bind_fn(&mut self, _: &mut T, _: &FfiBindFnExpr);
+    fn handle_ffi_bind_struct(&mut self, _: &mut T, _: &FfiBindStructExpr);
     fn handle_struct(&mut self, _: &mut T, _: &StructExpr);
     fn handle_keyword(&mut self, _: &mut T, _: &str, _: Span);
 
@@ -429,13 +430,66 @@ pub trait AstWalker<T> {
 
     fn walk_ffi_bind_struct(
         &mut self,
-        _: &mut T,
+        t: &mut T,
         items: &HashMap<&String, &Spanned<Expr>>,
         name: &Spanned<Expr>,
         span: Span,
     ) {
         const HELP : &str = "(ffi-bind :library <string> :symbol <string>  :struct <symbol> :fields (<symbol> <type>))";
-        todo!("{}{:?}{:?}{:?}", HELP, items, name, span)
+        #[allow(clippy::unnecessary_to_owned)]
+        let Some(lib) = items.get(&":library".to_string()) else {
+            self.error(Error::ExpectedFound {
+                span: span.clone(),
+                expected: ":library".to_string(),
+                found: "nothing".to_string(),
+                note: None,
+                help: Some(HELP.to_string()),
+            });
+            return;
+        };
+        #[allow(clippy::unnecessary_to_owned)]
+        let Some(symbol) = items.get(&":symbol".to_string()) else {
+            self.error(Error::ExpectedFound {
+                span: span.clone(),
+                expected: ":symbol".to_string(),
+                found: "nothing".to_string(),
+                note: None,
+                help: Some(HELP.to_string()),
+            });
+            return;
+        };
+        #[allow(clippy::unnecessary_to_owned)]
+        let Some(struct_symbol) = items.get(&":struct".to_string()) else {
+            self.error(Error::ExpectedFound {
+                span: span.clone(),
+                expected: ":struct".to_string(),
+                found: "nothing".to_string(),
+                note: None,
+                help: Some(HELP.to_string()),
+            });
+            return;
+        };
+        #[allow(clippy::unnecessary_to_owned)]
+        let Some(fields) = items.get(&":fields".to_string()) else {
+            self.error(Error::ExpectedFound {
+                span: span.clone(),
+                expected: ":fields".to_string(),
+                found: "nothing".to_string(),
+                note: None,
+                help: Some(HELP.to_string()),
+            });
+            return;
+        };
+
+        let ffi_bind_expr = FfiBindStructExpr {
+            name,
+            lib,
+            symbol,
+            struct_symbol,
+            fields,
+            span,
+        };
+        self.handle_ffi_bind_struct(t, &ffi_bind_expr);
     }
 
     fn walk_quote(&mut self, t: &mut T, elements: &[Spanned<Expr>], span: Span) {

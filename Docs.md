@@ -422,15 +422,6 @@
 (join " " (list "1" "2" "3")) ; -> "1 2 3"
 ```
 
-### do
-- Evaluate all the elements of the list and return the final evaluated element.
-- arguments
-   1. `List`
-- example:
-```lisp
-(do (print "hello")(+ 321 123)) ; -> 444
-```
-
 ### number?
 - return true if the argument is a number
 - arguments

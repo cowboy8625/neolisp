@@ -4,8 +4,10 @@ NeoLisp is a lightweight, Lisp-inspired programming language designed with simpl
 
 ## Features
 
+- **FFI**: NeoLisp supports foreign function interface (FFI) for calling external libraries and APIs from within the language.
 - **Simple Syntax**: NeoLisp features a clean and simple Lisp-inspired syntax, making it easy to learn and use.
 - **Functional Programming**: Supports functional programming paradigms, with first-class functions, recursion, and closures.
+- **Procedural Programming**: Offers a procedural programming style, allowing for easy integration with existing codebases.
 - **Lightweight**: Designed for simplicity and ease of use, making it suitable for quick prototyping and small projects.
 - **Extensibility**: Easily extendable, allowing users to define custom functions and expand the language's features.
 - **Efficient**: Written in Rust for performance and memory safety.

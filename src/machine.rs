@@ -1120,7 +1120,10 @@ impl Machine {
         let index = metadata.data;
         let Some(value) = self.free.get(index).cloned() else {
             // TODO: ERROR REPORTING
-            anyhow::bail!("no value on the free stack at index {index}");
+            anyhow::bail!(
+                "no value on the free stack at index {index} for {}",
+                metadata.name
+            );
         };
         let frame = self.get_current_frame_mut()?;
         frame.stack.push(value);
