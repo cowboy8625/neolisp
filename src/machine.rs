@@ -387,10 +387,9 @@ impl Machine {
         self.ip = address;
 
         while self.ip < self.program.len() {
-            let Some(byte) = self.peek_u8() else {
-                // TODO: ERROR REPORTING
-                panic!("missing opcode on stack");
-            };
+            let byte = self
+                .peek_u8()
+                .map_or_else(|| Err(Box::new(Error::StackUnderflow)), Ok)?;
             if let Some(OpCode::Return) = OpCode::from_u8(*byte) {
                 self.instruction_return()?;
                 break;
@@ -474,6 +473,27 @@ impl Machine {
             .iter()
             .map(|f| (f.scope_name.to_string(), f.span.clone()))
             .collect()
+    }
+
+    pub(crate) fn create_run_time_error(
+        &self,
+        name: &str,
+        message: impl Into<String>,
+        code: impl Into<String>,
+        help: Option<impl Into<String>>,
+    ) -> Result<Box<Error>> {
+        let frame = self.get_current_frame()?;
+        let span = frame.span.clone();
+        let stack_trace = self.create_stack_trace();
+        Ok(Box::new(Error::RunTimeError {
+            name: name.to_string(),
+            span,
+            stack_trace,
+            message: message.into(),
+            code: code.into(),
+            note: None,
+            help: help.map(Into::into),
+        }))
     }
 }
 
@@ -857,7 +877,21 @@ impl Machine {
                 (Value::F64(l), Value::F64(r)) => {
                     left = Value::F64(l + r);
                 }
-                _ => panic!("invalid types for Add"),
+                (l, r) => {
+                    let message =
+                        format!("Can not add {} and {} together", l.type_of(), r.type_of());
+                    let help = if l.kind() == r.kind() && l.kind() == ValueKind::String {
+                        Some("to concatenate strings use (append ...)")
+                    } else {
+                        None
+                    };
+                    return Err(self.create_run_time_error(
+                        "Type Cannot be added",
+                        message,
+                        "E012",
+                        help,
+                    )?);
+                }
             }
         }
         frame.stack.push(left);
@@ -878,7 +912,18 @@ impl Machine {
                 (Value::F64(l), Value::F64(r)) => {
                     left = Value::F64(l - r);
                 }
-                _ => panic!("invalid types for Sub"),
+                (l, r) => {
+                    return Err(self.create_run_time_error(
+                        "Type Cannot be subtracted",
+                        format!(
+                            "Can not subtract {} and {} together",
+                            l.type_of(),
+                            r.type_of()
+                        ),
+                        "E012",
+                        None::<&str>,
+                    )?);
+                }
             }
         }
         frame.stack.push(left);
@@ -899,7 +944,18 @@ impl Machine {
                 (Value::F64(l), Value::F64(r)) => {
                     left = Value::F64(l * r);
                 }
-                _ => panic!("invalid types for Mul"),
+                (l, r) => {
+                    return Err(self.create_run_time_error(
+                        "Type Cannot be multiplied",
+                        format!(
+                            "Can not multiply {} and {} together",
+                            l.type_of(),
+                            r.type_of()
+                        ),
+                        "E012",
+                        None::<&str>,
+                    )?);
+                }
             }
         }
         frame.stack.push(left);
@@ -920,7 +976,18 @@ impl Machine {
                 (Value::F64(l), Value::F64(r)) => {
                     left = Value::F64(l / r);
                 }
-                _ => panic!("invalid types for Div"),
+                (l, r) => {
+                    return Err(self.create_run_time_error(
+                        "Type Cannot be divided",
+                        format!(
+                            "Can not divide {} and {} together",
+                            l.type_of(),
+                            r.type_of()
+                        ),
+                        "E012",
+                        None::<&str>,
+                    )?);
+                }
             }
         }
         frame.stack.push(left);
@@ -944,7 +1011,14 @@ impl Machine {
                 (Value::Bool(l), Value::Bool(r)) => {
                     left = Value::Bool(l && *r);
                 }
-                _ => panic!("invalid types for Or"),
+                (l, r) => {
+                    return Err(self.create_run_time_error(
+                        "Type Cannot be And",
+                        format!("Can not And {} and {} together", l.type_of(), r.type_of()),
+                        "E012",
+                        None::<&str>,
+                    )?);
+                }
             }
         }
         frame.stack.push(left);
@@ -970,7 +1044,14 @@ impl Machine {
                 (Value::Bool(l), Value::Bool(r)) => {
                     left = Value::Bool(l || *r);
                 }
-                _ => panic!("invalid types for And"),
+                (l, r) => {
+                    return Err(self.create_run_time_error(
+                        "Type Cannot be Or",
+                        format!("Can not Or {} and {} together", l.type_of(), r.type_of()),
+                        "E012",
+                        None::<&str>,
+                    )?);
+                }
             }
         }
         frame.stack.push(left);
@@ -986,28 +1067,39 @@ impl Machine {
             Value::Bool(b) => {
                 frame.stack.push(Value::Bool(!b));
             }
-            _ => panic!("invalid types for Not"),
+            value => {
+                return Err(self.create_run_time_error(
+                    "Type Cannot be Not",
+                    format!("Can not Not {}", value.type_of()),
+                    "E012",
+                    None::<&str>,
+                )?);
+            }
         }
         Ok(())
     }
 
     fn instruction_mod(&mut self) -> Result<()> {
+        let right = self.pop()?;
         let frame = self.get_current_frame_mut()?;
-        let Some(right) = frame.stack.pop() else {
-            panic!("expected value on stack for Mod")
-        };
-        let Some(left) = frame.stack.last() else {
-            panic!("expected value on stack for Mod")
-        };
         let last_index = frame.stack.len() - 1;
-        match (left, right) {
-            (Value::I32(left), Value::I32(right)) => {
-                frame.stack[last_index] = Value::I32(left % right);
+        let mut left = &mut frame.stack[last_index];
+        match (&mut left, right) {
+            (Value::I32(l), Value::I32(r)) => {
+                *left = Value::I32(*l % r);
             }
-            (Value::F64(left), Value::F64(right)) => {
-                frame.stack[last_index] = Value::F64(left % right);
+            (Value::F64(l), Value::F64(r)) => {
+                *left = Value::F64(*l % r);
             }
-            _ => panic!("invalid types for Mod"),
+            (l, r) => {
+                let lhs_ty = l.type_of();
+                return Err(self.create_run_time_error(
+                    "Type Cannot be Mod",
+                    format!("Can not Mod {} and {} together", lhs_ty, r.type_of()),
+                    "E012",
+                    None::<&str>,
+                )?);
+            }
         }
         Ok(())
     }
@@ -1026,14 +1118,7 @@ impl Machine {
             ))));
         }
         let count = self.get_u8()? as usize;
-        let value = {
-            let frame = self.get_current_frame_mut()?;
-            let Some(value) = frame.stack.pop() else {
-                // TODO: ERROR REPORT;
-                panic!("missing callable value on stack");
-            };
-            value
-        };
+        let value = self.pop()?;
 
         if let Value::Builtin(callable) = value {
             self.buildin_function_call(*callable, count)?;
@@ -1041,8 +1126,10 @@ impl Machine {
         }
 
         let Value::Callable(callable) = value else {
-            // TODO: ERROR REPORT;
-            panic!("can not call '{}' type", value);
+            return Err(Box::new(Error::Internal(format!(
+                "can not call '{}' type",
+                value.kind()
+            ))));
         };
 
         self.symbol_table.enter_scope(&callable.name);
@@ -1064,17 +1151,13 @@ impl Machine {
         if self.stack.len() >= Self::MAX_STACK_FRAME_SIZE {
             panic!("stack frame overflow at {}", self.ip);
         }
-        let value = {
-            let frame = self.get_current_frame_mut()?;
-            let Some(value) = frame.stack.pop() else {
-                // TODO: ERROR REPORT;
-                panic!("missing callable value on stack");
-            };
-            value
-        };
+        let value = self.pop()?;
+
         let Value::Callable(callable) = value else {
-            // TODO: ERROR REPORT;
-            panic!("can not call '{}' type", value);
+            return Err(Box::new(Error::Internal(format!(
+                "can not call '{}' type",
+                value.kind()
+            ))));
         };
         self.symbol_table.enter_scope(&callable.name);
         let new_frame = Frame::new(self.ip, callable.name, callable.span, Vec::new());
@@ -1088,17 +1171,17 @@ impl Machine {
             panic!("stack frame overflow at {}", self.ip);
         }
         let count = self.get_u8()? as usize;
-        let frame = self.get_current_frame_mut()?;
 
-        let Some(value) = frame.stack.pop() else {
-            // TODO: ERROR REPORT;
-            panic!("missing callable value on stack");
-        };
+        let value = self.pop()?;
+
         let Value::Callable(callable) = value else {
-            // TODO: ERROR REPORT;
-            panic!("can not call '{}' type", value);
+            return Err(Box::new(Error::Internal(format!(
+                "can not call '{}' type",
+                value.kind()
+            ))));
         };
 
+        let frame = self.get_current_frame_mut()?;
         let length = frame.stack.len();
         let mut param_values = frame.stack.split_off(length - count);
         param_values.reverse();
@@ -1111,11 +1194,8 @@ impl Machine {
     fn instruction_set_local(&mut self) -> Result<()> {
         let metadata = self.get_metadata()?;
         let index = metadata.data;
+        let value = self.pop()?;
         let frame = self.get_current_frame_mut()?;
-        let Some(value) = frame.stack.pop() else {
-            // TODO: ERROR REPORT;
-            panic!("no value on stack for SetLocal");
-        };
         if let Some(stack_value) = frame.args.get_mut(index) {
             *stack_value = value;
             return Ok(());
@@ -1124,7 +1204,12 @@ impl Machine {
             frame.args.push(value);
             return Ok(());
         }
-        panic!("something in the compiler is wrong with SetLocal");
+        Err(Box::new(Error::Internal(format!(
+            "{} invalid set-local address at {} ip: {}",
+            file!(),
+            index,
+            self.ip
+        ))))
     }
 
     fn instruction_get_local(&mut self) -> Result<()> {
@@ -1132,8 +1217,12 @@ impl Machine {
         let index = metadata.data;
         let frame = self.get_current_frame_mut()?;
         let Some(value) = frame.args.get(index) else {
-            // TODO: ERROR REPORTING
-            panic!("no args on the arg stack");
+            return Err(Box::new(Error::Internal(format!(
+                "{} invalid get-local address at {} ip: {}",
+                file!(),
+                index,
+                self.ip
+            ))));
         };
         frame.stack.push(value.clone());
         Ok(())
@@ -1142,11 +1231,7 @@ impl Machine {
     fn instruction_set_global(&mut self) -> Result<()> {
         let metadata = self.get_metadata()?;
         let index = metadata.data;
-        let frame = self.get_current_frame_mut()?;
-        let Some(value) = frame.stack.pop() else {
-            // TODO: ERROR REPORTING
-            panic!("missing value on stack frame for SetGlobal instruction")
-        };
+        let value = self.pop()?;
 
         if let Some(stack_value) = self.global.get_mut(index) {
             *stack_value = value;
@@ -1156,20 +1241,24 @@ impl Machine {
             self.global.push(value);
             return Ok(());
         }
-        panic!(
-            "something in the compiler is wrong with SetGlobal\nindex: {}\nvalue: {}\nlen: {}",
+        Err(Box::new(Error::Internal(format!(
+            "{} invalid set-global address at {} ip: {}",
+            file!(),
             index,
-            value,
-            self.global.len()
-        );
+            self.ip
+        ))))
     }
 
     fn instruction_get_global(&mut self) -> Result<()> {
         let metadata = self.get_metadata()?;
         let index = metadata.data;
         let Some(value) = self.global.get(index).cloned() else {
-            // TODO: ERROR REPORTING
-            panic!("no value on the global stack");
+            return Err(Box::new(Error::Internal(format!(
+                "{} invalid get-global address at {} ip: {}",
+                file!(),
+                index,
+                self.ip
+            ))));
         };
         let frame = self.get_current_frame_mut()?;
         frame.stack.push(value);
@@ -1179,11 +1268,8 @@ impl Machine {
     fn instruction_set_free(&mut self) -> Result<()> {
         let metadata = self.get_metadata()?;
         let index = metadata.data;
-        let frame = self.get_current_frame_mut()?;
-        let Some(value) = frame.stack.pop() else {
-            // TODO: ERROR REPORTING
-            panic!("no value on the stack for SetFree");
-        };
+        let value = self.pop()?;
+
         if let Some(stack_value) = self.free.get_mut(index) {
             *stack_value = value;
             return Ok(());
@@ -1192,18 +1278,24 @@ impl Machine {
             self.free.push(value);
             return Ok(());
         }
-        panic!("something in the compiler is wrong with SetFree");
+        Err(Box::new(Error::Internal(format!(
+            "{} invalid set-free address at {} ip: {}",
+            file!(),
+            index,
+            self.ip
+        ))))
     }
 
     fn instruction_get_free(&mut self) -> Result<()> {
         let metadata = self.get_metadata()?;
         let index = metadata.data;
         let Some(value) = self.free.get(index).cloned() else {
-            // TODO: ERROR REPORTING
-            panic!(
-                "no value on the free stack at index {index} for {}",
-                metadata.name
-            );
+            return Err(Box::new(Error::Internal(format!(
+                "{} invalid get-free address at {} ip: {}",
+                file!(),
+                index,
+                self.ip
+            ))));
         };
         let frame = self.get_current_frame_mut()?;
         frame.stack.push(value);
@@ -1212,10 +1304,7 @@ impl Machine {
 
     fn instruction_jump_if(&mut self) -> Result<()> {
         let address = self.get_u32()? as usize;
-        let frame = self.get_current_frame_mut()?;
-        let Some(value) = frame.stack.pop() else {
-            panic!("expected value on stack for JumpIf")
-        };
+        let value = self.pop()?;
         if value == Value::Bool(false) {
             self.ip += address;
         }
