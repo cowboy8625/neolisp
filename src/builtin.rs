@@ -150,7 +150,7 @@ impl Function {
                 1,
                 &callable.name,
             )?;
-            let Some(Value::Bool(true)) = machine.pop()? else {
+            let Value::Bool(true) = machine.pop()? else {
                 continue;
             };
             result.push(value);
@@ -179,11 +179,7 @@ impl Function {
                 2,
                 &callable.name,
             )?;
-            let Some(v) = machine.pop()? else {
-                // TODO: ERROR REPORTING
-                panic!("expected value on stack for fold-right")
-            };
-            result = v;
+            result = machine.pop()?;
         }
         machine.push(result)?;
         Ok(())
@@ -209,24 +205,7 @@ impl Function {
                 2,
                 &callable.name,
             )?;
-            let Some(v) = machine.pop()? else {
-                // TODO: ERROR REPORTING
-                let stack_trace = machine.create_stack_trace();
-                let frame = machine.get_current_frame_mut()?;
-                let name = frame.scope_name.to_string();
-                let span = frame.span.clone();
-                let error = Error::RunTimeError {
-                    span,
-                    name,
-                    stack_trace,
-                    message: "expected value on stack for fold".to_string(),
-                    code: "".to_string(),
-                    note: None,
-                    help: None,
-                };
-                return Err(Box::new(error));
-            };
-            result = v;
+            result = machine.pop()?;
         }
         machine.push(result)?;
         Ok(())
@@ -250,21 +229,7 @@ impl Function {
                 1,
                 &callable.name,
             )?;
-            let Some(v) = machine.pop()? else {
-                // TODO: ERROR REPORTING
-                let stack_trace = machine.create_stack_trace();
-                let frame = machine.get_current_frame_mut()?;
-                let error = Error::RunTimeError {
-                    span: frame.span.clone(),
-                    name: frame.scope_name.to_string(),
-                    message: "expected value on stack for map".to_string(),
-                    stack_trace,
-                    code: "".to_string(),
-                    note: None,
-                    help: None,
-                };
-                return Err(Box::new(error));
-            };
+            let v = machine.pop()?;
             result.push(v);
         }
 

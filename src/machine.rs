@@ -330,9 +330,11 @@ impl Machine {
         Ok(())
     }
 
-    pub fn pop(&mut self) -> Result<Option<Value>> {
+    pub fn pop(&mut self) -> Result<Value> {
         let frame = self.get_current_frame_mut()?;
-        let value = frame.stack.pop();
+        let Some(value) = frame.stack.pop() else {
+            return Err(Box::new(Error::StackUnderflow));
+        };
         Ok(value)
     }
 

@@ -148,7 +148,7 @@ pub fn run(args: Cli) -> Result<()> {
                 }
             }
         }
-        if let Ok(Some(last)) = machine.pop() {
+        if let Ok(last) = machine.pop() {
             eprintln!(":{last}");
         }
     }
