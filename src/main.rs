@@ -37,7 +37,7 @@ fn main() -> anyhow::Result<()> {
                 Ok(None) => return Ok(()),
                 Err(errors) => {
                     for error in errors {
-                        error.report(&filename, &src)?;
+                        error.report(&filename, &src);
                     }
                     return Ok(());
                 }
@@ -50,8 +50,11 @@ fn main() -> anyhow::Result<()> {
                 let mut debugger =
                     Debugger::new(&mut machine)?.with_breakpoints(r.breakpoints.clone());
                 debugger.run()?;
-            } else {
-                machine.run()?;
+                return Ok(());
+            }
+
+            if let Err(error) = machine.run() {
+                error.report(&filename, &src);
             }
 
             Ok(())
@@ -72,7 +75,7 @@ fn main() -> anyhow::Result<()> {
                 Ok(None) => return Ok(()),
                 Err(errors) => {
                     for error in errors {
-                        error.report(&filename, &src)?;
+                        error.report(&filename, &src);
                     }
                     return Ok(());
                 }
@@ -86,7 +89,12 @@ fn main() -> anyhow::Result<()> {
                     Debugger::new(&mut machine)?.with_breakpoints(t.breakpoints.clone());
                 debugger.run()?;
             } else {
-                machine.run()?;
+                match machine.run() {
+                    Ok(()) => {}
+                    Err(error) => {
+                        error.report(&filename, &src);
+                    }
+                }
             }
             Ok(())
         }

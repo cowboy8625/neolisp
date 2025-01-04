@@ -115,7 +115,7 @@ pub struct Debugger<'a> {
 
 impl<'a> Debugger<'a> {
     pub fn new(machine: &'a mut Machine) -> Result<Self> {
-        let instructions = machine.decompile()?;
+        let instructions = machine.decompile().unwrap();
         let mut this = Self {
             machine,
             instructions,
@@ -385,11 +385,11 @@ impl<'a> Debugger<'a> {
                         Result::Ok(_) => {}
                         Result::Err(errors) => {
                             for error in errors {
-                                error.report(&file, &src)?;
+                                error.report(&file, &src);
                             }
                         }
                     };
-                    let instructions = self.machine.decompile()?;
+                    let instructions = self.machine.decompile().expect("failed to decompile");
                     self.instructions = instructions;
                 }
                 Result::Err(err) => {

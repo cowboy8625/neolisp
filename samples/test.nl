@@ -473,57 +473,57 @@
 
 (test type?-f64
   (assert-eq
-    :expected "f64"
+    :expected :f64
     :actual (type? 123)
-    :description "type? 123 -> \"f64\""))
+    :description "type? 123 -> :f64"))
 
 (test type?-symbol
   (assert-eq
-    :expected "Symbol"
+    :expected :symbol
     :actual (type? 'a)
-    :description "type? 'a -> \"symbol\""))
+    :description "type? 'a -> :symbol"))
 
 (test type?-:keyword
   (assert-eq
-    :expected "Keyword"
+    :expected :keyword
     :actual (type? :key)
-    :description "type? :key -> \"Keyword\""))
+    :description "type? :key -> :keyword"))
 
 (test type?-bool-true
   (assert-eq
-    :expected "Bool"
+    :expected :bool
     :actual (type? true)
-    :description "type? true -> \"Bool\""))
+    :description "type? true -> :bool"))
 
 (test type?-bool-false
   (assert-eq
-    :expected "Bool"
+    :expected :bool
     :actual (type? false)
-    :description "type? false -> \"Bool\""))
+    :description "type? false -> :bool"))
 
 (test type?-string
   (assert-eq
-    :expected "String"
+    :expected :string
     :actual (type? "hello")
-    :description "type? \"hello\" -> \"String\""))
+    :description "type? \"hello\" -> :string"))
 
 (test type?-list
   (assert-eq
-    :expected "List"
+    :expected :list
     :actual (type? '(1 2 3))
-    :description "type? '(1 2 3) -> \"List\""))
+    :description "type? '(1 2 3) -> :list"))
 
 (test type?-lambda
   (assert-eq
-    :expected "Function"
+    :expected :function
     :actual (type? (lambda (x) (+ x 1)))
-    :description "type? (lambda (x) (+ x 1)) -> \"Function\""))
+    :description "type? (lambda (x) (+ x 1)) -> :function"))
 
 (test type?-function
   (assert-eq
-    :expected "Function"
+    :expected :function
     :actual (type? add)
-    :description "type? add -> \"Function\""))
+    :description "type? add -> :function"))
 
 ; TODO: at some point we need to be able to capture stdout
 ; (test print

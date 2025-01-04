@@ -1,5 +1,4 @@
 use super::ast::Span;
-use anyhow::Result;
 use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
 
 fn empty_file_example() -> String {
@@ -32,6 +31,8 @@ pub enum ErrorType {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Error {
+    StackUnderflow,
+    Internal(String),
     ExpectedFound {
         span: Span,
         expected: String,
@@ -46,8 +47,9 @@ pub enum Error {
     EmptyFile,
     MainNotDefined,
     RunTimeError {
-        span: Span,
         name: String,
+        span: Span,
+        stack_trace: Vec<(String, Span)>,
         message: String,
         code: String,
         note: Option<String>,
@@ -65,33 +67,43 @@ pub enum Error {
         span: Span,
         name: String,
     },
+    Temporary {
+        span: Span,
+        message: String,
+    },
 }
 
 impl Error {
     fn code(&self) -> String {
         match self {
-            Error::ExpectedFound { .. } => String::from("E000"),
-            Error::MissingClosingParenthesis(..) => String::from("E001"),
-            Error::MissingOpeningParenthesis(..) => String::from("E001"),
-            Error::NotCallable(..) => String::from("E002"),
-            Error::SymbolNotDefined(..) => String::from("E003"),
-            Error::EmptyFile => todo!(),
-            Error::MainNotDefined => String::from("E004"),
-            Error::RunTimeError { code, .. } => code.clone(),
-            Error::Redefined { .. } => String::from("E005"),
-            Error::TestNotDefined { .. } => String::from("E006"),
+            Self::Internal(..) => String::from("E999"),
+            Self::ExpectedFound { .. } => String::from("E000"),
+            Self::MissingClosingParenthesis(..) => String::from("E001"),
+            Self::MissingOpeningParenthesis(..) => String::from("E001"),
+            Self::NotCallable(..) => String::from("E002"),
+            Self::SymbolNotDefined(..) => String::from("E003"),
+            Self::EmptyFile => todo!(),
+            Self::MainNotDefined => String::from("E004"),
+            Self::RunTimeError { code, .. } => code.clone(),
+            Self::Redefined { .. } => String::from("E005"),
+            Self::TestNotDefined { .. } => String::from("E006"),
+            Self::StackUnderflow => String::from("EFFF"),
+            Self::Temporary { .. } => String::from("EFFF"),
         }
     }
 
     fn error_kind(&self) -> ReportKind {
         match self {
+            Self::Internal(..) => ReportKind::Custom("Internal", Color::Red),
             Self::RunTimeError { .. } => ReportKind::Custom("RunTimeError", Color::Red),
+            Self::StackUnderflow => ReportKind::Custom("RunTimeError", Color::Red),
             _ => ReportKind::Error,
         }
     }
 
     pub fn span(&self) -> &Span {
         match self {
+            Self::Internal(..) => &(0..0),
             Self::ExpectedFound { span, .. } => span,
             Self::MissingClosingParenthesis(span) => span,
             Self::MissingOpeningParenthesis(span) => span,
@@ -102,11 +114,14 @@ impl Error {
             Self::RunTimeError { span, .. } => span,
             Self::Redefined { new_span, .. } => new_span,
             Self::TestNotDefined { span, .. } => span,
+            Self::Temporary { span, .. } => span,
+            Self::StackUnderflow => &(0..0),
         }
     }
 
     pub fn second_label<'a>(&'a self, filename: &'a str) -> Option<Label<(&'a str, Span)>> {
         match self {
+            Self::Internal(..) => None,
             Self::ExpectedFound { .. } => None,
             Self::MissingClosingParenthesis(_) => None,
             Self::MissingOpeningParenthesis(_) => None,
@@ -125,11 +140,14 @@ impl Error {
                     .with_message("this test is not defined")
                     .with_color(Color::Blue),
             ),
+            Self::Temporary { .. } => None,
+            Self::StackUnderflow => None,
         }
     }
 
     pub fn message(&self) -> String {
         match self {
+            Self::Internal(message) => message.to_string(),
             Self::ExpectedFound {
                 expected, found, ..
             } => {
@@ -144,44 +162,52 @@ impl Error {
             Self::RunTimeError { message, .. } => message.to_string(),
             Self::Redefined { .. } => "redefined".to_string(),
             Self::TestNotDefined { name, .. } => format!("test '{name}' is not defined"),
+            Self::Temporary { message, .. } => message.to_string(),
+            Self::StackUnderflow => "stack underflow".to_string(),
         }
     }
 
     fn note(&self) -> Option<String> {
         match self {
-            Error::ExpectedFound { note, .. } => note.clone(),
-            Error::MissingClosingParenthesis(..) => None,
-            Error::MissingOpeningParenthesis(..) => None,
-            Error::NotCallable(..) => None,
-            Error::SymbolNotDefined(..) => None,
-            Error::EmptyFile => None,
-            Error::MainNotDefined => None,
-            Error::RunTimeError { note, .. } => note.clone(),
-            Error::Redefined { note, .. } => note.clone(),
-            Error::TestNotDefined { .. } => None,
+            Self::Internal(..) => None,
+            Self::ExpectedFound { note, .. } => note.clone(),
+            Self::MissingClosingParenthesis(..) => None,
+            Self::MissingOpeningParenthesis(..) => None,
+            Self::NotCallable(..) => None,
+            Self::SymbolNotDefined(..) => None,
+            Self::EmptyFile => None,
+            Self::MainNotDefined => None,
+            Self::RunTimeError { note, .. } => note.clone(),
+            Self::Redefined { note, .. } => note.clone(),
+            Self::TestNotDefined { .. } => None,
+            Self::Temporary { .. } => None,
+            Self::StackUnderflow => None,
         }
     }
     fn help(&self) -> Option<String> {
         match self {
-            Error::ExpectedFound{help, ..} => help.clone(),
-            Error::MissingClosingParenthesis(..) => None,
-            Error::MissingOpeningParenthesis(..) => None,
-            Error::NotCallable(..) => None,
-            Error::SymbolNotDefined(..) => None,
-            Error::EmptyFile => Some(
+            Self::Internal(..) => None,
+            Self::ExpectedFound{help, ..} => help.clone(),
+            Self::MissingClosingParenthesis(..) => None,
+            Self::MissingOpeningParenthesis(..) => None,
+            Self::NotCallable(..) => None,
+            Self::SymbolNotDefined(..) => None,
+            Self::EmptyFile => Some(
                 format!("Hey, you have an empty file!
  If your unsure how to get started with the language, take a look at the docs but here is a quick start tip.
  Put this 👇 in your file and try again.
  {}", empty_file_example())
            ),
-            Error::MainNotDefined => Some("If this is intentinal you may want to add the `--no-main` flag.".to_string()),
-            Error::RunTimeError { help, .. } => help.clone(),
-            Error::Redefined { help, .. } => help.clone(),
-            Error::TestNotDefined { .. } => None,
+            Self::MainNotDefined => Some("If this is intentinal you may want to add the `--no-main` flag.".to_string()),
+            Self::RunTimeError { help, .. } => help.clone(),
+            Self::Redefined { help, .. } => help.clone(),
+            Self::TestNotDefined { .. } => None,
+            Self::Temporary{..} => None,
+            Self::StackUnderflow => None,
         }
     }
 
-    pub fn report(&self, filename: &str, src: &str) -> Result<()> {
+    pub fn report(&self, filename: &str, src: &str) {
         let src = if src.is_empty() {
             " ".to_string()
         } else {
@@ -205,8 +231,10 @@ impl Error {
         if let Some(help) = self.help() {
             report = report.with_help(help);
         }
-        report.finish().print((filename, Source::from(src)))?;
-        Ok(())
+        report
+            .finish()
+            .print((filename, Source::from(src)))
+            .expect("failed to print error");
     }
 }
 
@@ -258,6 +286,6 @@ impl chumsky::Error<char> for Error {
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}:{}", self.span(), self.message())
+        write!(f, "{}", self.message())
     }
 }

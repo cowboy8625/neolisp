@@ -25,10 +25,10 @@ impl TryFrom<&str> for Type {
     type Error = ();
     fn try_from(s: &str) -> Result<Self, Self::Error> {
         match s {
-            "int" => Ok(Type::Int),
-            "string" => Ok(Type::String),
-            "bool" => Ok(Type::Bool),
-            "nil" => Ok(Type::Nil),
+            ":int" => Ok(Type::Int),
+            ":string" => Ok(Type::String),
+            ":bool" => Ok(Type::Bool),
+            ":nil" => Ok(Type::Nil),
             _ => Err(()),
         }
     }
@@ -1012,16 +1012,6 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
                 });
                 return;
             };
-            if !name.starts_with(":") {
-                self.error(Error::ExpectedFound {
-                    span: spanned.span.clone(),
-                    expected: "Keyword".to_string(),
-                    found: spanned.expr.type_of(),
-                    note: None,
-                    help: None,
-                });
-                return;
-            };
             let Some(symbol_type) = fields_iter.next() else {
                 self.error(Error::ExpectedFound {
                     span: spanned.span.clone(),
@@ -1037,6 +1027,16 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
                 self.error(Error::ExpectedFound {
                     span: spanned.span.clone(),
                     expected: "Symbol".to_string(),
+                    found: spanned.expr.type_of(),
+                    note: None,
+                    help: None,
+                });
+                return;
+            };
+            if !symbol_type_name.starts_with(":") {
+                self.error(Error::ExpectedFound {
+                    span: spanned.span.clone(),
+                    expected: "Keyword".to_string(),
                     found: spanned.expr.type_of(),
                     note: None,
                     help: None,
@@ -1064,7 +1064,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         let struct_symbol = Struct {
             // HACK: I think we need a type id
             id: 0,
-            name: name.clone(),
+            name: format!(":{}", name),
             span: struct_expr.span.clone(),
             field_names,
             field_params,

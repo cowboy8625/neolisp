@@ -285,7 +285,7 @@ pub trait AstWalker<T> {
         const STRUCT_KEYWORD: usize = 0;
         const STRUCT_NAME: usize = STRUCT_KEYWORD + 1;
         const FIELDS: usize = STRUCT_NAME + 1;
-        const HELP: &str = "(struct <symbol> <(<symbol> <expr>)*>)";
+        const HELP: &str = "(struct <symbol> <(<symbol> <type>)*>)";
 
         let struct_keyword = &elements[STRUCT_KEYWORD];
         let start_span = struct_keyword.span.clone();

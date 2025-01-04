@@ -142,9 +142,13 @@ pub fn run(args: Cli) -> Result<()> {
 
         match machine.run_from_string(&input) {
             Ok(()) => (),
-            Err(e) => println!("{e}"),
+            Err(e) => {
+                for e in e {
+                    e.report("repl", &input);
+                }
+            }
         }
-        if let Some(last) = machine.pop()? {
+        if let Ok(Some(last)) = machine.pop() {
             eprintln!(":{last}");
         }
     }

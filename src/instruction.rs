@@ -577,6 +577,27 @@ pub enum ValueKind {
     Struct,
 }
 
+impl std::fmt::Display for ValueKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ValueKind::Nil => write!(f, ":nil"),
+            ValueKind::U8 => write!(f, ":u8"),
+            ValueKind::I32 => write!(f, ":i32"),
+            ValueKind::U32 => write!(f, ":u32"),
+            ValueKind::F32 => write!(f, ":f32"),
+            ValueKind::F64 => write!(f, ":f64"),
+            ValueKind::String => write!(f, ":string"),
+            ValueKind::Bool => write!(f, ":bool"),
+            ValueKind::List => write!(f, ":list"),
+            ValueKind::Callable => write!(f, ":callable"),
+            ValueKind::Builtin => write!(f, ":builtin"),
+            ValueKind::Symbol => write!(f, ":symbol"),
+            ValueKind::Keyword => write!(f, ":keyword"),
+            ValueKind::Struct => write!(f, ":struct"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Nil,
@@ -713,18 +734,18 @@ impl Value {
     pub fn type_of(&self) -> String {
         match self {
             Self::Nil => "nil".to_string(),
-            Self::U8(_) => "u8".to_string(),
-            Self::I32(_) => "i32".to_string(),
-            Self::U32(_) => "u32".to_string(),
-            Self::F32(_) => "f32".to_string(),
-            Self::F64(_) => "f64".to_string(),
-            Self::String(_) => "String".to_string(),
-            Self::Bool(_) => "Bool".to_string(),
-            Self::List(_) => "List".to_string(),
-            Self::Callable(_) => "Function".to_string(),
-            Self::Builtin(_) => "Builtin".to_string(),
-            Self::Symbol(_) => "Symbol".to_string(),
-            Self::Keyword(_) => "Keyword".to_string(),
+            Self::U8(_) => ":u8".to_string(),
+            Self::I32(_) => ":i32".to_string(),
+            Self::U32(_) => ":u32".to_string(),
+            Self::F32(_) => ":f32".to_string(),
+            Self::F64(_) => ":f64".to_string(),
+            Self::String(_) => ":string".to_string(),
+            Self::Bool(_) => ":bool".to_string(),
+            Self::List(_) => ":list".to_string(),
+            Self::Callable(_) => ":function".to_string(),
+            Self::Builtin(_) => ":builtin".to_string(),
+            Self::Symbol(_) => ":symbol".to_string(),
+            Self::Keyword(_) => ":keyword".to_string(),
             Self::Struct(data) => data.borrow().name.clone(),
         }
     }

@@ -187,7 +187,7 @@ impl<'a> Emitter<'a> {
         program.push(Instruction::Jump(usize::MAX));
 
         let start = self.get_program_size(program);
-        let constructor_name = format!("{}:new", type_symbol.name);
+        let constructor_name = type_symbol.name.clone();
         let Some(constructor_symbol) = self.symbol_table.get(&constructor_name) else {
             unreachable!("This should never fail as we already checked this in AstWalker");
         };
