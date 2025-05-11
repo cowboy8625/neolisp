@@ -577,8 +577,8 @@
   (var person (Person:new :name "Bob" :age 30))
   (it
     (list
-      (assert-eq :expected "Bob" :actual (Person:get :name person))
-      (assert-eq :expected 30 :actual (Person:get :age person)))))
+      (assert-eq :expected "Bob" :actual (Person:get person :name) :description "Person:get person :name -> \"Bob\"")
+      (assert-eq :expected 30 :actual (Person:get person :age) :description "Person:get person :age -> 30"))))
 
 ; let binding
 
