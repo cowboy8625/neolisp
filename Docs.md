@@ -581,7 +581,7 @@
 (struct Person name :string age :int)
 
 (fn main ()
-   (var person (Person name "John" age 20))
+   (var person (Person:new :name "John" :age 20))
    (Person:set person :name "John Doe")
    (var name (Person:get person :name)))
 ```
