@@ -589,7 +589,7 @@ impl Function {
             };
             return Err(Box::new(error));
         };
-        let output = format_from_vec(&format_arg, &args);
+        let output = format_from_vec(format_arg, &args);
         let lock = std::io::stdout().lock();
         let mut writer = std::io::BufWriter::new(lock);
         writer.write_all(output.as_bytes()).expect("write failed");
