@@ -570,7 +570,6 @@ impl Function {
     }
 
     pub(crate) fn fn_print_fmt(machine: &mut Machine) -> Result<()> {
-        println!("fn_print_fmt");
         // (print-fmt "hello {}" "world") => "hello world"
         use std::io::Write;
         let frame = machine.get_current_frame_mut()?;
