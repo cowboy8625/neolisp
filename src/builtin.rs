@@ -568,4 +568,53 @@ impl Function {
         machine.push(Value::String(Box::new(trimmed.to_string())))?;
         Ok(())
     }
+
+    pub(crate) fn fn_print_fmt(machine: &mut Machine) -> Result<()> {
+        println!("fn_print_fmt");
+        // (print-fmt "hello {}" "world") => "hello world"
+        use std::io::Write;
+        let frame = machine.get_current_frame_mut()?;
+        let args = frame.args.iter().skip(1).collect::<Vec<_>>();
+        let Some(Value::String(format_arg)) = frame.args.first() else {
+            let span = frame.span.clone();
+            let stack_trace = machine.create_stack_trace();
+            let error = Error::RunTimeError {
+                name: "Expected String".to_string(),
+                span,
+                stack_trace,
+                message: "First argument to print-fmt must be a format string".to_string(),
+                code: "E012".to_string(),
+                note: None,
+                help: None,
+            };
+            return Err(Box::new(error));
+        };
+        let output = format_from_vec(&format_arg, &args);
+        let lock = std::io::stdout().lock();
+        let mut writer = std::io::BufWriter::new(lock);
+        writer.write_all(output.as_bytes()).expect("write failed");
+        writer.flush().expect("flush failed");
+        frame.stack.push(Value::Nil);
+        Ok(())
+    }
+}
+
+fn format_from_vec(fmt: &str, args: &[&Value]) -> String {
+    let mut result = String::new();
+    let mut parts = fmt.split("{}");
+    let mut iter = args.iter();
+
+    if let Some(first) = parts.next() {
+        result.push_str(first);
+    }
+
+    for part in parts {
+        match iter.next() {
+            Some(value) => result.push_str(&value.to_string()),
+            None => result.push_str("{}"),
+        }
+        result.push_str(part);
+    }
+
+    result
 }

@@ -33,6 +33,7 @@ const BUILTINS: &[&str] = &[
     "string-trim-left",
     "string-trim-right",
     "string-trim",
+    "print-fmt",
 ];
 
 /// Keywords that are not builtins functions, but are

@@ -151,6 +151,7 @@ make_static_array!(
     fn_string_trim_left,
     fn_string_trim_right,
     fn_string_trim,
+    fn_print_fmt,
 );
 
 #[derive(Debug, Clone)]
