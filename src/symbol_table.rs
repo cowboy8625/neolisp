@@ -521,7 +521,7 @@ impl SymbolTable {
 
         let name = symbol.name();
 
-        if self.scope_stack.last().map_or(false, |sn| &name == sn) {
+        if self.scope_stack.last() == Some(&name) {
             self.scope_stack.pop();
             let scope_name = self.get_full_scope_name();
             self.scopes.entry(scope_name).or_default().insert(symbol);
