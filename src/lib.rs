@@ -23,12 +23,16 @@ const BUILTINS: &[&str] = &[
     "cdr",
     "type?",
     "print",
+    "input",
     "length",
     "assert-eq",
     "assert",
     "list",
     "cons",
     "car",
+    "string-trim-left",
+    "string-trim-right",
+    "string-trim",
 ];
 
 /// Keywords that are not builtins functions, but are

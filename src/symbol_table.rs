@@ -1,5 +1,3 @@
-use num_derive::{FromPrimitive, ToPrimitive};
-
 use super::{
     ast::{Ast, Expr, Span, Spanned},
     compiler::CompilerOptions,
@@ -12,13 +10,39 @@ use super::{
 };
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, FromPrimitive, ToPrimitive)]
-#[repr(u8)]
+#[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Type {
     Nil,
     Bool,
     Int,
     String,
+    Cutsom(String),
+}
+
+impl Type {
+    pub(crate) fn to_u8(&self) -> Result<u8, ()> {
+        match self {
+            Self::Nil => Ok(0),
+            Self::Bool => Ok(1),
+            Self::Int => Ok(2),
+            Self::String => Ok(3),
+            // TODO: Add support for custom types
+            Self::Cutsom(_) => Err(()),
+        }
+    }
+}
+
+impl TryFrom<u8> for Type {
+    type Error = ();
+    fn try_from(s: u8) -> Result<Self, Self::Error> {
+        match s {
+            0 => Ok(Type::Nil),
+            1 => Ok(Type::Bool),
+            2 => Ok(Type::Int),
+            3 => Ok(Type::String),
+            _ => Err(()),
+        }
+    }
 }
 
 impl TryFrom<&str> for Type {
@@ -29,6 +53,7 @@ impl TryFrom<&str> for Type {
             ":string" => Ok(Type::String),
             ":bool" => Ok(Type::Bool),
             ":nil" => Ok(Type::Nil),
+            custom if custom.starts_with(":") => Ok(Type::Cutsom(custom.to_string())),
             _ => Err(()),
         }
     }
@@ -37,10 +62,11 @@ impl TryFrom<&str> for Type {
 impl std::fmt::Display for Type {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            Type::Nil => "nil",
-            Type::Bool => "bool",
-            Type::Int => "int",
-            Type::String => "string",
+            Type::Nil => ":nil",
+            Type::Bool => ":bool",
+            Type::Int => ":int",
+            Type::String => ":string",
+            Type::Cutsom(name) => name,
         })
     }
 }
@@ -516,6 +542,7 @@ pub struct SymbolTableBuilder {
     lambda_counter: usize,
     unbound_counter: usize,
     variable_counter: usize,
+    struct_counter: usize,
     variable_last_counter: usize,
     errors: Vec<Error>,
     options: CompilerOptions,
@@ -544,6 +571,12 @@ impl SymbolTableBuilder {
     fn variable_id(&mut self) -> usize {
         let id = self.variable_counter;
         self.variable_counter += 1;
+        id
+    }
+
+    fn struct_id(&mut self) -> usize {
+        let id = self.struct_counter;
+        self.struct_counter += 1;
         id
     }
 
@@ -605,7 +638,7 @@ impl SymbolTableBuilder {
         }
         self.variable_restore_state();
 
-        let struct_function_new = Function::new(
+        let struct_function_set = Function::new(
             self.variable_id(),
             format!("{}:set", struct_symbol.name),
             struct_symbol.span.clone(),
@@ -613,7 +646,7 @@ impl SymbolTableBuilder {
             table.scope_level(),
             false,
         );
-        table.push(struct_function_new);
+        table.push(struct_function_set);
     }
 
     fn struct_create_getter(&mut self, table: &mut SymbolTable, struct_symbol: &Struct) {
@@ -635,7 +668,7 @@ impl SymbolTableBuilder {
         }
         self.variable_restore_state();
 
-        let struct_function_new = Function::new(
+        let struct_function_get = Function::new(
             self.variable_id(),
             format!("{}:get", struct_symbol.name),
             struct_symbol.span.clone(),
@@ -643,7 +676,8 @@ impl SymbolTableBuilder {
             table.scope_level(),
             false,
         );
-        table.push(struct_function_new);
+
+        table.push(struct_function_get);
     }
 }
 
@@ -1062,9 +1096,9 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
             field_params.push(param);
         }
         let struct_symbol = Struct {
-            // HACK: I think we need a type id
+            // HACK: WTF
             id: 0,
-            name: format!(":{}", name),
+            name: name.to_string(),
             span: struct_expr.span.clone(),
             field_names,
             field_params,
@@ -1269,8 +1303,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         self.variable_restore_state();
 
         let struct_symbol = Struct {
-            // HACK: I think we need a type id
-            id: 0,
+            id: self.struct_id(),
             name: name.clone(),
             span: ffi_bind_expr.span.clone(),
             field_names,

@@ -59,71 +59,99 @@ macro_rules! generate_instruction_operator {
     };
 }
 
-const INSTRUCTION_CALL: [fn(&mut Machine) -> Result<()>; 36] = [
-    Machine::instruction_halt,
-    Machine::instruction_return,
-    Machine::instruction_return_from_test,
-    Machine::instruction_push,
-    Machine::instruction_add,
-    Machine::instruction_sub,
-    Machine::instruction_mul,
-    Machine::instruction_div,
-    Machine::instruction_eq,
-    Machine::instruction_greater_than,
-    Machine::instruction_less_than,
-    Machine::instruction_greater_than_or_equal,
-    Machine::instruction_less_than_or_equal,
-    Machine::instruction_and,
-    Machine::instruction_or,
-    Machine::instruction_not,
-    Machine::instruction_mod,
-    Machine::instruction_rot,
-    Machine::instruction_call_function,
-    Machine::instruction_call_test,
-    Machine::instruction_tail_call_function,
-    Machine::instruction_set_local,
-    Machine::instruction_set_global,
-    Machine::instruction_set_free,
-    Machine::instruction_get_local,
-    Machine::instruction_get_global,
-    Machine::instruction_get_free,
-    Machine::instruction_jump_if,
-    Machine::instruction_jump_forward,
-    Machine::instruction_jump_backward,
-    Machine::instruction_jump,
-    Machine::instruction_load_library,
-    Machine::instruction_call_ffi,
-    Machine::instruction_struct_init,
-    Machine::instruction_struct_setter,
-    Machine::instruction_struct_getter,
-];
+macro_rules! make_static_array {
+    ($name:ident, $type:ty, $kind:path, $( $func:ident ),+ $(,)?) => {
+        const $name: [$type; count_idents!($($func),+)] = [
+            $(
+                <$kind>::$func,
+            )+
+        ];
+    };
+}
 
-const INTRISICS: [fn(&mut Machine) -> Result<()>; 24] = [
-    Function::fn_sleep,
-    Function::fn_is_atom,
-    Function::fn_is_number,
-    Function::fn_slice,
-    Function::fn_join,
-    Function::fn_split,
-    Function::fn_to_string,
-    Function::fn_filter,
-    Function::fn_fold_right,
-    Function::fn_fold,
-    Function::fn_map,
-    Function::fn_nth,
-    Function::fn_reverse,
-    Function::fn_append,
-    Function::fn_last,
-    Function::fn_cdr,
-    Function::fn_typeof,
-    Function::fn_print,
-    Function::fn_length,
-    Function::fn_assert_eq,
-    Function::fn_assert,
-    Function::fn_create_list,
-    Function::fn_cons,
-    Function::fn_car,
-];
+// Helper macro to count the number of identifiers
+macro_rules! count_idents {
+    ($($idents:ident),*) => {
+        <[()]>::len(&[$(count_idents!(@sub $idents)),*])
+    };
+    (@sub $ident:ident) => { () };
+}
+
+make_static_array!(
+    INSTRUCTION_CALL,
+    fn(&mut Machine) -> Result<()>,
+    Machine,
+    instruction_halt,
+    instruction_return,
+    instruction_return_from_test,
+    instruction_push,
+    instruction_add,
+    instruction_sub,
+    instruction_mul,
+    instruction_div,
+    instruction_eq,
+    instruction_greater_than,
+    instruction_less_than,
+    instruction_greater_than_or_equal,
+    instruction_less_than_or_equal,
+    instruction_and,
+    instruction_or,
+    instruction_not,
+    instruction_mod,
+    instruction_rot,
+    instruction_call_function,
+    instruction_call_test,
+    instruction_tail_call_function,
+    instruction_set_local,
+    instruction_set_global,
+    instruction_set_free,
+    instruction_get_local,
+    instruction_get_global,
+    instruction_get_free,
+    instruction_jump_if,
+    instruction_jump_forward,
+    instruction_jump_backward,
+    instruction_jump,
+    instruction_load_library,
+    instruction_call_ffi,
+    instruction_struct_init,
+    instruction_struct_setter,
+    instruction_struct_getter,
+);
+
+make_static_array!(
+    INTRISICS,
+    fn(&mut Machine) -> Result<()>,
+    Function,
+    fn_sleep,
+    fn_is_atom,
+    fn_is_number,
+    fn_slice,
+    fn_join,
+    fn_split,
+    fn_to_string,
+    fn_filter,
+    fn_fold_right,
+    fn_fold,
+    fn_map,
+    fn_nth,
+    fn_reverse,
+    fn_append,
+    fn_last,
+    fn_cdr,
+    fn_typeof,
+    fn_print,
+    fn_input,
+    fn_length,
+    fn_assert_eq,
+    fn_assert,
+    fn_create_list,
+    fn_cons,
+    fn_car,
+    fn_string_trim_left,
+    fn_string_trim_right,
+    fn_string_trim,
+);
 
 #[derive(Debug, Clone)]
 pub(crate) struct Frame {
@@ -712,9 +740,9 @@ impl Machine {
         let mut args = Vec::new();
         for _ in 0..args_len {
             let byte = self.get_u8()?;
-            args.push(Type::from_u8(byte).unwrap());
+            args.push(Type::try_from(byte).unwrap());
         }
-        let ret = Type::from_u8(self.get_u8()?).unwrap();
+        let ret = Type::try_from(self.get_u8()?).unwrap();
 
         let span = self.get_span()?;
         Ok(CallFfi::new(lib, ffi_function_name, args, ret, span))
@@ -1237,15 +1265,19 @@ impl Machine {
             *stack_value = value;
             return Ok(());
         }
+
         if index == self.global.len() {
             self.global.push(value);
             return Ok(());
         }
+
         Err(Box::new(Error::Internal(format!(
-            "{} invalid set-global address at {} ip: {}",
+            "{} invalid set-global address at {} ip: {} for {} and len is {}",
             file!(),
             index,
-            self.ip
+            self.ip,
+            metadata.name,
+            self.global.len(),
         ))))
     }
 
@@ -1412,6 +1444,7 @@ impl Machine {
                 let result = unsafe { CStr::from_ptr(result) };
                 Value::String(Box::new(result.to_string_lossy().to_string()))
             }
+            _ => unreachable!("unsupported return type for ffi call"),
         };
 
         let frame = self.get_current_frame_mut()?;
@@ -1450,6 +1483,7 @@ impl Machine {
         frame.stack.push(value);
         Ok(())
     }
+
     fn instruction_struct_setter(&mut self) -> Result<()> {
         let metatadata = self.get_metadata()?;
         let frame = self.get_current_frame_mut()?;

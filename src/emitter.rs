@@ -187,21 +187,21 @@ impl<'a> Emitter<'a> {
         program.push(Instruction::Jump(usize::MAX));
 
         let start = self.get_program_size(program);
-        let constructor_name = type_symbol.name.clone();
+        let constructor_name = format!("{}:new", type_symbol.name);
         let Some(constructor_symbol) = self.symbol_table.get(&constructor_name) else {
             unreachable!("This should never fail as we already checked this in AstWalker");
         };
         let type_metadata = RuntimeMetadata::from(type_symbol);
         let constructor_metadata = RuntimeMetadata::new(
             constructor_symbol.id(),
-            &constructor_name,
+            constructor_name.as_str(),
             constructor_symbol.span(),
         );
 
         program.push(Instruction::StructInit(type_metadata));
         program.push(Instruction::Return);
         let end = self.get_program_size(program);
-        let callable = Callable::new(start, constructor_name, constructor_symbol.span());
+        let callable = Callable::new(start, &constructor_name, constructor_symbol.span());
         let value = Value::Callable(Box::new(callable));
         program.push(Instruction::Push(Box::new(value)));
         program.push(Instruction::SetGlobal(constructor_metadata));
@@ -657,9 +657,9 @@ impl AstWalker<Program> for Emitter<'_> {
         let args = symbol
             .get_parameters()
             .iter()
-            .filter_map(|p| p.typeis)
+            .filter_map(|p| p.typeis.clone())
             .collect();
-        let ret = function.return_type.unwrap();
+        let ret = function.return_type.clone().unwrap();
         let call_ffi = crate::instruction::CallFfi::new(
             lib_name,
             ffi_function_name,

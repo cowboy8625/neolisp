@@ -3,6 +3,7 @@ use crate::instruction::{Value, ValueKind};
 use crate::machine::Machine;
 use crossterm::style::Stylize;
 use std::collections::HashMap;
+use std::io::Write;
 
 type Result<T> = std::result::Result<T, Box<Error>>;
 
@@ -372,6 +373,29 @@ impl Function {
         Ok(())
     }
 
+    pub(crate) fn fn_input(machine: &mut Machine) -> Result<()> {
+        // (input)
+        // (input "message")
+        if let Ok(Value::String(message)) = machine.pop_arg(1, Some(&[ValueKind::String])) {
+            print!("{}", message);
+            std::io::stdout().flush().unwrap();
+        }
+        let mut input = String::new();
+        let Ok(_) = std::io::stdin().read_line(&mut input) else {
+            return Err(Box::new(Error::RunTimeError {
+                span: machine.get_current_frame()?.span.clone(),
+                name: machine.get_current_frame()?.scope_name.to_string(),
+                message: "input failed".to_string(),
+                stack_trace: machine.create_stack_trace(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            }));
+        };
+        machine.push(Value::String(Box::new(input)))?;
+        Ok(())
+    }
+
     pub(crate) fn fn_length(machine: &mut Machine) -> Result<()> {
         // (length (list 1 2 3)) -> 3
         machine.check_arg_count(1)?;
@@ -503,6 +527,45 @@ impl Function {
         };
 
         machine.push(item.clone())?;
+        Ok(())
+    }
+
+    pub(crate) fn fn_string_trim_left(machine: &mut Machine) -> Result<()> {
+        // (string-trim-left "   hello") => "hello"
+        machine.check_arg_count(1)?;
+
+        let Value::String(string) = machine.pop_arg(1, Some(&[ValueKind::String]))? else {
+            unreachable!();
+        };
+
+        let trimmed = string.trim_start();
+        machine.push(Value::String(Box::new(trimmed.to_string())))?;
+        Ok(())
+    }
+
+    pub(crate) fn fn_string_trim_right(machine: &mut Machine) -> Result<()> {
+        // (string-trim-right "hello   \n") => "hello"
+        machine.check_arg_count(1)?;
+
+        let Value::String(string) = machine.pop_arg(1, Some(&[ValueKind::String]))? else {
+            unreachable!();
+        };
+
+        let trimmed = string.trim_end();
+        machine.push(Value::String(Box::new(trimmed.to_string())))?;
+        Ok(())
+    }
+
+    pub(crate) fn fn_string_trim(machine: &mut Machine) -> Result<()> {
+        // (string-trim-right "   hello   \n") => "hello"
+        machine.check_arg_count(1)?;
+
+        let Value::String(string) = machine.pop_arg(1, Some(&[ValueKind::String]))? else {
+            unreachable!();
+        };
+
+        let trimmed = string.trim();
+        machine.push(Value::String(Box::new(trimmed.to_string())))?;
         Ok(())
     }
 }

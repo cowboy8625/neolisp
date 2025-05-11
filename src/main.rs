@@ -30,6 +30,7 @@ fn main() -> anyhow::Result<()> {
             let compiler = Compiler::default()
                 .no_main(r.no_main)
                 .debug_ast(args.ast_debug)
+                .debug_symbol_table(args.symbol_table_debug)
                 .decompile(r.decompile)
                 .compile(&src, &mut symbol_table);
             let instructions = match compiler {

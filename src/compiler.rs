@@ -31,6 +31,7 @@ impl CompilerOptions {
 #[derive(Debug, Default)]
 pub struct Compiler {
     debug_ast: bool,
+    debug_symbol_table: bool,
     decompile: Option<Decompile>,
     no_main: bool,
     test: bool,
@@ -41,6 +42,11 @@ pub struct Compiler {
 impl Compiler {
     pub fn debug_ast(mut self, value: bool) -> Self {
         self.debug_ast = value;
+        self
+    }
+
+    pub fn debug_symbol_table(mut self, symbol_table_debug: bool) -> Self {
+        self.debug_symbol_table = symbol_table_debug;
         self
     }
 
@@ -89,6 +95,11 @@ impl Compiler {
         } else {
             0
         };
+
+        if self.debug_symbol_table {
+            eprintln!("{symbol_table:#?}");
+            return Ok(None);
+        }
 
         let instructions = Emitter::new(symbol_table, options)
             .with_offset(offset)

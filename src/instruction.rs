@@ -487,10 +487,10 @@ impl CallFfi {
         bytes.push(args_len as u8);
         // args
         for arg in &self.args {
-            bytes.push(*arg as u8);
+            bytes.push(arg.to_u8().expect("Invalid arg type"));
         }
         // ret
-        bytes.push(self.ret as u8);
+        bytes.push(self.ret.to_u8().expect("Invalid return type"));
         // 4 start span
         let start = self.span.start as u32;
         bytes.extend(&start.to_le_bytes());
@@ -530,6 +530,7 @@ impl CallFfi {
                 Type::Bool => libffi::middle::Type::i32(),
                 Type::Int => libffi::middle::Type::i32(),
                 Type::String => libffi::middle::Type::pointer(),
+                _ => unreachable!("unsupported argument type for ffi call: {t}"),
             })
             .collect()
     }
@@ -540,6 +541,7 @@ impl CallFfi {
             Type::Bool => libffi::middle::Type::i32(),
             Type::Int => libffi::middle::Type::i32(),
             Type::String => libffi::middle::Type::pointer(),
+            _ => unreachable!("unsupported argument type for ffi call: {}", self.ret),
         }
     }
 }
