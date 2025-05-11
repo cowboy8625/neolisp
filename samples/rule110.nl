@@ -54,16 +54,7 @@
 ; ----------------------------------------------------
 
 (fn is-alive (id)
-    (if (= id 0) 0
-    (if (= id 1) 1
-    (if (= id 2) 1
-    (if (= id 3) 1
-    (if (= id 4) 0
-    (if (= id 5) 1
-    (if (= id 6) 1
-    (if (= id 7) 0
-      ; else
-      0)))))))))
+  (nth '(0 1 1 1 0 1 1 0) id))
 
 (test is-alive
   (it
@@ -157,13 +148,11 @@
 ; ----------------------------------------------------
 
 (fn main ()
-  (var i 0)
   (var line nil)
   (let
-    ((grid (append (my-map (lambda (x) 0) (range 119)) (list 1)))
+    ((grid (append (my-map (lambda (x) 0) (range 156)) (list 1)))
     (is-running true))
-    (loop (and is-running (< i 10))
-      (set i (+ i 1))
+    (loop is-running
       (set grid (next-generation grid))
       (set line (join "" (my-map (lambda (x) (if (= x 1) "*" " ")) grid)))
       (print line "\n"))))

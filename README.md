@@ -29,9 +29,11 @@ To get started with NeoLisp, follow these steps:
    ```bash
    cargo run --release -- run samples/hello_world.nl
    ```
-1. ***Docs***: View the [documentation](Docs.md) for NeoLisp more in-depth info.
+
+1. **_Docs_**: View the [documentation](Docs.md) for NeoLisp more in-depth info.
 
 ## Syntax
+
 ```lisp
 ;; Comments
 
@@ -57,6 +59,10 @@ To get started with NeoLisp, follow these steps:
 
 '(10 20 30) ;;  -> (10 20 30)
 
+(struct Point x 10 y 20)
+(var point (Point:new :x 10 :y 20))
+(var x (Point:get point :x))
+(Point:set point :y 30)
 ```
 
 ## Builtin Testing
@@ -67,13 +73,16 @@ NeoLisp comes with a built-in testing framework that allows you to write and run
 ;; Builtin testing run with `neolisp test`
 (test add (assert-eq :expected 3 :actual (add 1 2) :description "1 + 2 = 3"))
 ```
+
 By running the `neolisp test` command, NeoLisp will run all the tests in the `src/main.nl` file.
 You can also provide a specific test file as an argument to the `neolisp test` command.
+
 ```bash
 neolisp test
 ```
 
 ## Examples
+
 - [Fibonacci](./samples/fib.nl)
 - [Rule110](./samples/rule110.nl)
 
@@ -92,7 +101,7 @@ neolisp run my_script.nl
 You can also enter the NeoLisp REPL (Read-Eval-Print Loop) by running the binary with the `-r` flag.
 
 ```bash
-neolisp run -r
+neolisp
 ```
 
 ## Contributing
