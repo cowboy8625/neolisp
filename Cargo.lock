@@ -679,6 +679,7 @@ dependencies = [
  "crossterm",
  "insta",
  "libffi",
+ "libffi-sys",
  "libloading",
  "num-derive",
  "num-traits",

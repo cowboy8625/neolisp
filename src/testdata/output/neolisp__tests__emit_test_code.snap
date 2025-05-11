@@ -8,7 +8,7 @@ expression: string
 000019     25  add        2
 00001B     27  push       3
 000025     37  eq 2
-000027     39  push       <builtin 20:assert:20..40>
+000027     39  push       <builtin 21:assert:20..40>
 00003F     63  call       1
 000041     65  ret-test
 000042     66  push       <function 5:test()test-testing:0..42>

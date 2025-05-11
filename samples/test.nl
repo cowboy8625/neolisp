@@ -1,5 +1,9 @@
 ; (test sleep ; not sure how to test this
 
+; Helper for testing
+; test is a list of assert-eq or assert
+(fn it (tests) (fold false (lambda (acc value) (or acc value)) tests))
+
 ; operator functions
 
 (test add+2
@@ -564,6 +568,17 @@
     :actual (car '(1 2 3))
     :description "car '(1 2 3) -> 1"))
 
+; TODO: would be nice to be able to define a struct in side of the type its self.
+(struct Person
+  name :string
+  age :int)
+
+(test struct-items
+  (var person (Person:new :name "Bob" :age 30))
+  (it
+    (list
+      (assert-eq :expected "Bob" :actual (Person:get person :name) :description "Person:get person :name -> \"Bob\"")
+      (assert-eq :expected 30 :actual (Person:get person :age) :description "Person:get person :age -> 30"))))
 
 ; let binding
 

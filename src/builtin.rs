@@ -3,6 +3,7 @@ use crate::instruction::{Value, ValueKind};
 use crate::machine::Machine;
 use crossterm::style::Stylize;
 use std::collections::HashMap;
+use std::io::Write;
 
 type Result<T> = std::result::Result<T, Box<Error>>;
 
@@ -372,6 +373,29 @@ impl Function {
         Ok(())
     }
 
+    pub(crate) fn fn_input(machine: &mut Machine) -> Result<()> {
+        // (input)
+        // (input "message")
+        if let Ok(Value::String(message)) = machine.pop_arg(1, Some(&[ValueKind::String])) {
+            print!("{}", message);
+            std::io::stdout().flush().unwrap();
+        }
+        let mut input = String::new();
+        let Ok(_) = std::io::stdin().read_line(&mut input) else {
+            return Err(Box::new(Error::RunTimeError {
+                span: machine.get_current_frame()?.span.clone(),
+                name: machine.get_current_frame()?.scope_name.to_string(),
+                message: "input failed".to_string(),
+                stack_trace: machine.create_stack_trace(),
+                code: "".to_string(),
+                note: None,
+                help: None,
+            }));
+        };
+        machine.push(Value::String(Box::new(input)))?;
+        Ok(())
+    }
+
     pub(crate) fn fn_length(machine: &mut Machine) -> Result<()> {
         // (length (list 1 2 3)) -> 3
         machine.check_arg_count(1)?;
@@ -505,4 +529,91 @@ impl Function {
         machine.push(item.clone())?;
         Ok(())
     }
+
+    pub(crate) fn fn_string_trim_left(machine: &mut Machine) -> Result<()> {
+        // (string-trim-left "   hello") => "hello"
+        machine.check_arg_count(1)?;
+
+        let Value::String(string) = machine.pop_arg(1, Some(&[ValueKind::String]))? else {
+            unreachable!();
+        };
+
+        let trimmed = string.trim_start();
+        machine.push(Value::String(Box::new(trimmed.to_string())))?;
+        Ok(())
+    }
+
+    pub(crate) fn fn_string_trim_right(machine: &mut Machine) -> Result<()> {
+        // (string-trim-right "hello   \n") => "hello"
+        machine.check_arg_count(1)?;
+
+        let Value::String(string) = machine.pop_arg(1, Some(&[ValueKind::String]))? else {
+            unreachable!();
+        };
+
+        let trimmed = string.trim_end();
+        machine.push(Value::String(Box::new(trimmed.to_string())))?;
+        Ok(())
+    }
+
+    pub(crate) fn fn_string_trim(machine: &mut Machine) -> Result<()> {
+        // (string-trim-right "   hello   \n") => "hello"
+        machine.check_arg_count(1)?;
+
+        let Value::String(string) = machine.pop_arg(1, Some(&[ValueKind::String]))? else {
+            unreachable!();
+        };
+
+        let trimmed = string.trim();
+        machine.push(Value::String(Box::new(trimmed.to_string())))?;
+        Ok(())
+    }
+
+    pub(crate) fn fn_print_fmt(machine: &mut Machine) -> Result<()> {
+        // (print-fmt "hello {}" "world") => "hello world"
+        use std::io::Write;
+        let frame = machine.get_current_frame_mut()?;
+        let args = frame.args.iter().skip(1).collect::<Vec<_>>();
+        let Some(Value::String(format_arg)) = frame.args.first() else {
+            let span = frame.span.clone();
+            let stack_trace = machine.create_stack_trace();
+            let error = Error::RunTimeError {
+                name: "Expected String".to_string(),
+                span,
+                stack_trace,
+                message: "First argument to print-fmt must be a format string".to_string(),
+                code: "E012".to_string(),
+                note: None,
+                help: None,
+            };
+            return Err(Box::new(error));
+        };
+        let output = format_from_vec(format_arg, &args);
+        let lock = std::io::stdout().lock();
+        let mut writer = std::io::BufWriter::new(lock);
+        writer.write_all(output.as_bytes()).expect("write failed");
+        writer.flush().expect("flush failed");
+        frame.stack.push(Value::Nil);
+        Ok(())
+    }
+}
+
+fn format_from_vec(fmt: &str, args: &[&Value]) -> String {
+    let mut result = String::new();
+    let mut parts = fmt.split("{}");
+    let mut iter = args.iter();
+
+    if let Some(first) = parts.next() {
+        result.push_str(first);
+    }
+
+    for part in parts {
+        match iter.next() {
+            Some(value) => result.push_str(&value.to_string()),
+            None => result.push_str("{}"),
+        }
+        result.push_str(part);
+    }
+
+    result
 }
