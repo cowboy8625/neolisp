@@ -19,6 +19,20 @@
 (fn any-number-of-expressions-in-body (x y z) (var a 10)(+ a x y z))
 ```
 
+### return
+
+- returns the first argument
+- arguments type: `Any`
+- example:
+
+```lisp
+(fn main ()
+  ; returns nil
+  (if true (return))
+  ; print will not be executed
+  (print 10))
+```
+
 ### lambda
 
 - returns a `Function`
