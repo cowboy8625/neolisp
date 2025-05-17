@@ -181,30 +181,38 @@ pub struct StructExpr<'a> {
     pub span: Span,
 }
 
+#[derive(Debug)]
+pub struct ReturnExpr<'a> {
+    pub return_keyword: &'a Spanned<Expr>,
+    pub expr: Option<&'a Spanned<Expr>>,
+    pub span: Span,
+}
+
 pub trait AstWalker<T> {
     fn error(&mut self, _: Error);
     fn get_lambda_name(&mut self) -> String;
-    fn handle_operator(&mut self, _: &mut T, _: &str, _: &OperatorExpr);
-    fn handle_builtin(&mut self, _: &mut T, _: &str, _: Span, _: &[Spanned<Expr>]);
-    fn handle_test(&mut self, _: &mut T, _: &TestExpr);
-    fn handle_function(&mut self, _: &mut T, _: &FunctionExpr);
-    fn handle_lambda(&mut self, _: &mut T, _: &LambdaExpr);
-    fn handle_let_binding(&mut self, _: &mut T, _: &LetBindingExpr);
-    fn handle_call(&mut self, _: &mut T, _: &CallExpr);
-    fn handle_var(&mut self, _: &mut T, _: &VarExpr);
-    fn handle_set(&mut self, _: &mut T, _: &SetExpr);
-    fn handle_if_else(&mut self, _: &mut T, _: &IfElseExpr);
-    fn handle_loop(&mut self, _: &mut T, _: &LoopExpr);
     fn handle_bool(&mut self, _: &mut T, _: bool);
-    fn handle_nil(&mut self, _: &mut T);
-    fn handle_string(&mut self, _: &mut T, _: &str);
-    fn handle_number(&mut self, _: &mut T, _: f64);
-    fn handle_symbol(&mut self, _: &mut T, _: &str, _: Span);
-    fn handle_quote(&mut self, _: &mut T, _: &QuoteExpr);
+    fn handle_builtin(&mut self, _: &mut T, _: &str, _: Span, _: &[Spanned<Expr>]);
+    fn handle_call(&mut self, _: &mut T, _: &CallExpr);
     fn handle_ffi_bind_fn(&mut self, _: &mut T, _: &FfiBindFnExpr);
     fn handle_ffi_bind_struct(&mut self, _: &mut T, _: &FfiBindStructExpr);
-    fn handle_struct(&mut self, _: &mut T, _: &StructExpr);
+    fn handle_function(&mut self, _: &mut T, _: &FunctionExpr);
+    fn handle_if_else(&mut self, _: &mut T, _: &IfElseExpr);
     fn handle_keyword(&mut self, _: &mut T, _: &str, _: Span);
+    fn handle_lambda(&mut self, _: &mut T, _: &LambdaExpr);
+    fn handle_let_binding(&mut self, _: &mut T, _: &LetBindingExpr);
+    fn handle_loop(&mut self, _: &mut T, _: &LoopExpr);
+    fn handle_nil(&mut self, _: &mut T);
+    fn handle_number(&mut self, _: &mut T, _: f64);
+    fn handle_operator(&mut self, _: &mut T, _: &str, _: &OperatorExpr);
+    fn handle_quote(&mut self, _: &mut T, _: &QuoteExpr);
+    fn handle_return(&mut self, _: &mut T, _: &ReturnExpr);
+    fn handle_set(&mut self, _: &mut T, _: &SetExpr);
+    fn handle_string(&mut self, _: &mut T, _: &str);
+    fn handle_struct(&mut self, _: &mut T, _: &StructExpr);
+    fn handle_symbol(&mut self, _: &mut T, _: &str, _: Span);
+    fn handle_test(&mut self, _: &mut T, _: &TestExpr);
+    fn handle_var(&mut self, _: &mut T, _: &VarExpr);
 
     fn walk_list(&mut self, t: &mut T, exprs: &[Spanned<Expr>], span: Span) {
         let Some(first) = exprs.first() else {
@@ -277,6 +285,7 @@ pub trait AstWalker<T> {
             "quote" => self.walk_quote(t, exprs, span),
             "ffi-bind" => self.walk_ffi_bind(t, exprs, span),
             "struct" => self.walk_struct(t, exprs),
+            "return" => self.walk_return(t, exprs, span),
             _ => panic!("Unknown keyword: {name}"),
         }
     }
@@ -846,8 +855,10 @@ pub trait AstWalker<T> {
         let body_list = &elements.iter().skip(BODY).collect::<Vec<_>>();
         // TODO: Is a empty body valid?
         // (fn foo ())
-        // I think to answer this question I would as is this useful?
+        // I think to answer this question I would ask is this useful?
         // I don't think so? But I will leave it for now till I am sure.
+        // You can always just write (fn foo nil) to do nothing
+        // So maybe this is the answer?
         if body_list.is_empty() {
             self.error(Error::ExpectedFound {
                 span: condtion_spanned.span.clone(),
@@ -864,6 +875,17 @@ pub trait AstWalker<T> {
             body: body_list,
         };
         self.handle_loop(t, &loop_expr);
+    }
+
+    fn walk_return(&mut self, t: &mut T, exprs: &[Spanned<Expr>], span: Span) {
+        const KEYWORD: usize = 0;
+        const EXPRS: usize = 1;
+        let return_expr = ReturnExpr {
+            return_keyword: &exprs[KEYWORD],
+            expr: exprs.get(EXPRS),
+            span,
+        };
+        self.handle_return(t, &return_expr);
     }
 
     fn walk_expr(&mut self, t: &mut T, spanned: &Spanned<Expr>) {

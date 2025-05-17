@@ -596,6 +596,66 @@ impl Function {
         frame.stack.push(Value::Nil);
         Ok(())
     }
+
+    pub(crate) fn fn_string_to_number(machine: &mut Machine) -> Result<()> {
+        let Value::String(string) = machine.pop_arg(1, Some(&[ValueKind::String]))? else {
+            unreachable!();
+        };
+
+        let Ok(number) = string.parse::<f64>() else {
+            machine.push(Value::Nil)?;
+            return Ok(());
+        };
+        machine.push(Value::F64(number))?;
+
+        Ok(())
+    }
+
+    pub(crate) fn fn_random_int(machine: &mut Machine) -> Result<()> {
+        // (random-int 10)
+        use rand::Rng;
+        let Value::F64(max) = machine.pop_arg(1, Some(&[ValueKind::F64]))? else {
+            unreachable!();
+        };
+        let Value::F64(min) = machine.pop_arg(1, Some(&[ValueKind::F64]))? else {
+            unreachable!();
+        };
+        let mut rng = rand::rng();
+        machine.push(Value::F64(
+            rng.random_range((min as u32)..(max as u32)) as f64
+        ))?;
+        Ok(())
+    }
+
+    pub(crate) fn fn_max(machine: &mut Machine) -> Result<()> {
+        let frame = machine.get_current_frame_mut()?;
+        let Some(max) = frame.args.iter().reduce(|a, b| if a.gt(b) { a } else { b }) else {
+            unreachable!();
+        };
+        frame.stack.push(max.clone());
+        Ok(())
+    }
+
+    pub(crate) fn fn_min(machine: &mut Machine) -> Result<()> {
+        let frame = machine.get_current_frame_mut()?;
+        let Some(max) = frame
+            .args
+            .iter()
+            .reduce(|a, b| if !a.gt(b) { a } else { b })
+        else {
+            unreachable!();
+        };
+        frame.stack.push(max.clone());
+        Ok(())
+    }
+
+    pub(crate) fn fn_floor(machine: &mut Machine) -> Result<()> {
+        let Value::F64(value) = machine.pop_arg(1, Some(&[ValueKind::F64]))? else {
+            unreachable!();
+        };
+        machine.push(Value::F64(value.floor()))?;
+        Ok(())
+    }
 }
 
 fn format_from_vec(fmt: &str, args: &[&Value]) -> String {

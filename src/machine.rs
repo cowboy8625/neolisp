@@ -41,7 +41,10 @@ macro_rules! generate_instruction_operator {
                     (Value::F64(l), Value::F64(r)) if l $token r => continue,
                     (Value::Keyword(l), Value::Keyword(r)) if l $token r => continue,
                     (Value::Symbol(l), Value::Symbol(r)) if l $token r => continue,
+                    (Value::String(l), Value::Symbol(r)) if l $token r => continue,
+                    (Value::Symbol(l), Value::String(r)) if l $token r => continue,
                     (Value::String(l), Value::String(r)) if l $token r => continue,
+                    (l @ Value::Nil, r @ Value::Nil) if l $token r => continue,
                     (r, l) if l.type_of() != r.type_of() => {
                         frame.stack.push(Value::Nil);
                         return Ok(());
@@ -152,6 +155,11 @@ make_static_array!(
     fn_string_trim_right,
     fn_string_trim,
     fn_print_fmt,
+    fn_string_to_number,
+    fn_random_int,
+    fn_max,
+    fn_min,
+    fn_floor,
 );
 
 #[derive(Debug, Clone)]
@@ -1486,7 +1494,7 @@ impl Machine {
     }
 
     fn instruction_struct_setter(&mut self) -> Result<()> {
-        let metatadata = self.get_metadata()?;
+        let metadata = self.get_metadata()?;
         let frame = self.get_current_frame_mut()?;
         let Some(value) = frame.args.pop() else {
             // TODO: ERROR REPORTING
@@ -1500,11 +1508,11 @@ impl Machine {
             // TODO: ERROR REPORTING
             panic!("no value on the stack for StructSetter");
         };
-        if struct_value.borrow().name != *metatadata.name {
+        if struct_value.borrow().name != *metadata.name {
             // TODO: ERROR REPORTING
             panic!(
                 "miss match struct setter function called on struct '{}' with '{}'",
-                metatadata.name,
+                metadata.name,
                 struct_value.borrow().name,
             );
         }
@@ -1525,7 +1533,7 @@ impl Machine {
         Ok(())
     }
     fn instruction_struct_getter(&mut self) -> Result<()> {
-        let metatadata = self.get_metadata()?;
+        let metadata = self.get_metadata()?;
         let frame = self.get_current_frame_mut()?;
         let Some(Value::Keyword(name)) = frame.args.pop() else {
             // TODO: ERROR REPORTING
@@ -1533,13 +1541,13 @@ impl Machine {
         };
         let Some(Value::Struct(struct_value)) = frame.args.pop() else {
             // TODO: ERROR REPORTING
-            panic!("no value on the stack for StructSetter");
+            panic!("no value on the stack for StructSetter",);
         };
-        if struct_value.borrow().name != *metatadata.name {
+        if struct_value.borrow().name != *metadata.name {
             // TODO: ERROR REPORTING
             panic!(
                 "miss match struct getter function called on struct '{}' with '{}'",
-                metatadata.name,
+                metadata.name,
                 struct_value.borrow().name,
             );
         }
@@ -1664,286 +1672,263 @@ impl Machine {
     }
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::{Machine, Value};
-//     use anyhow::Result;
-//     #[test]
-//     fn test_single_value() -> Result<()> {
-//         let mut machine = Machine::default();
-//         machine.run_from_string(r#"12345"#)?;
-//         machine.run()?;
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(frame.stack[0], Value::F64(12345.0));
-//         assert_eq!(machine.cycle_count, 2);
-//
-//         let mut machine = Machine::default();
-//         machine.run_from_string(r#"321.123"#)?;
-//         machine.run()?;
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(frame.stack[0], Value::F64(321.123));
-//
-//         let mut machine = Machine::default();
-//         machine.run_from_string(r#""string :)""#)?;
-//         machine.run()?;
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(
-//             frame.stack[0],
-//             Value::String(Box::new(String::from("string :)")))
-//         );
-//         assert_eq!(machine.cycle_count, 2);
-//         assert_eq!(machine.cycle_count, 2);
-//         Ok(())
-//     }
-//
-//     #[test]
-//     fn test_add_function() -> Result<()> {
-//         let src = r#"(+ 1 2)"#;
-//         let mut machine = Machine::default();
-//         machine.run_from_string(src)?;
-//         machine.run()?;
-//
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(frame.stack[0], Value::F64(3.0));
-//         assert_eq!(machine.cycle_count, 4);
-//         Ok(())
-//     }
-//
-//     #[test]
-//     fn test_sub_function() -> Result<()> {
-//         let src = r#"(- 2 1)"#;
-//         let mut machine = Machine::default();
-//         machine.run_from_string(src)?;
-//         machine.run()?;
-//
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(frame.stack[0], Value::F64(1.0));
-//         assert_eq!(machine.cycle_count, 4);
-//         Ok(())
-//     }
-//
-//     #[test]
-//     fn test_mul_function() -> Result<()> {
-//         let src = r#"(* 2 1)"#;
-//         let mut machine = Machine::default();
-//         machine.run_from_string(src)?;
-//         machine.run()?;
-//
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(frame.stack[0], Value::F64(2.0));
-//         assert_eq!(machine.cycle_count, 4);
-//         Ok(())
-//     }
-//
-//     #[test]
-//     fn test_div_function() -> Result<()> {
-//         let src = r#"(/ 2 1)"#;
-//         let mut machine = Machine::default();
-//         machine.run_from_string(src)?;
-//         machine.run()?;
-//
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(frame.stack[0], Value::F64(2.0));
-//         assert_eq!(machine.cycle_count, 4);
-//         Ok(())
-//     }
-//
-//     #[test]
-//     fn test_eq_function() -> Result<()> {
-//         let src = r#"(= 2 2 2)"#;
-//         let mut machine = Machine::default();
-//         machine.run_from_string(src)?;
-//         machine.run()?;
-//
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(frame.stack[0], Value::Bool(true));
-//         assert_eq!(machine.cycle_count, 5);
-//         Ok(())
-//     }
-//
-//     #[test]
-//     fn test_gt_function() -> Result<()> {
-//         let src = r#"(> 3 2 1)"#;
-//         let mut machine = Machine::default();
-//         machine.run_from_string(src)?;
-//         machine.run()?;
-//
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(frame.stack[0], Value::Bool(true));
-//         assert_eq!(machine.cycle_count, 5);
-//         Ok(())
-//     }
-//
-//     #[test]
-//     fn test_lt_function() -> Result<()> {
-//         let src = r#"(< 2 3 4)"#;
-//         let mut machine = Machine::default();
-//         machine.run_from_string(src)?;
-//         machine.run()?;
-//
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(frame.stack[0], Value::Bool(true));
-//         assert_eq!(machine.cycle_count, 5);
-//         Ok(())
-//     }
-//
-//     #[test]
-//     fn test_gte_function() -> Result<()> {
-//         let src = r#"(>= 3 3 2 1)"#;
-//         let mut machine = Machine::default();
-//         machine.run_from_string(src)?;
-//         machine.run()?;
-//
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(frame.stack[0], Value::Bool(true));
-//         assert_eq!(machine.cycle_count, 6);
-//         Ok(())
-//     }
-//
-//     #[test]
-//     fn test_lte_function() -> Result<()> {
-//         let src = r#"(<= 1 3 2 1)"#;
-//         let mut machine = Machine::default();
-//         machine.run_from_string(src)?;
-//         machine.run()?;
-//
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(frame.stack[0], Value::Bool(true));
-//         assert_eq!(machine.cycle_count, 6);
-//         Ok(())
-//     }
-//
-//     #[test]
-//     fn test_and_function() -> Result<()> {
-//         let src = r#"(and true true)"#;
-//         let mut machine = Machine::default();
-//         machine.run_from_string(src)?;
-//         machine.run()?;
-//
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(frame.stack[0], Value::Bool(true));
-//         assert_eq!(machine.cycle_count, 4);
-//         Ok(())
-//     }
-//
-//     #[test]
-//     fn test_or_function() -> Result<()> {
-//         let src = r#"(or false true)"#;
-//         let mut machine = Machine::default();
-//         machine.run_from_string(src)?;
-//         machine.run()?;
-//
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(frame.stack[0], Value::Bool(true));
-//         assert_eq!(machine.cycle_count, 4);
-//         Ok(())
-//     }
-//
-//     #[test]
-//     fn test_not_function() -> Result<()> {
-//         let src = r#"(not false)"#;
-//         let mut machine = Machine::default();
-//         machine.run_from_string(src)?;
-//         machine.run()?;
-//
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(frame.stack[0], Value::Bool(true));
-//         assert_eq!(machine.cycle_count, 3);
-//         Ok(())
-//     }
-//
-//     #[test]
-//     fn test_mod_function() -> Result<()> {
-//         let src = r#"(mod 4 2)"#;
-//         let mut machine = Machine::default();
-//         machine.run_from_string(src)?;
-//         machine.run()?;
-//
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(frame.stack[0], Value::F64(0.0));
-//         assert_eq!(machine.cycle_count, 4);
-//         Ok(())
-//     }
-//
-//     #[test]
-//     fn test_calling_a_function() -> Result<()> {
-//         let src = r#"
-//         (fn add (x y) (+ x y))
-//         (add 123 321)
-//         "#;
-//         let mut machine = Machine::default();
-//         machine.run_from_string(src)?;
-//         machine.run()?;
-//
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(frame.stack[0], Value::F64(444.0));
-//         assert_eq!(machine.cycle_count, 12);
-//         Ok(())
-//     }
-//
-//     #[test]
-//     fn test_calling_a_lambda() -> Result<()> {
-//         let src = r#"
-//         (var add (lambda (x y) (+ x y)))
-//         (add 123 321)
-//         "#;
-//         let mut machine = Machine::default();
-//         machine.run_from_string(src)?;
-//         machine.run()?;
-//
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(frame.stack[0], Value::F64(444.0));
-//         assert_eq!(machine.cycle_count, 12);
-//         Ok(())
-//     }
-//
-//     #[test]
-//     fn test_var_function() -> Result<()> {
-//         let src = r#"
-//         (var X 100)
-//         (var Y 300)
-//         (fn add (x y) (+ x y))
-//         (add X Y)
-//         "#;
-//         let mut machine = Machine::default();
-//         machine.run_from_string(src)?;
-//         machine.run()?;
-//
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(frame.stack[0], Value::F64(400.0));
-//         assert_eq!(machine.cycle_count, 16);
-//         Ok(())
-//     }
-//
-//     #[test]
-//     fn test_if_else_function() -> Result<()> {
-//         let mut machine = Machine::default();
-//         machine.run_from_string("(if true 1 3)")?;
-//         machine.run()?;
-//
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(frame.stack[0], Value::F64(1.0));
-//         assert_eq!(machine.cycle_count, 5);
-//
-//         let mut machine = Machine::default();
-//         machine.run_from_string("(if false 1 3)")?;
-//         machine.run()?;
-//
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(frame.stack[0], Value::F64(3.0));
-//         assert_eq!(machine.cycle_count, 4);
-//         Ok(())
-//     }
-//
-//     #[test]
-//     fn test_let_function() -> Result<()> {
-//         let mut machine = Machine::default();
-//         machine.run_from_string("(let (x 10) x)")?;
-//         machine.run()?;
-//
-//         let frame = machine.get_current_frame()?;
-//         assert_eq!(frame.stack[0], Value::F64(10.0));
-//         assert_eq!(machine.cycle_count, 4);
-//         Ok(())
-//     }
-// }
+#[cfg(test)]
+mod tests {
+    use super::{Compiler, Machine, SymbolTable, Value};
+    use anyhow::Result;
+    use pretty_assertions::assert_eq;
+
+    fn run_program(src: &str) -> Result<Machine> {
+        let mut symbol_table = SymbolTable::default();
+        let compiler = Compiler::default()
+            .no_main(true)
+            .compile(&src, &mut symbol_table);
+
+        let instructions = match compiler {
+            Ok(Some(instructions)) => instructions,
+            Ok(None) => return Err(anyhow::anyhow!("Failed to compile")),
+            Err(errors) => {
+                for error in errors {
+                    error.report(&"test", &src);
+                }
+                return Err(anyhow::anyhow!("Failed to compile"));
+            }
+        };
+
+        let program: Vec<u8> = instructions.iter().flat_map(|i| i.to_bytecode()).collect();
+        let mut machine = Machine::new(program, symbol_table);
+        match machine.run() {
+            Ok(()) => return Ok(machine),
+            Err(e) => Err(anyhow::anyhow!(e)),
+        }
+    }
+
+    #[test]
+    fn test_single_value() {
+        let machine = run_program(r#"12345"#).unwrap();
+        let frame = machine.get_current_frame().unwrap();
+        assert_eq!(frame.stack[0], Value::F64(12345.0));
+        assert_eq!(machine.cycle_count, 2);
+
+        let machine = run_program(r#"321.123"#).unwrap();
+        let frame = machine.get_current_frame().unwrap();
+        assert_eq!(frame.stack[0], Value::F64(321.123));
+
+        let machine = run_program(r#""string :)""#).unwrap();
+        let frame = machine.get_current_frame().unwrap();
+        assert_eq!(
+            frame.stack[0],
+            Value::String(Box::new(String::from("string :)")))
+        );
+        assert_eq!(machine.cycle_count, 2);
+        assert_eq!(machine.cycle_count, 2);
+    }
+
+    #[test]
+    fn test_add_function() {
+        let machine = run_program(r#"(+ 1 2)"#).unwrap();
+        let frame = machine.get_current_frame().unwrap();
+        assert_eq!(frame.stack[0], Value::F64(3.0));
+        assert_eq!(machine.cycle_count, 4);
+    }
+
+    #[test]
+    fn test_sub_function() {
+        let machine = run_program(r#"(- 2 1)"#).unwrap();
+        let frame = machine.get_current_frame().unwrap();
+        assert_eq!(frame.stack[0], Value::F64(1.0));
+        assert_eq!(machine.cycle_count, 4);
+    }
+
+    #[test]
+    fn test_mul_function() {
+        let machine = run_program(r#"(* 2 1)"#).unwrap();
+        let frame = machine.get_current_frame().unwrap();
+        assert_eq!(frame.stack[0], Value::F64(2.0));
+        assert_eq!(machine.cycle_count, 4);
+    }
+
+    #[test]
+    fn test_div_function() {
+        let machine = run_program(r#"(/ 2 1)"#).unwrap();
+        let frame = machine.get_current_frame().unwrap();
+        assert_eq!(frame.stack[0], Value::F64(2.0));
+        assert_eq!(machine.cycle_count, 4);
+    }
+
+    #[test]
+    fn test_eq_function() {
+        let src = r#"(= 2 2 2)"#;
+        let machine = run_program(src).unwrap();
+        let frame = machine.get_current_frame().unwrap();
+        assert_eq!(frame.stack[0], Value::Bool(true));
+        assert_eq!(machine.cycle_count, 5);
+    }
+
+    #[test]
+    fn test_gt_function() {
+        let src = r#"(> 3 2 1)"#;
+        let machine = run_program(src).unwrap();
+        let frame = machine.get_current_frame().unwrap();
+        assert_eq!(frame.stack[0], Value::Bool(true));
+        assert_eq!(machine.cycle_count, 5);
+    }
+
+    #[test]
+    fn test_lt_function() {
+        let src = r#"(< 2 3 4)"#;
+        let machine = run_program(src).unwrap();
+        let frame = machine.get_current_frame().unwrap();
+        assert_eq!(frame.stack[0], Value::Bool(true));
+        assert_eq!(machine.cycle_count, 5);
+    }
+
+    #[test]
+    fn test_gte_function() {
+        let src = r#"(>= 3 3 2 1)"#;
+        let machine = run_program(src).unwrap();
+        let frame = machine.get_current_frame().unwrap();
+        assert_eq!(frame.stack[0], Value::Bool(true));
+        assert_eq!(machine.cycle_count, 6);
+    }
+
+    #[test]
+    fn test_lte_function() {
+        let src = r#"(<= 1 3 2 1)"#;
+        let machine = run_program(src).unwrap();
+        let frame = machine.get_current_frame().unwrap();
+        assert_eq!(frame.stack[0], Value::Bool(true));
+        assert_eq!(machine.cycle_count, 6);
+    }
+
+    #[test]
+    fn test_and_function() {
+        let src = r#"(and true true)"#;
+        let machine = run_program(src).unwrap();
+        let frame = machine.get_current_frame().unwrap();
+        assert_eq!(frame.stack[0], Value::Bool(true));
+        assert_eq!(machine.cycle_count, 4);
+    }
+
+    #[test]
+    fn test_or_function() {
+        let src = r#"(or false true)"#;
+        let machine = run_program(src).unwrap();
+        let frame = machine.get_current_frame().unwrap();
+        assert_eq!(frame.stack[0], Value::Bool(true));
+        assert_eq!(machine.cycle_count, 4);
+    }
+
+    #[test]
+    fn test_not_function() {
+        let src = r#"(not false)"#;
+        let machine = run_program(src).unwrap();
+        let frame = machine.get_current_frame().unwrap();
+        assert_eq!(frame.stack[0], Value::Bool(true));
+        assert_eq!(machine.cycle_count, 3);
+    }
+
+    #[test]
+    fn test_mod_function() {
+        let src = r#"(mod 4 2)"#;
+        let machine = run_program(src).unwrap();
+        let frame = machine.get_current_frame().unwrap();
+        assert_eq!(frame.stack[0], Value::F64(0.0));
+        assert_eq!(machine.cycle_count, 4);
+    }
+
+    #[test]
+    fn test_calling_a_function() {
+        let src = r#"
+            (fn add (x y) (+ x y))
+            (add 123 321)
+            "#;
+        let machine = run_program(src).unwrap();
+        let frame = machine.get_current_frame().unwrap();
+        assert_eq!(frame.stack[0], Value::F64(444.0));
+        assert_eq!(machine.cycle_count, 12);
+    }
+
+    #[test]
+    fn test_calling_a_lambda() {
+        let src = r#"
+            (var add (lambda (x y) (+ x y)))
+            (add 123 321)
+            "#;
+        let machine = run_program(src).unwrap();
+        let frame = machine.get_current_frame().unwrap();
+        assert_eq!(frame.stack[0], Value::F64(444.0));
+        assert_eq!(machine.cycle_count, 12);
+    }
+
+    #[test]
+    fn test_var_function() {
+        let src = r#"
+            (var X 100)
+            (var Y 300)
+            (fn add (x y) (+ x y))
+            (add X Y)
+            "#;
+        let machine = run_program(src).unwrap();
+        let frame = machine.get_current_frame().unwrap();
+        assert_eq!(frame.stack[0], Value::F64(400.0));
+        assert_eq!(machine.cycle_count, 16);
+    }
+
+    #[test]
+    fn test_quote() {
+        // TODO: use this test for the run time error when using a quote on the list.
+        let src = r#"
+(struct Person
+    name :string
+    age :int)
+(var people (list
+    (Person:new :name "Bob" :age 20)
+    (Person:new :name "Alice" :age 21)))
+
+    (var person (nth people 0))
+    (var name (Person:get person :name))
+    (var age (Person:get person :age))
+            "#;
+        let machine = run_program(src).unwrap();
+        // let frame = machine.get_current_frame().unwrap();
+        assert_eq!(
+            machine.global.get(5),
+            Some(&Value::String(Box::new(String::from("Bob"))))
+        );
+        assert_eq!(machine.global.get(6), Some(&Value::F64(20.0)));
+        assert_eq!(machine.cycle_count, 48);
+    }
+
+    // #[test]
+    // fn test_if_else_function() -> Result<()> {
+    //     let mut machine = Machine::default();
+    //     machine.run_from_string("(if true 1 3)")?;
+    //     machine.run()?;
+    //
+    //     let frame = machine.get_current_frame()?;
+    //     assert_eq!(frame.stack[0], Value::F64(1.0));
+    //     assert_eq!(machine.cycle_count, 5);
+    //
+    //     let mut machine = Machine::default();
+    //     machine.run_from_string("(if false 1 3)")?;
+    //     machine.run()?;
+    //
+    //     let frame = machine.get_current_frame()?;
+    //     assert_eq!(frame.stack[0], Value::F64(3.0));
+    //     assert_eq!(machine.cycle_count, 4);
+    //     Ok(())
+    // }
+    //
+    // #[test]
+    // fn test_let_function() -> Result<()> {
+    //     let mut machine = Machine::default();
+    //     machine.run_from_string("(let (x 10) x)")?;
+    //     machine.run()?;
+    //
+    //     let frame = machine.get_current_frame()?;
+    //     assert_eq!(frame.stack[0], Value::F64(10.0));
+    //     assert_eq!(machine.cycle_count, 4);
+    //     Ok(())
+    // }
+}

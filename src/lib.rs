@@ -34,6 +34,11 @@ const BUILTINS: &[&str] = &[
     "string-trim-right",
     "string-trim",
     "print-fmt",
+    "string->number",
+    "random-int",
+    "max",
+    "min",
+    "floor",
 ];
 
 /// Keywords that are not builtins functions, but are
@@ -41,6 +46,7 @@ const BUILTINS: &[&str] = &[
 /// i.e. `ffi-bind`
 const KEYWORDS: &[&str] = &[
     "var", "set", "let", "fn", "if", "lambda", "loop", "quote", "test", "ffi-bind", "struct",
+    "return",
 ];
 
 pub mod ast;

@@ -4,8 +4,8 @@ use super::{
     error::Error,
     expr_walker::{
         AstWalker, CallExpr, FfiBindFnExpr, FfiBindStructExpr, FunctionExpr, IfElseExpr,
-        LambdaExpr, LetBindingExpr, LoopExpr, OperatorExpr, QuoteExpr, SetExpr, StructExpr,
-        TestExpr, VarExpr,
+        LambdaExpr, LetBindingExpr, LoopExpr, OperatorExpr, QuoteExpr, ReturnExpr, SetExpr,
+        StructExpr, TestExpr, VarExpr,
     },
 };
 use std::collections::HashMap;
@@ -1325,6 +1325,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
     fn handle_number(&mut self, _: &mut SymbolTable, _: f64) {}
     fn handle_quote(&mut self, _: &mut SymbolTable, _: &QuoteExpr) {}
     fn handle_keyword(&mut self, _: &mut SymbolTable, _: &str, _: Span) {}
+    fn handle_return(&mut self, _: &mut SymbolTable, _: &ReturnExpr) {}
     // -----------  END NOT USED  -----------
 }
 

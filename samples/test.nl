@@ -170,7 +170,7 @@
                38 39 40 41 42 43 44 45 46 47 48 49 50)
     :description ">= 1..50 -> false"))
 
-; TODO: not will fail at runtime if a bool is not given
+; TODO: 'not' will fail at runtime if a bool is not given
 
 (test not-false-true
   (assert-eq
@@ -184,7 +184,7 @@
     :actual (not true)
     :description "not true -> false"))
 
-; TODO: Again and will fail at runtime if a bool is not given
+; TODO: Again 'and' will fail at runtime if a bool is not given
 
 (test and-2-true
   (assert-eq
@@ -210,7 +210,7 @@
     :actual (and true true false true true)
     :description "and true true false true true -> false"))
 
-; TODO: Again or will fail at runtime if a bool is not given
+; TODO: Again 'or' will fail at runtime if a bool is not given
 
 (test or-2-true
   (assert-eq
@@ -567,6 +567,25 @@
     :expected 1
     :actual (car '(1 2 3))
     :description "car '(1 2 3) -> 1"))
+
+(test max
+  (assert-eq
+    :expected 5
+    :actual (max 1 2 3 4 5)
+    :description "max 1 2 3 4 5 -> 5"))
+
+(test min
+  (assert-eq
+    :expected 1
+    :actual (min 1 2 3 4 5)
+    :description "min 1 2 3 4 5 -> 1"))
+
+; TODO: expected should maybe take a lambda
+; (test random-int
+;   (assert-eq
+;     :expected 7
+;     :actual (random-int 0 10)
+;     :description "random-int 0 10 -> 0-10"))
 
 ; TODO: would be nice to be able to define a struct in side of the type its self.
 (struct Person
