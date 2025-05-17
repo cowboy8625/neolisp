@@ -619,6 +619,16 @@
 (min 10 20 30) ; -> 10
 ```
 
+### floor
+
+- returns the floor of the first argument
+- arguments type: `Number`
+- example:
+
+```lisp
+(floor 10.5) ; -> 10
+```
+
 ### ffi-bind
 
 - creates a binding to a dll/so file
