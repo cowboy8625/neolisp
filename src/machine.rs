@@ -41,6 +41,8 @@ macro_rules! generate_instruction_operator {
                     (Value::F64(l), Value::F64(r)) if l $token r => continue,
                     (Value::Keyword(l), Value::Keyword(r)) if l $token r => continue,
                     (Value::Symbol(l), Value::Symbol(r)) if l $token r => continue,
+                    (Value::String(l), Value::Symbol(r)) if l $token r => continue,
+                    (Value::Symbol(l), Value::String(r)) if l $token r => continue,
                     (Value::String(l), Value::String(r)) if l $token r => continue,
                     (l @ Value::Nil, r @ Value::Nil) if l $token r => continue,
                     (r, l) if l.type_of() != r.type_of() => {
