@@ -357,6 +357,12 @@ pub struct Callable {
     pub span: Span,
 }
 
+impl PartialOrd for Callable {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.address.cmp(&other.address))
+    }
+}
+
 impl Callable {
     pub fn new(address: usize, name: impl Into<String>, span: Span) -> Self {
         Self {
@@ -600,7 +606,7 @@ impl std::fmt::Display for ValueKind {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, PartialOrd)]
 pub enum Value {
     Nil,
     U8(u8),
@@ -619,6 +625,17 @@ pub enum Value {
 }
 
 impl Value {
+    pub fn gt(&self, other: &Value) -> bool {
+        match (self, other) {
+            (Value::U8(a), Value::U8(b)) => a > b,
+            (Value::I32(a), Value::I32(b)) => a > b,
+            (Value::U32(a), Value::U32(b)) => a > b,
+            (Value::F32(a), Value::F32(b)) => a > b,
+            (Value::F64(a), Value::F64(b)) => a > b,
+            _ => false,
+        }
+    }
+
     pub fn kind(&self) -> ValueKind {
         match self {
             Self::Nil => ValueKind::Nil,
@@ -813,6 +830,12 @@ pub struct Struct {
     pub span: Span,
     pub field_names: Vec<String>,
     pub field_values: Vec<Value>,
+}
+
+impl PartialOrd for Struct {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.name.cmp(&other.name))
+    }
 }
 
 impl Struct {

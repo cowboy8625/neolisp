@@ -232,6 +232,17 @@
 (print 10)
 ```
 
+### print-fmt
+
+- returns nil
+- arguments type: `Any`
+  1.  `String`: format string
+  2.  `Any`: arguments
+
+```lisp
+(print-fmt "hello {}" "world")
+```
+
 ### type?
 
 - returns the type of the first argument
@@ -483,6 +494,19 @@
 (to-string 1000) ; -> "1000"
 ```
 
+### string->number
+
+- return number representation in number form if not a number nil is returned
+- arguments
+  1.  `String`
+- example:
+
+```lisp
+(string->number "1000") ; -> 1000
+(string->number "100abc") ; -> nil
+(string->number "abc") ; -> nil
+```
+
 ### split
 
 - return list of string split by separator
@@ -545,6 +569,40 @@
 ```lisp
 (slice "abc" 1 2) ; -> "b"
 (slice (list 1 2 3) 1 2) ; -> (2)
+```
+
+### random-int
+
+- return a random integer between min and max
+- arguments
+  1.  `Number` min
+  2.  `Number` max
+- example:
+
+```lisp
+(random-int 1 10) ; -> random number between 1 and 10
+```
+
+### max
+
+- returns the maximum of the arguments
+- arguments type: `Number`
+- example:
+
+```lisp
+(max 10 20) ; -> 20
+(max 10 20 30) ; -> 30
+```
+
+### min
+
+- returns the minimum of the arguments
+- arguments type: `Number`
+- example:
+
+```lisp
+(min 10 20) ; -> 10
+(min 10 20 30) ; -> 10
 ```
 
 ### ffi-bind

@@ -4,8 +4,8 @@ use super::{
     error::Error,
     expr_walker::{
         AstWalker, CallExpr, FfiBindFnExpr, FfiBindStructExpr, FunctionExpr, IfElseExpr,
-        LambdaExpr, LetBindingExpr, LoopExpr, OperatorExpr, QuoteExpr, SetExpr, StructExpr,
-        TestExpr, VarExpr,
+        LambdaExpr, LetBindingExpr, LoopExpr, OperatorExpr, QuoteExpr, ReturnExpr, SetExpr,
+        StructExpr, TestExpr, VarExpr,
     },
     instruction::{Callable, Instruction, LoadLibrary, RuntimeMetadata, Value},
     symbol_table::{
@@ -805,5 +805,14 @@ impl AstWalker<Program> for Emitter<'_> {
         program.push(Instruction::Push(Box::new(Value::Keyword(Box::new(
             name.to_string(),
         )))));
+    }
+
+    fn handle_return(&mut self, program: &mut Program, expr: &ReturnExpr) {
+        let Some(expr) = expr.expr.as_ref() else {
+            program.push(Instruction::Return);
+            return;
+        };
+        self.walk_expr(program, expr);
+        program.push(Instruction::Return);
     }
 }
