@@ -83,10 +83,7 @@ impl Compiler {
             return Ok(None);
         }
 
-        let ast: Vec<_> = ast
-            .iter()
-            .map(|expr| crate::ast::macro_expand(expr))
-            .collect();
+        let ast: Vec<_> = ast.iter().map(crate::ast::macro_expand).collect();
 
         let options = CompilerOptions::default()
             .with_test(self.test)
