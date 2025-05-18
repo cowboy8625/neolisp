@@ -212,7 +212,7 @@ fn expand_quasiquote(expr: &Spanned) -> Spanned {
                         Expr::Symbol("list".to_string()),
                         expr.span.clone(),
                     ))
-                    .chain(parts.into_iter())
+                    .chain(parts)
                     .collect(),
                 );
                 Spanned::new(final_expr, expr.span.clone())
@@ -234,8 +234,7 @@ fn make_splicing_list(items: Vec<Spanned>) -> Spanned {
     let mut list_parts = vec![];
     let mut splice_next = false;
 
-    let mut iter = items.into_iter();
-    while let Some(item) = iter.next() {
+    for item in items {
         if let Symbol(s) = &item.expr {
             if s == "__SPLICE_MARKER__" {
                 splice_next = true;
@@ -261,7 +260,7 @@ fn make_splicing_list(items: Vec<Spanned>) -> Spanned {
     Spanned::new(
         Expr::List(
             std::iter::once(Spanned::new(Symbol("append".into()), span.clone()))
-                .chain(list_parts.into_iter())
+                .chain(list_parts)
                 .collect(),
         ),
         span,
