@@ -202,10 +202,7 @@ fn expand_quasiquote(expr: &Spanned) -> Spanned {
             }
 
             if has_splice {
-                let expr = make_splicing_list(parts);
-                crate::ast::print_expr(&expr);
-                eprintln!("{expr}");
-                expr
+                make_splicing_list(parts)
             } else {
                 let final_expr = Expr::List(
                     std::iter::once(Spanned::new(
