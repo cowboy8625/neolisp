@@ -5,7 +5,12 @@ const HISTORY_PATH: &str = "%TEMP%.history";
 const HISTORY_PATH: &str = "/tmp/.history";
 
 #[derive(Debug, Parser)]
-#[command(about = "neolisp - a simple Lisp interpreter", long_about = None, color = clap::ColorChoice::Always)]
+#[command(
+    about = "neolisp - a simple Lisp interpreter",
+    long_about = None,
+    color = clap::ColorChoice::Always,
+    version = env!("CARGO_PKG_VERSION"),
+)]
 pub struct Cli {
     #[arg(short, long, default_value_t = false)]
     pub ast_debug: bool,
