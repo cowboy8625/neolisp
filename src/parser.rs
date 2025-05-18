@@ -2,7 +2,7 @@ use crate::ast::{Expr, Span, Spanned};
 use crate::error::{Error, ErrorType};
 use chumsky::prelude::*;
 
-pub fn parse_expr() -> impl Parser<char, Spanned<Expr>, Error = Error> {
+pub fn parse_expr() -> impl Parser<char, Spanned, Error = Error> {
     recursive(|expr| {
         let comment = just(';').then(take_until(just('\n'))).padded();
 
@@ -87,7 +87,7 @@ pub fn parse_expr() -> impl Parser<char, Spanned<Expr>, Error = Error> {
         let quoted = just('\'')
             .ignore_then(expr.clone())
             .padded_by(comment.repeated())
-            .map_with_span(|e: Spanned<Expr>, span: Span| {
+            .map_with_span(|e: Spanned, span: Span| {
                 (
                     Expr::List(vec![
                         (Expr::Symbol("quote".to_string()), span.clone()).into(),
@@ -98,25 +98,75 @@ pub fn parse_expr() -> impl Parser<char, Spanned<Expr>, Error = Error> {
                     .into()
             });
 
+        let unquote = just(',')
+            .ignore_then(expr.clone())
+            .padded_by(comment.repeated())
+            .map_with_span(|e: Spanned, span: Span| {
+                (
+                    Expr::List(vec![
+                        (Expr::Symbol("unquote".to_string()), span.clone()).into(),
+                        e,
+                    ]),
+                    span,
+                )
+                    .into()
+            });
+
+        let unquote_splicing = just(",@")
+            .ignore_then(expr.clone())
+            .padded_by(comment.repeated())
+            .map_with_span(|e: Spanned, span: Span| {
+                (
+                    Expr::List(vec![
+                        (Expr::Symbol("unquote-splicing".to_string()), span.clone()).into(),
+                        e,
+                    ]),
+                    span,
+                )
+                    .into()
+            });
+
+        let quasiquote = just('`')
+            .ignore_then(expr.clone())
+            .padded_by(comment.repeated())
+            .map_with_span(|e: Spanned, span: Span| {
+                (
+                    Expr::List(vec![
+                        (Expr::Symbol("quasiquote".to_string()), span.clone()).into(),
+                        e,
+                    ]),
+                    span,
+                )
+                    .into()
+            });
+
         let list = expr
             .repeated()
             .delimited_by(
-                just('(').map_err(|e| Error::with_label(e, ErrorType::MissingOpeningParenthesis)),
-                just(')').map_err(|e| Error::with_label(e, ErrorType::MissingClosingParenthesis)),
+                just('(')
+                    .padded()
+                    .map_err(|e| Error::with_label(e, ErrorType::MissingOpeningParenthesis)),
+                just(')')
+                    .padded()
+                    .map_err(|e| Error::with_label(e, ErrorType::MissingClosingParenthesis)),
             )
             .padded_by(comment.repeated())
             .padded()
             .map_with_span(|list, span| Spanned::from((Expr::List(list), span)));
 
-        list.or(quoted).or(atom)
+        list.or(quoted)
+            .or(quasiquote)
+            .or(unquote_splicing)
+            .or(unquote)
+            .or(atom)
     })
 }
 
-pub fn parser() -> impl Parser<char, Vec<Spanned<Expr>>, Error = Error> {
+pub fn parser() -> impl Parser<char, Vec<Spanned>, Error = Error> {
     parse_expr().repeated().padded().then_ignore(end())
 }
 
-pub fn parse_or_report(filename: &str, src: &str) -> Vec<Spanned<Expr>> {
+pub fn parse_or_report(filename: &str, src: &str) -> Vec<Spanned> {
     use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
     match parser().parse(src) {
         Ok(ast) => ast,
@@ -142,3 +192,18 @@ pub fn parse_or_report(filename: &str, src: &str) -> Vec<Spanned<Expr>> {
         }
     }
 }
+
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use pretty_assertions::assert_eq;
+//     #[test]
+//     fn quasiquote() {
+//         use pretty_assertions::assert_eq;
+//         let src = r#"
+//         `(1 ,(list n))
+//         "#;
+//         let ast = parser().parse(src).unwrap();
+//         assert_eq!(ast, vec![]);
+//     }
+// }

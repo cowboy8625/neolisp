@@ -698,13 +698,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
         }
     }
 
-    fn handle_builtin(
-        &mut self,
-        table: &mut SymbolTable,
-        _: &str,
-        _: Span,
-        expr: &[Spanned<Expr>],
-    ) {
+    fn handle_builtin(&mut self, table: &mut SymbolTable, _: &str, _: Span, expr: &[Spanned]) {
         for spanned in expr.iter().skip(1) {
             self.walk_expr(table, spanned);
         }
@@ -1329,7 +1323,7 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
     // -----------  END NOT USED  -----------
 }
 
-fn is_recursive(lambda_name: &str, body: &Spanned<Expr>) -> bool {
+fn is_recursive(lambda_name: &str, body: &Spanned) -> bool {
     match &body.expr {
         Expr::Symbol(name) => name == lambda_name,
         Expr::List(list) => list

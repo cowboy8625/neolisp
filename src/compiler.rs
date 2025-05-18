@@ -1,4 +1,5 @@
 use super::{
+    ast,
     cli::Decompile,
     emitter::Emitter,
     error::Error,
@@ -78,9 +79,11 @@ impl Compiler {
         let ast = parser().parse(src)?;
 
         if self.debug_ast {
-            eprintln!("{ast:#?}");
+            ast::print_ast(&ast);
             return Ok(None);
         }
+
+        let ast: Vec<_> = ast.iter().map(crate::ast::macro_expand).collect();
 
         let options = CompilerOptions::default()
             .with_test(self.test)

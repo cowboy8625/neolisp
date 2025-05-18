@@ -78,11 +78,11 @@
     :actual (= 1 1)
     :description "= 1 1 -> true"))
 
-(test equal=2-nil
+(test equal=2-used-to-be-nil
   (assert-eq
-    :expected nil
+    :expected false
     :actual (= 1 'a)
-    :description "= 1 'a -> nil"))
+    :description "= 1 'a -> false"))
 
 (test equal=50
   (assert-eq
@@ -104,11 +104,11 @@
     :actual (> 2 1)
     :description "> 2 1 -> true"))
 
-(test greater>2-nil
+(test greater>2-used-to-be-nil
   (assert-eq
-    :expected nil
+    :expected false
     :actual (> 1 'a)
-    :description "> 1 'a -> nil"))
+    :description "> 1 'a -> false"))
 
 (test greater>50
   (assert-eq
@@ -130,11 +130,11 @@
     :actual (< 2 1)
     :description "> 2 1 -> false"))
 
-(test less<2-nil
+(test less<2-used-to-be-nil
   (assert-eq
-    :expected nil
+    :expected false
     :actual (< 1 'a)
-    :description "< 1 'a -> nil"))
+    :description "< 1 'a -> false"))
 
 (test less<50
   (assert-eq
@@ -156,11 +156,11 @@
     :actual (>= 2 1)
     :description ">= 2 1 -> true"))
 
-(test greater-or-equal>=2-nil
+(test greater-or-equal>=2-used-to-be-nil
   (assert-eq
-    :expected nil
+    :expected false
     :actual (>= 1 'a)
-    :description ">= 1 'a -> nil"))
+    :description ">= 1 'a -> false"))
 
 (test greater-or-equal=>50
   (assert-eq
@@ -580,12 +580,12 @@
     :actual (min 1 2 3 4 5)
     :description "min 1 2 3 4 5 -> 1"))
 
-; TODO: expected should maybe take a lambda
-; (test random-int
-;   (assert-eq
-;     :expected 7
-;     :actual (random-int 0 10)
-;     :description "random-int 0 10 -> 0-10"))
+(test random-int
+  (var max 10)
+  (var min 0)
+  (var number (random-int min max))
+  (var is-in-range (and (>= number min) (<= number max)))
+  (assert is-in-range "random-int 0 10 -> 0-10"))
 
 ; TODO: would be nice to be able to define a struct in side of the type its self.
 (struct Person
@@ -598,6 +598,23 @@
     (list
       (assert-eq :expected "Bob" :actual (Person:get person :name) :description "Person:get person :name -> \"Bob\"")
       (assert-eq :expected 30 :actual (Person:get person :age) :description "Person:get person :age -> 30"))))
+
+(test quasiquote
+  (var people `(
+    ,(Person:new :name "Bob" :age 20)))
+  (var person (nth people 0))
+  (var name (Person:get person :name))
+  (var age (Person:get person :age))
+  (it
+    (list
+      (assert-eq :expected "Bob" :actual name :description "This test is just to check the quasiquote works")
+      (assert-eq :expected 20 :actual age :description "This test is just to check the quasiquote works"))))
+
+(test unquote-splicing
+  (var adding (list '+ 1 2))
+  (var num 1)
+  (var result `(,@adding ,num))
+  (assert-eq :expected '(+ 1 2 1) :actual result :description "unquote-splicing -> '(+ 1 2 1)"))
 
 ; let binding
 

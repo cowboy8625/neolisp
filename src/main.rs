@@ -38,7 +38,7 @@ fn main() -> anyhow::Result<()> {
                 Ok(None) => return Ok(()),
                 Err(errors) => {
                     for error in errors {
-                        error.report(&filename, &src);
+                        error.report(&filename, &src, !args.no_color);
                     }
                     return Ok(());
                 }
@@ -55,7 +55,7 @@ fn main() -> anyhow::Result<()> {
             }
 
             if let Err(error) = machine.run() {
-                error.report(&filename, &src);
+                error.report(&filename, &src, !args.no_color);
             }
 
             Ok(())
@@ -76,7 +76,7 @@ fn main() -> anyhow::Result<()> {
                 Ok(None) => return Ok(()),
                 Err(errors) => {
                     for error in errors {
-                        error.report(&filename, &src);
+                        error.report(&filename, &src, !args.no_color);
                     }
                     return Ok(());
                 }
@@ -93,7 +93,7 @@ fn main() -> anyhow::Result<()> {
                 match machine.run() {
                     Ok(()) => {}
                     Err(error) => {
-                        error.report(&filename, &src);
+                        error.report(&filename, &src, !args.no_color);
                     }
                 }
             }

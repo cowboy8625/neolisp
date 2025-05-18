@@ -144,7 +144,7 @@ pub fn run(args: Cli) -> Result<()> {
             Ok(()) => (),
             Err(e) => {
                 for e in e {
-                    e.report("repl", &input);
+                    e.report("repl", &input, !args.no_color);
                 }
             }
         }

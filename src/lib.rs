@@ -45,8 +45,10 @@ const BUILTINS: &[&str] = &[
 /// more of a compile time functionality
 /// i.e. `ffi-bind`
 const KEYWORDS: &[&str] = &[
-    "var", "set", "let", "fn", "if", "lambda", "loop", "quote", "test", "ffi-bind", "struct",
-    "return",
+    "var", "set", "let", "fn", "if", "lambda", "loop",
+    // TODO: move quote to macro expansion function instead.  I dont think it should be in here.
+    // also changed the name to __QUOTE__ in parser.
+    "quote", "test", "ffi-bind", "struct", "return",
 ];
 
 pub mod ast;

@@ -9,6 +9,8 @@ const HISTORY_PATH: &str = "/tmp/.history";
 pub struct Cli {
     #[arg(short, long, default_value_t = false)]
     pub ast_debug: bool,
+    #[arg(short, long, default_value_t = false)]
+    pub no_color: bool,
     #[arg(long, default_value_t = false)]
     pub symbol_table_debug: bool,
     #[arg(short='H', long, default_value_t = String::from(HISTORY_PATH))]

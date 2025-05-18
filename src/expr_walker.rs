@@ -8,14 +8,14 @@ use super::{
 
 #[derive(Debug)]
 pub struct OperatorExpr<'a> {
-    pub operator: &'a Spanned<Expr>,
-    pub args: &'a [&'a Spanned<Expr>],
+    pub operator: &'a Spanned,
+    pub args: &'a [&'a Spanned],
 }
 
 #[derive(Debug)]
 pub struct VarExpr<'a> {
-    pub name: &'a Spanned<Expr>,
-    pub body: &'a Spanned<Expr>,
+    pub name: &'a Spanned,
+    pub body: &'a Spanned,
 }
 
 impl VarExpr<'_> {
@@ -28,15 +28,15 @@ impl VarExpr<'_> {
 
 #[derive(Debug)]
 pub struct SetExpr<'a> {
-    pub name: &'a Spanned<Expr>,
-    pub body: &'a Spanned<Expr>,
+    pub name: &'a Spanned,
+    pub body: &'a Spanned,
 }
 
 #[derive(Debug)]
 pub struct TestExpr<'a> {
-    pub keyword: &'a Spanned<Expr>,
-    pub name: &'a Spanned<Expr>,
-    pub body: &'a [&'a Spanned<Expr>],
+    pub keyword: &'a Spanned,
+    pub name: &'a Spanned,
+    pub body: &'a [&'a Spanned],
     pub span: Span,
 }
 
@@ -45,7 +45,7 @@ impl TestExpr<'_> {
         format!("test_{}", self.name)
     }
 
-    pub fn as_expr(&self) -> Spanned<Expr> {
+    pub fn as_expr(&self) -> Spanned {
         let mut list = vec![self.keyword.clone(), self.name.clone()];
 
         list.extend(self.body.iter().map(|&expr| expr.clone()));
@@ -56,14 +56,14 @@ impl TestExpr<'_> {
 
 #[derive(Debug)]
 pub struct LoopExpr<'a> {
-    pub condition: &'a Spanned<Expr>,
-    pub body: &'a [&'a Spanned<Expr>],
+    pub condition: &'a Spanned,
+    pub body: &'a [&'a Spanned],
 }
 
 #[derive(Debug)]
 pub struct LambdaExpr<'a> {
-    pub params: &'a Spanned<Expr>,
-    pub body: &'a [&'a Spanned<Expr>],
+    pub params: &'a Spanned,
+    pub body: &'a [&'a Spanned],
 }
 
 impl LambdaExpr<'_> {
@@ -82,15 +82,15 @@ impl LambdaExpr<'_> {
 
 #[derive(Debug)]
 pub struct FunctionExpr<'a> {
-    pub fn_symbol: &'a Spanned<Expr>,
-    pub name: &'a Spanned<Expr>,
-    pub params: &'a Spanned<Expr>,
-    pub body: &'a [&'a Spanned<Expr>],
+    pub fn_symbol: &'a Spanned,
+    pub name: &'a Spanned,
+    pub params: &'a Spanned,
+    pub body: &'a [&'a Spanned],
     pub span: Span,
 }
 
 impl FunctionExpr<'_> {
-    pub fn as_expr(&self) -> Spanned<Expr> {
+    pub fn as_expr(&self) -> Spanned {
         let mut list = vec![
             self.fn_symbol.clone(),
             self.name.clone(),
@@ -105,86 +105,86 @@ impl FunctionExpr<'_> {
 
 #[derive(Debug)]
 pub struct CallExpr<'a> {
-    pub callee: &'a Spanned<Expr>,
-    pub args: &'a [&'a Spanned<Expr>],
+    pub callee: &'a Spanned,
+    pub args: &'a [&'a Spanned],
 }
 
 #[derive(Debug)]
 pub struct IfElseExpr<'a> {
-    pub condition: &'a Spanned<Expr>,
-    pub then: &'a Spanned<Expr>,
-    pub otherwise: Option<&'a Spanned<Expr>>,
+    pub condition: &'a Spanned,
+    pub then: &'a Spanned,
+    pub otherwise: Option<&'a Spanned>,
 }
 
 #[derive(Debug)]
 pub struct LetBindingExpr<'a> {
-    pub bindings: &'a [&'a Spanned<Expr>],
-    pub body: &'a [&'a Spanned<Expr>],
+    pub bindings: &'a [&'a Spanned],
+    pub body: &'a [&'a Spanned],
 }
 
 #[derive(Debug)]
 pub struct QuoteExpr<'a> {
-    pub quoted: &'a Spanned<Expr>,
-    pub expr: &'a Spanned<Expr>,
+    pub quoted: &'a Spanned,
+    pub expr: &'a Spanned,
     pub span: Span,
 }
 
 #[derive(Debug)]
 pub struct FfiBindFnExpr<'a> {
     /// ffi-bind keyword
-    pub name: &'a Spanned<Expr>,
+    pub name: &'a Spanned,
     /// library name symbol is in
     /// :library "libname"
-    pub lib: &'a Spanned<Expr>,
+    pub lib: &'a Spanned,
     /// symbol name in the library
     /// :symbol "symbolname"
-    pub symbol: &'a Spanned<Expr>,
+    pub symbol: &'a Spanned,
     /// name of function in source code aka neolisp
     /// :fn 'function-name-in-source
-    pub fn_symbol: &'a Spanned<Expr>,
+    pub fn_symbol: &'a Spanned,
     /// arguments to the function in library
     /// :args '(int int)
-    pub args: &'a Spanned<Expr>,
+    pub args: &'a Spanned,
     /// return type of the function
     /// :return 'int
-    pub return_type: &'a Spanned<Expr>,
+    pub return_type: &'a Spanned,
     pub span: Span,
 }
 
 #[derive(Debug)]
 pub struct FfiBindStructExpr<'a> {
     /// ffi-bind keyword
-    pub name: &'a Spanned<Expr>,
+    pub name: &'a Spanned,
     /// library name symbol is in
     /// :library "libname"
-    pub lib: &'a Spanned<Expr>,
+    pub lib: &'a Spanned,
     /// symbol name in the library
     /// :symbol "symbolname"
-    pub symbol: &'a Spanned<Expr>,
+    pub symbol: &'a Spanned,
     /// name of function in source code aka neolisp
     /// :struct 'struct-name-in-source
-    pub struct_symbol: &'a Spanned<Expr>,
+    pub struct_symbol: &'a Spanned,
     /// arguments to the function in library
     /// :args '(int int)
-    pub fields: &'a Spanned<Expr>,
+    pub fields: &'a Spanned,
     pub span: Span,
 }
 
 #[derive(Debug)]
 pub struct StructExpr<'a> {
     /// struct keyword
-    pub struct_keyword: &'a Spanned<Expr>,
+    pub struct_keyword: &'a Spanned,
     /// struct name
-    pub name: &'a Spanned<Expr>,
+    pub name: &'a Spanned,
     /// struct fields
-    pub fields: &'a [&'a Spanned<Expr>],
+    pub fields: &'a [&'a Spanned],
     pub span: Span,
 }
 
 #[derive(Debug)]
 pub struct ReturnExpr<'a> {
-    pub return_keyword: &'a Spanned<Expr>,
-    pub expr: Option<&'a Spanned<Expr>>,
+    pub return_keyword: &'a Spanned,
+    pub expr: Option<&'a Spanned>,
     pub span: Span,
 }
 
@@ -192,7 +192,7 @@ pub trait AstWalker<T> {
     fn error(&mut self, _: Error);
     fn get_lambda_name(&mut self) -> String;
     fn handle_bool(&mut self, _: &mut T, _: bool);
-    fn handle_builtin(&mut self, _: &mut T, _: &str, _: Span, _: &[Spanned<Expr>]);
+    fn handle_builtin(&mut self, _: &mut T, _: &str, _: Span, _: &[Spanned]);
     fn handle_call(&mut self, _: &mut T, _: &CallExpr);
     fn handle_ffi_bind_fn(&mut self, _: &mut T, _: &FfiBindFnExpr);
     fn handle_ffi_bind_struct(&mut self, _: &mut T, _: &FfiBindStructExpr);
@@ -214,7 +214,7 @@ pub trait AstWalker<T> {
     fn handle_test(&mut self, _: &mut T, _: &TestExpr);
     fn handle_var(&mut self, _: &mut T, _: &VarExpr);
 
-    fn walk_list(&mut self, t: &mut T, exprs: &[Spanned<Expr>], span: Span) {
+    fn walk_list(&mut self, t: &mut T, exprs: &[Spanned], span: Span) {
         let Some(first) = exprs.first() else {
             // TODO: Should this be an error?
             return;
@@ -237,7 +237,7 @@ pub trait AstWalker<T> {
         }
     }
 
-    fn walk_operator(&mut self, t: &mut T, symbol: &str, exprs: &[Spanned<Expr>]) {
+    fn walk_operator(&mut self, t: &mut T, symbol: &str, exprs: &[Spanned]) {
         const OPERATOR: usize = 0;
         const ARGS: usize = 1;
 
@@ -255,7 +255,7 @@ pub trait AstWalker<T> {
         self.handle_operator(t, symbol, &operator)
     }
 
-    fn walk_callable(&mut self, t: &mut T, exprs: &[Spanned<Expr>]) {
+    fn walk_callable(&mut self, t: &mut T, exprs: &[Spanned]) {
         const ARGS: usize = 1;
         let Some(first) = exprs.first() else {
             // TODO: Should this be an error?
@@ -272,7 +272,7 @@ pub trait AstWalker<T> {
         )
     }
 
-    fn walk_keyword(&mut self, t: &mut T, name: &str, exprs: &[Spanned<Expr>], span: Span) {
+    fn walk_keyword(&mut self, t: &mut T, name: &str, exprs: &[Spanned], span: Span) {
         match name {
             "var" => self.walk_var(t, exprs),
             "set" => self.walk_set(t, exprs),
@@ -286,11 +286,13 @@ pub trait AstWalker<T> {
             "ffi-bind" => self.walk_ffi_bind(t, exprs, span),
             "struct" => self.walk_struct(t, exprs),
             "return" => self.walk_return(t, exprs, span),
+            "unquote" => unreachable!("unquote"),
+            "quasiquote" => unreachable!("quasiquote"),
             _ => panic!("Unknown keyword: {name}"),
         }
     }
 
-    fn walk_struct(&mut self, t: &mut T, elements: &[Spanned<Expr>]) {
+    fn walk_struct(&mut self, t: &mut T, elements: &[Spanned]) {
         const STRUCT_KEYWORD: usize = 0;
         const STRUCT_NAME: usize = STRUCT_KEYWORD + 1;
         const FIELDS: usize = STRUCT_NAME + 1;
@@ -324,7 +326,7 @@ pub trait AstWalker<T> {
         self.handle_struct(t, &struct_expr);
     }
 
-    fn walk_ffi_bind(&mut self, t: &mut T, elements: &[Spanned<Expr>], span: Span) {
+    fn walk_ffi_bind(&mut self, t: &mut T, elements: &[Spanned], span: Span) {
         let mut items = HashMap::new();
         let mut element_iters = elements.iter().skip(1);
         while let Some(ele) = element_iters.next() {
@@ -364,8 +366,8 @@ pub trait AstWalker<T> {
     fn walk_ffi_bind_fn(
         &mut self,
         t: &mut T,
-        items: &HashMap<&String, &Spanned<Expr>>,
-        name: &Spanned<Expr>,
+        items: &HashMap<&String, &Spanned>,
+        name: &Spanned,
         span: Span,
     ) {
         const HELP : &str = "(ffi-bind :library <string> :symbol <string>  :fn <symbol> <args> (<symbol>*) :return <symbol>)";
@@ -440,8 +442,8 @@ pub trait AstWalker<T> {
     fn walk_ffi_bind_struct(
         &mut self,
         t: &mut T,
-        items: &HashMap<&String, &Spanned<Expr>>,
-        name: &Spanned<Expr>,
+        items: &HashMap<&String, &Spanned>,
+        name: &Spanned,
         span: Span,
     ) {
         const HELP : &str = "(ffi-bind :library <string> :symbol <string>  :struct <symbol> :fields (<symbol> <type>))";
@@ -501,7 +503,7 @@ pub trait AstWalker<T> {
         self.handle_ffi_bind_struct(t, &ffi_bind_expr);
     }
 
-    fn walk_quote(&mut self, t: &mut T, elements: &[Spanned<Expr>], span: Span) {
+    fn walk_quote(&mut self, t: &mut T, elements: &[Spanned], span: Span) {
         const QUOTED: usize = 0;
         const BODY: usize = 1;
 
@@ -536,7 +538,7 @@ pub trait AstWalker<T> {
         self.handle_quote(t, &quote);
     }
 
-    fn walk_if(&mut self, t: &mut T, elements: &[Spanned<Expr>]) {
+    fn walk_if(&mut self, t: &mut T, elements: &[Spanned]) {
         const CONDITION: usize = 1;
         const THEN: usize = 2;
         const OTHERWISE: usize = 3;
@@ -573,7 +575,7 @@ pub trait AstWalker<T> {
         self.handle_if_else(t, &if_else);
     }
 
-    fn walk_let_binding(&mut self, t: &mut T, elements: &[Spanned<Expr>]) {
+    fn walk_let_binding(&mut self, t: &mut T, elements: &[Spanned]) {
         const BINDINGS: usize = 1;
         const BODY: usize = 2;
 
@@ -619,7 +621,7 @@ pub trait AstWalker<T> {
         self.handle_let_binding(t, &let_binding_expr);
     }
 
-    fn walk_lambda(&mut self, t: &mut T, elements: &[Spanned<Expr>]) {
+    fn walk_lambda(&mut self, t: &mut T, elements: &[Spanned]) {
         const PARAMS: usize = 1;
         const BODY: usize = 2;
 
@@ -656,7 +658,7 @@ pub trait AstWalker<T> {
         self.handle_lambda(t, &function);
     }
 
-    fn walk_fn(&mut self, t: &mut T, elements: &[Spanned<Expr>], span: Span) {
+    fn walk_fn(&mut self, t: &mut T, elements: &[Spanned], span: Span) {
         const NAME: usize = 1;
         const PARAMS: usize = 2;
         const BODY: usize = 3;
@@ -710,7 +712,7 @@ pub trait AstWalker<T> {
         self.handle_function(t, &function);
     }
 
-    fn walk_var(&mut self, t: &mut T, elements: &[Spanned<Expr>]) {
+    fn walk_var(&mut self, t: &mut T, elements: &[Spanned]) {
         const NAME: usize = 1;
         const BODY: usize = 2;
 
@@ -754,7 +756,7 @@ pub trait AstWalker<T> {
         self.handle_var(t, &var);
     }
 
-    fn walk_set(&mut self, t: &mut T, elements: &[Spanned<Expr>]) {
+    fn walk_set(&mut self, t: &mut T, elements: &[Spanned]) {
         const NAME: usize = 1;
         const BODY: usize = 2;
 
@@ -798,7 +800,7 @@ pub trait AstWalker<T> {
         self.handle_set(t, &set);
     }
 
-    fn walk_test(&mut self, t: &mut T, elements: &[Spanned<Expr>], span: Span) {
+    fn walk_test(&mut self, t: &mut T, elements: &[Spanned], span: Span) {
         const NAME: usize = 1;
         const BODY: usize = 2;
 
@@ -837,7 +839,7 @@ pub trait AstWalker<T> {
         self.handle_test(t, &test);
     }
 
-    fn walk_loop(&mut self, t: &mut T, elements: &[Spanned<Expr>]) {
+    fn walk_loop(&mut self, t: &mut T, elements: &[Spanned]) {
         const CONDTION: usize = 1;
         const BODY: usize = 2;
         let starting_span = elements[0].span.clone();
@@ -877,7 +879,7 @@ pub trait AstWalker<T> {
         self.handle_loop(t, &loop_expr);
     }
 
-    fn walk_return(&mut self, t: &mut T, exprs: &[Spanned<Expr>], span: Span) {
+    fn walk_return(&mut self, t: &mut T, exprs: &[Spanned], span: Span) {
         const KEYWORD: usize = 0;
         const EXPRS: usize = 1;
         let return_expr = ReturnExpr {
@@ -888,7 +890,7 @@ pub trait AstWalker<T> {
         self.handle_return(t, &return_expr);
     }
 
-    fn walk_expr(&mut self, t: &mut T, spanned: &Spanned<Expr>) {
+    fn walk_expr(&mut self, t: &mut T, spanned: &Spanned) {
         match &spanned.expr {
             Expr::Bool(value) => self.handle_bool(t, *value),
             Expr::String(string) => self.handle_string(t, string),
@@ -901,7 +903,7 @@ pub trait AstWalker<T> {
             Expr::List(vec) => self.walk_list(t, vec, spanned.span.clone()),
         }
     }
-    fn walk(&mut self, t: &mut T, exprs: &[Spanned<Expr>]) {
+    fn walk(&mut self, t: &mut T, exprs: &[Spanned]) {
         for expr in exprs {
             self.walk_expr(t, expr);
         }

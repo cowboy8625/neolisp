@@ -629,6 +629,19 @@
 (floor 10.5) ; -> 10
 ```
 
+### do
+
+- returns the result of the last expression
+- arguments type: `Any`
+- example:
+
+```lisp
+(do
+   (var a 10)
+   (var b 20)
+   (+ a b)) ; -> 30
+```
+
 ### ffi-bind
 
 - creates a binding to a dll/so file

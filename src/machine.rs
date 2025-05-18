@@ -46,7 +46,7 @@ macro_rules! generate_instruction_operator {
                     (Value::String(l), Value::String(r)) if l $token r => continue,
                     (l @ Value::Nil, r @ Value::Nil) if l $token r => continue,
                     (r, l) if l.type_of() != r.type_of() => {
-                        frame.stack.push(Value::Nil);
+                        frame.stack.push(Value::Bool(false));
                         return Ok(());
                     }
                     _ => {
@@ -1345,10 +1345,10 @@ impl Machine {
 
     fn instruction_jump_if(&mut self) -> Result<()> {
         let address = self.get_u32()? as usize;
-        let value = self.pop()?;
-        if value == Value::Bool(false) {
-            self.ip += address;
-        }
+        let (Value::Bool(false) | Value::Nil) = self.pop()? else {
+            return Ok(());
+        };
+        self.ip += address;
         Ok(())
     }
 
@@ -1689,7 +1689,7 @@ mod tests {
             Ok(None) => return Err(anyhow::anyhow!("Failed to compile")),
             Err(errors) => {
                 for error in errors {
-                    error.report(&"test", &src);
+                    error.report(&"test", &src, true);
                 }
                 return Err(anyhow::anyhow!("Failed to compile"));
             }
@@ -1763,6 +1763,12 @@ mod tests {
         let frame = machine.get_current_frame().unwrap();
         assert_eq!(frame.stack[0], Value::Bool(true));
         assert_eq!(machine.cycle_count, 5);
+
+        let src = r#"(= "north" 'north)"#;
+        let machine = run_program(src).unwrap();
+        let frame = machine.get_current_frame().unwrap();
+        assert_eq!(frame.stack[0], Value::Bool(true));
+        assert_eq!(machine.cycle_count, 4);
     }
 
     #[test]
