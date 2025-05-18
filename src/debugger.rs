@@ -385,7 +385,7 @@ impl<'a> Debugger<'a> {
                         Result::Ok(_) => {}
                         Result::Err(errors) => {
                             for error in errors {
-                                error.report(&file, &src);
+                                error.report(&file, &src, true);
                             }
                         }
                     };

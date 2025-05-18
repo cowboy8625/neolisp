@@ -45,8 +45,20 @@ const BUILTINS: &[&str] = &[
 /// more of a compile time functionality
 /// i.e. `ffi-bind`
 const KEYWORDS: &[&str] = &[
-    "var", "set", "let", "fn", "if", "lambda", "loop", "quote", "test", "ffi-bind", "struct",
+    "var",
+    "set",
+    "let",
+    "fn",
+    "if",
+    "lambda",
+    "loop",
+    "quote",
+    "test",
+    "ffi-bind",
+    "struct",
     "return",
+    "unquote",
+    "quasiquote",
 ];
 
 pub mod ast;

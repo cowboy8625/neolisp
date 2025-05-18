@@ -272,6 +272,16 @@ impl Function {
             }
             let value = string.remove(index);
             machine.push(Value::String(Box::new(value.to_string())))?;
+        } else {
+            return Err(Box::new(Error::RunTimeError {
+                span: machine.get_current_frame()?.span.clone(),
+                name: machine.get_current_frame()?.scope_name.to_string(),
+                message: "nth called on non iter".to_string(),
+                stack_trace: machine.create_stack_trace(),
+                code: "E1000".to_string(),
+                note: Some(format!("nth called on non iter: {}", arg2.type_of())),
+                help: None,
+            }));
         }
 
         Ok(())

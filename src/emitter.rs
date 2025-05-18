@@ -54,10 +54,7 @@ impl<'a> Emitter<'a> {
         self
     }
 
-    pub fn compile(
-        mut self,
-        ast: &[Spanned<Expr>],
-    ) -> std::result::Result<Vec<Instruction>, Vec<Error>> {
+    pub fn compile(mut self, ast: &[Spanned]) -> std::result::Result<Vec<Instruction>, Vec<Error>> {
         let mut program = Vec::new();
         self.walk(&mut program, ast);
         if !self.options.no_main {
@@ -340,13 +337,7 @@ impl AstWalker<Program> for Emitter<'_> {
         self.tests.push((name, test_expr.span.clone()));
     }
 
-    fn handle_builtin(
-        &mut self,
-        program: &mut Program,
-        name: &str,
-        span: Span,
-        args: &[Spanned<Expr>],
-    ) {
+    fn handle_builtin(&mut self, program: &mut Program, name: &str, span: Span, args: &[Spanned]) {
         const ARGS: usize = 1;
         for arg in args.iter().skip(ARGS).rev() {
             self.walk_expr(program, arg);
@@ -605,8 +596,9 @@ impl AstWalker<Program> for Emitter<'_> {
         self.walk_expr(program, set.body);
 
         let Some(symbol) = self.symbol_table.get(name) else {
-            // NOTE: Probably need to have a user error message
-            panic!("unknown symbol: {}", name);
+            // NOTE: INTENTIONAL_PANIC If this fails, it means that the symbol is not defined and
+            // should have been caught in another location like the SymbolTable builder
+            panic!("unknown symbol: {} at {:?}", name, set.name.span);
         };
 
         Self::emit_set_instruction(program, symbol);
@@ -693,7 +685,7 @@ impl AstWalker<Program> for Emitter<'_> {
     }
 
     fn handle_quote(&mut self, program: &mut Program, quote: &QuoteExpr) {
-        fn emit_values(values: &mut Vec<Value>, spanned: &Spanned<Expr>) {
+        fn emit_values(values: &mut Vec<Value>, spanned: &Spanned) {
             match &spanned.expr {
                 Expr::Bool(b) => {
                     values.push(Value::Bool(*b));

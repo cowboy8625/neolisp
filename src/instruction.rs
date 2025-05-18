@@ -752,7 +752,7 @@ impl Value {
 
     pub fn type_of(&self) -> String {
         match self {
-            Self::Nil => "nil".to_string(),
+            Self::Nil => ":nil".to_string(),
             Self::U8(_) => ":u8".to_string(),
             Self::I32(_) => ":i32".to_string(),
             Self::U32(_) => ":u32".to_string(),
@@ -765,7 +765,7 @@ impl Value {
             Self::Builtin(_) => ":builtin".to_string(),
             Self::Symbol(_) => ":symbol".to_string(),
             Self::Keyword(_) => ":keyword".to_string(),
-            Self::Struct(data) => data.borrow().name.clone(),
+            Self::Struct(data) => format!(":{}", data.borrow().name),
         }
     }
 

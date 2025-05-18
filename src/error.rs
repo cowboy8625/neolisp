@@ -1,5 +1,5 @@
 use super::ast::Span;
-use ariadne::{Color, Fmt, Label, Report, ReportKind, Source};
+use ariadne::{Color, Config, Fmt, Label, Report, ReportKind, Source};
 
 fn empty_file_example() -> String {
     let open_pran = "(".fg(Color::Yellow);
@@ -207,13 +207,14 @@ impl Error {
         }
     }
 
-    pub fn report(&self, filename: &str, src: &str) {
+    pub fn report(&self, filename: &str, src: &str, has_color: bool) {
         let src = if src.is_empty() {
             " ".to_string()
         } else {
             src.to_string()
         };
         let mut report = Report::build(self.error_kind(), (filename, self.span().clone()))
+            .with_config(Config::default().with_color(has_color))
             .with_code(self.code())
             .with_message(self.message())
             .with_label(

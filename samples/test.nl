@@ -78,11 +78,11 @@
     :actual (= 1 1)
     :description "= 1 1 -> true"))
 
-(test equal=2-nil
+(test equal=2-used-to-be-nil
   (assert-eq
-    :expected nil
+    :expected false
     :actual (= 1 'a)
-    :description "= 1 'a -> nil"))
+    :description "= 1 'a -> false"))
 
 (test equal=50
   (assert-eq
@@ -104,11 +104,11 @@
     :actual (> 2 1)
     :description "> 2 1 -> true"))
 
-(test greater>2-nil
+(test greater>2-used-to-be-nil
   (assert-eq
-    :expected nil
+    :expected false
     :actual (> 1 'a)
-    :description "> 1 'a -> nil"))
+    :description "> 1 'a -> false"))
 
 (test greater>50
   (assert-eq
@@ -130,11 +130,11 @@
     :actual (< 2 1)
     :description "> 2 1 -> false"))
 
-(test less<2-nil
+(test less<2-used-to-be-nil
   (assert-eq
-    :expected nil
+    :expected false
     :actual (< 1 'a)
-    :description "< 1 'a -> nil"))
+    :description "< 1 'a -> false"))
 
 (test less<50
   (assert-eq
@@ -156,11 +156,11 @@
     :actual (>= 2 1)
     :description ">= 2 1 -> true"))
 
-(test greater-or-equal>=2-nil
+(test greater-or-equal>=2-used-to-be-nil
   (assert-eq
-    :expected nil
+    :expected false
     :actual (>= 1 'a)
-    :description ">= 1 'a -> nil"))
+    :description ">= 1 'a -> false"))
 
 (test greater-or-equal=>50
   (assert-eq
