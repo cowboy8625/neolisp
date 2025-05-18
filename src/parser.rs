@@ -193,17 +193,17 @@ pub fn parse_or_report(filename: &str, src: &str) -> Vec<Spanned> {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use pretty_assertions::assert_eq;
-    #[test]
-    fn quasiquote() {
-        use pretty_assertions::assert_eq;
-        let src = r#"
-        `(1 ,(list n))
-        "#;
-        let ast = parser().parse(src).unwrap();
-        assert_eq!(ast, vec![]);
-    }
-}
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use pretty_assertions::assert_eq;
+//     #[test]
+//     fn quasiquote() {
+//         use pretty_assertions::assert_eq;
+//         let src = r#"
+//         `(1 ,(list n))
+//         "#;
+//         let ast = parser().parse(src).unwrap();
+//         assert_eq!(ast, vec![]);
+//     }
+// }

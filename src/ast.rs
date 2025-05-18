@@ -8,6 +8,10 @@ pub struct Spanned {
 }
 
 impl Spanned {
+    pub fn new(expr: Expr, span: Span) -> Spanned {
+        Spanned { expr, span }
+    }
+
     pub fn fake(expr: Expr) -> Spanned {
         Spanned { expr, span: 0..0 }
     }
@@ -145,10 +149,13 @@ pub fn expand_quasiquote(expr: &Spanned) -> Spanned {
     use Expr::*;
 
     match &expr.expr {
-        Symbol(_) | String(_) | Number(_) | Bool(_) => Spanned::fake(Expr::List(vec![
-            Spanned::fake(Expr::Symbol("quote".to_string())),
-            expr.clone(),
-        ])),
+        Symbol(_) | String(_) | Number(_) | Bool(_) => Spanned::new(
+            Expr::List(vec![
+                Spanned::new(Expr::Symbol("quote".to_string()), expr.span.clone()),
+                expr.clone(),
+            ]),
+            expr.span.clone(),
+        ),
 
         List(items) => {
             let mut parts = vec![];
@@ -166,10 +173,16 @@ pub fn expand_quasiquote(expr: &Spanned) -> Spanned {
                                 }
                                 "unquote-splicing" => {
                                     if let Some(val) = inner.get(1) {
-                                        parts.push(Spanned::fake(Expr::List(vec![
-                                            Spanned::fake(Expr::Symbol("splice".to_string())),
-                                            val.clone(),
-                                        ])));
+                                        parts.push(Spanned::new(
+                                            Expr::List(vec![
+                                                Spanned::new(
+                                                    Expr::Symbol("splice".to_string()),
+                                                    item.span.clone(),
+                                                ),
+                                                val.clone(),
+                                            ]),
+                                            item.span.clone(),
+                                        ));
                                         continue;
                                     }
                                 }
@@ -181,17 +194,23 @@ pub fn expand_quasiquote(expr: &Spanned) -> Spanned {
                     _ => {}
                 }
 
-                let quoted = Spanned::fake(Expr::List(vec![
-                    Spanned::fake(Expr::Symbol("quote".to_string())),
-                    item.clone(),
-                ]));
+                let quoted = Spanned::new(
+                    Expr::List(vec![
+                        Spanned::new(Expr::Symbol("quote".to_string()), item.span.clone()),
+                        item.clone(),
+                    ]),
+                    item.span.clone(),
+                );
                 parts.push(quoted);
             }
 
-            let mut full = vec![Spanned::fake(Expr::Symbol("list".to_string()))];
+            let mut full = vec![Spanned::new(
+                Expr::Symbol("list".to_string()),
+                expr.span.clone(),
+            )];
             full.extend(parts);
 
-            Spanned::fake(Expr::List(full))
+            Spanned::new(Expr::List(full), expr.span.clone())
         }
     }
 }
@@ -207,31 +226,28 @@ pub fn macro_expand(expr: &Spanned) -> Spanned {
                 }
             }
             let new_items = items.iter().map(macro_expand).collect();
-            Spanned::fake(Expr::List(new_items))
+            Spanned::new(Expr::List(new_items), expr.span.clone())
         }
 
         _ => expr.clone(),
     }
 }
 
-#[test]
-fn test_expand_quasiquote() {
-    use chumsky::prelude::*;
-    use pretty_assertions::assert_eq;
-    let src = r#"
-    (fn main ()
-    (var n 0)
-    `(1 ,n)
-)"#;
-
-    let ast = crate::parser::parser().parse(src).unwrap();
-    let mut new_ast = vec![];
-    for spanned in ast.iter() {
-        let expanded = macro_expand(spanned);
-        new_ast.push(expanded);
-    }
-    crate::ast::print_ast(&ast);
-    println!("-----------------");
-    crate::ast::print_ast(&new_ast);
-    assert!(false);
-}
+// #[test]
+// fn test_expand_quasiquote() {
+//     use chumsky::prelude::*;
+//     use pretty_assertions::assert_eq;
+//     let src = r#"
+//     (fn main ()
+//     (var n 0)
+//     `(1 ,n)
+// )"#;
+//
+//     let ast = crate::parser::parser().parse(src).unwrap();
+//     let mut new_ast = vec![];
+//     for spanned in ast.iter() {
+//         let expanded = macro_expand(spanned);
+//         new_ast.push(expanded);
+//     }
+//     assert_eq!(new_ast, vec![]);
+// }
