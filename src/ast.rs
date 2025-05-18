@@ -145,7 +145,7 @@ pub fn print_ast(exprs: &[Spanned]) {
     }
 }
 
-pub fn expand_quasiquote(expr: &Spanned) -> Spanned {
+fn expand_quasiquote(expr: &Spanned) -> Spanned {
     use Expr::*;
 
     match &expr.expr {
@@ -159,6 +159,7 @@ pub fn expand_quasiquote(expr: &Spanned) -> Spanned {
 
         List(items) => {
             let mut parts = vec![];
+            let mut has_splice = false;
 
             for item in items {
                 match &item.expr {
@@ -173,16 +174,12 @@ pub fn expand_quasiquote(expr: &Spanned) -> Spanned {
                                 }
                                 "unquote-splicing" => {
                                     if let Some(val) = inner.get(1) {
+                                        has_splice = true;
                                         parts.push(Spanned::new(
-                                            Expr::List(vec![
-                                                Spanned::new(
-                                                    Expr::Symbol("splice".to_string()),
-                                                    item.span.clone(),
-                                                ),
-                                                val.clone(),
-                                            ]),
+                                            Expr::Symbol("__SPLICE_MARKER__".to_string()),
                                             item.span.clone(),
                                         ));
+                                        parts.push(val.clone());
                                         continue;
                                     }
                                 }
@@ -204,15 +201,71 @@ pub fn expand_quasiquote(expr: &Spanned) -> Spanned {
                 parts.push(quoted);
             }
 
-            let mut full = vec![Spanned::new(
-                Expr::Symbol("list".to_string()),
-                expr.span.clone(),
-            )];
-            full.extend(parts);
-
-            Spanned::new(Expr::List(full), expr.span.clone())
+            if has_splice {
+                let expr = make_splicing_list(parts);
+                crate::ast::print_expr(&expr);
+                eprintln!("{expr}");
+                expr
+            } else {
+                let final_expr = Expr::List(
+                    std::iter::once(Spanned::new(
+                        Expr::Symbol("list".to_string()),
+                        expr.span.clone(),
+                    ))
+                    .chain(parts.into_iter())
+                    .collect(),
+                );
+                Spanned::new(final_expr, expr.span.clone())
+            }
         }
     }
+}
+
+fn make_splicing_list(items: Vec<Spanned>) -> Spanned {
+    use Expr::*;
+
+    let start_span = items.first().map(|i| i.span.clone()).unwrap_or(0..0);
+    let end_span = items
+        .last()
+        .map(|i| i.span.clone())
+        .unwrap_or(start_span.clone());
+    let span = start_span.start..end_span.end;
+
+    let mut list_parts = vec![];
+    let mut splice_next = false;
+
+    let mut iter = items.into_iter();
+    while let Some(item) = iter.next() {
+        if let Symbol(s) = &item.expr {
+            if s == "__SPLICE_MARKER__" {
+                splice_next = true;
+                continue;
+            }
+        }
+
+        let span = item.span.clone();
+        if splice_next {
+            list_parts.push(item);
+            splice_next = false;
+        } else {
+            list_parts.push(Spanned::new(
+                Expr::List(vec![
+                    Spanned::new(Symbol("list".into()), span.clone()),
+                    item,
+                ]),
+                span,
+            ));
+        }
+    }
+
+    Spanned::new(
+        Expr::List(
+            std::iter::once(Spanned::new(Symbol("append".into()), span.clone()))
+                .chain(list_parts.into_iter())
+                .collect(),
+        ),
+        span,
+    )
 }
 
 pub fn macro_expand(expr: &Spanned) -> Spanned {

@@ -286,8 +286,8 @@ pub trait AstWalker<T> {
             "ffi-bind" => self.walk_ffi_bind(t, exprs, span),
             "struct" => self.walk_struct(t, exprs),
             "return" => self.walk_return(t, exprs, span),
-            "unquote" => todo!("unquote"),
-            "quasiquote" => todo!("quasiquote"),
+            "unquote" => unreachable!("unquote"),
+            "quasiquote" => unreachable!("quasiquote"),
             _ => panic!("Unknown keyword: {name}"),
         }
     }
