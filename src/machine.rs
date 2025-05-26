@@ -797,6 +797,14 @@ impl Machine {
         let mut param_values = {
             let frame = self.get_current_frame_mut()?;
             let length = frame.stack.len();
+            if length < count {
+                return Err(self.create_run_time_error(
+                    "Missing arguments",
+                    format!("Missing {} arguments for function {}", count, callable.name),
+                    "E013",
+                    None::<&str>,
+                )?);
+            }
             frame.stack.split_off(length - count)
         };
 
