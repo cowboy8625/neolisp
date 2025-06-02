@@ -1542,7 +1542,7 @@ impl Machine {
         let Some(Value::Struct(struct_value)) = frame.args.pop() else {
             return Err(self.create_run_time_error(
                 "Missing Struct",
-                format!("Expected Struct instance as first argument"),
+                "Expected Struct instance as first argument".to_string(),
                 "E0FF",
                 None::<&str>,
             )?);

@@ -1,5 +1,3 @@
-use std::usize;
-
 use super::{
     ast::{Expr, Span, Spanned},
     compiler::CompilerOptions,
