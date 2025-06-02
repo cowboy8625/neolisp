@@ -1,3 +1,5 @@
+use std::usize;
+
 use super::{
     ast::{Expr, Span, Spanned},
     compiler::CompilerOptions,
@@ -722,25 +724,29 @@ impl AstWalker<Program> for Emitter<'_> {
     fn handle_if_else(&mut self, program: &mut Program, if_else: &IfElseExpr) {
         self.walk_expr(program, if_else.condition);
 
-        let mut then_chunk = Vec::new();
-        self.walk_expr(&mut then_chunk, if_else.then);
-        let then_offset = self.get_program_size(&then_chunk) + Instruction::JumpForward(0).size();
+        program.push(Instruction::Not);
 
-        let mut else_chunk = Vec::new();
+        let then_failed_index = program.len();
+        program.push(Instruction::JumpIf(usize::MAX));
+
+        self.walk_expr(program, if_else.then);
+
+        let then_success_index = program.len();
+        program.push(Instruction::Jump(usize::MAX));
+
+        program[then_failed_index] = Instruction::JumpIf(self.get_program_size(program));
+
         if let Some(else_spanned) = if_else.otherwise.as_ref() {
-            self.walk_expr(&mut else_chunk, else_spanned);
+            self.walk_expr(program, else_spanned);
         };
-        let else_offset = self.get_program_size(&else_chunk);
-        program.push(Instruction::JumpIf(then_offset));
-        program.extend(then_chunk);
-        program.push(Instruction::JumpForward(else_offset));
-        program.extend(else_chunk);
+        program[then_success_index] = Instruction::Jump(self.get_program_size(program));
     }
 
     fn handle_loop(&mut self, program: &mut Program, r#loop: &LoopExpr) {
         let start = self.get_program_size(program);
         self.walk_expr(program, r#loop.condition);
         let jump_instruction_index = program.len();
+
         program.push(Instruction::JumpIf(usize::MAX));
 
         for stmt in r#loop.body.iter() {
