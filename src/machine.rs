@@ -797,14 +797,6 @@ impl Machine {
         let mut param_values = {
             let frame = self.get_current_frame_mut()?;
             let length = frame.stack.len();
-            if length < count {
-                return Err(self.create_run_time_error(
-                    "Missing arguments",
-                    format!("Missing {} arguments for function {}", count, callable.name),
-                    "E013",
-                    None::<&str>,
-                )?);
-            }
             frame.stack.split_off(length - count)
         };
 
@@ -852,9 +844,6 @@ impl Machine {
         };
         self.stack.pop();
         let frame = self.get_current_frame_mut()?;
-        if let Value::Nil = value {
-            return Ok(());
-        }
         frame.stack.push(value);
         Ok(())
     }
@@ -1112,6 +1101,9 @@ impl Machine {
             Value::Bool(b) => {
                 frame.stack.push(Value::Bool(!b));
             }
+            Value::Nil => {
+                frame.stack.push(Value::Bool(true));
+            }
             value => {
                 return Err(self.create_run_time_error(
                     "Type Cannot be Not",
@@ -1356,7 +1348,7 @@ impl Machine {
         let (Value::Bool(false) | Value::Nil) = self.pop()? else {
             return Ok(());
         };
-        self.ip += address;
+        self.ip = address;
         Ok(())
     }
 
@@ -1548,8 +1540,12 @@ impl Machine {
             panic!("no value on the stack for StructSetter");
         };
         let Some(Value::Struct(struct_value)) = frame.args.pop() else {
-            // TODO: ERROR REPORTING
-            panic!("no value on the stack for StructSetter",);
+            return Err(self.create_run_time_error(
+                "Missing Struct",
+                "Expected Struct instance as first argument".to_string(),
+                "E0FF",
+                None::<&str>,
+            )?);
         };
         if struct_value.borrow().name != *metadata.name {
             // TODO: ERROR REPORTING
