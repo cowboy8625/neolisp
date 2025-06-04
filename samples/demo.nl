@@ -7,17 +7,17 @@
 (test b-a (assert-eq :expected 198 :actual (- b a) :description "321 - 123 = 198"))
 
 ; map is builtin but you can also make your own
-(fn map1 (f lst)
+(fn native-map (f lst)
   (if (= 0 (length lst))
     '()
     (cons (f (car lst))
-      (map1 f (cdr lst)))))
+      (native-map f (cdr lst)))))
 
-(test my-map
+(test native-map
   (assert-eq
     :expected '(2 3 4)
-    :actual (map1 (lambda (x) (+ x 1)) '(1 2 3))
-    :description "321 - 123 = 198"))
+    :actual (native-map (lambda (x) (+ x 1)) '(1 2 3))
+    :description "should add 1 to each list element"))
 
 (var add (lambda (x y) (+ x y)))
 ;; Builtin testing run with `neolisp test`
@@ -36,5 +36,4 @@
   (assert-eq
     :expected (list 0 1 2 3)
     :actual (range 4)
-    :description "range n: 4 return (0 1 2 3)")
-)
+    :description "range n: 4 return (0 1 2 3)"))

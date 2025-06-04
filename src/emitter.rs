@@ -722,8 +722,6 @@ impl AstWalker<Program> for Emitter<'_> {
     fn handle_if_else(&mut self, program: &mut Program, if_else: &IfElseExpr) {
         self.walk_expr(program, if_else.condition);
 
-        program.push(Instruction::Not);
-
         let then_failed_index = program.len();
         program.push(Instruction::JumpIf(usize::MAX));
 

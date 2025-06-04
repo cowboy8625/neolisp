@@ -2,24 +2,23 @@
 source: src/tests.rs
 expression: string
 ---
-000000      0  jump       152
+000000      0  jump       151
 000005      5  get-local  0:"n" 25..27
 000014     20  push       0
 00001E     30  eq 2
-000020     32  not
-000021     33  jump-if    58
-000026     38  get-local  1:"a" 36..44
-000035     53  jump       151
-00003A     58  get-local  1:"a" 62..64
-000049     73  get-local  2:"b" 64..65
-000058     88  add        2
-00005A     90  get-local  2:"b" 57..59
-000069    105  get-local  0:"n" 52..54
-000078    120  push       1
-000082    130  sub        2
-000084    132  get-global 0:"fib" 45..49
-000095    149  tail-call  3
-000097    151  ret
-000098    152  push       <function 5:fib:0..69>
-0000AD    173  set-global 0:"fib" 0..69
-0000BE    190  halt
+000020     32  jump-if    57
+000025     37  get-local  1:"a" 36..44
+000034     52  jump       150
+000039     57  get-local  1:"a" 62..64
+000048     72  get-local  2:"b" 64..65
+000057     87  add        2
+000059     89  get-local  2:"b" 57..59
+000068    104  get-local  0:"n" 52..54
+000077    119  push       1
+000081    129  sub        2
+000083    131  get-global 0:"fib" 45..49
+000094    148  tail-call  3
+000096    150  ret
+000097    151  push       <function 5:fib:0..69>
+0000AC    172  set-global 0:"fib" 0..69
+0000BD    189  halt

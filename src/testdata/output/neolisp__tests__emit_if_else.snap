@@ -3,9 +3,8 @@ source: src/tests.rs
 expression: string
 ---
 000000      0  push       true
-000003      3  not
-000004      4  jump-if    24
-000009      9  push       then
-000013     19  jump       34
-000018     24  push       else
-000022     34  halt
+000003      3  jump-if    23
+000008      8  push       then
+000012     18  jump       33
+000017     23  push       else
+000021     33  halt
