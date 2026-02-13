@@ -92,7 +92,7 @@ impl Error {
         }
     }
 
-    fn error_kind(&self) -> ReportKind {
+    fn error_kind(&self) -> ReportKind<'_> {
         match self {
             Self::Internal(..) => ReportKind::Custom("Internal", Color::Red),
             Self::RunTimeError { .. } => ReportKind::Custom("RunTimeError", Color::Red),

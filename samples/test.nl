@@ -616,19 +616,39 @@
   (var result `(,@adding ,num))
   (assert-eq :expected '(+ 1 2 1) :actual result :description "unquote-splicing -> '(+ 1 2 1)"))
 
+
+(fn closure-test ()
+  (let ((x 42))
+    ((lambda () x))))
+
+(test closure-test
+  (assert-eq
+    :expected 42
+    :actual (closure-test)
+    :description "closure capture failed"))
+
+(fn make-adder (x)
+  (lambda (y) (+ x y)))
+
+(test return-closure
+  (assert-eq
+    :expected 7
+    :actual ((make-adder 3) 4)
+    :description "returned closure failed"))
+
 ; let binding
 
-; (fn get-cell (grid i)
-;   (let
-;     ((l (length grid))
-;     (wrapped (mod (+ i l) l)))
-;       ; print will leave a string on the stack but once the function frame is destroyed
-;       ; the string will get removed with the stack as its life time is tyed to it
-;       (print "get-cell: " i " -> " wrapped "\n")
-;       ; return the value we care about
-;       wrapped))
-;
-; (test let-binding (assert-eq :expected 2 :actual (get-cell (list 'a 'b 'c) -1) :description "get-cell list len 3, index -1, returns 2"))
+(fn get-cell (grid i)
+  (let
+    ((l (length grid))
+    (wrapped (mod (+ i l) l)))
+      ; print will leave a string on the stack but once the function frame is destroyed
+      ; the string will get removed with the stack as its life time is tyed to it
+      (print "get-cell: " i " -> " wrapped "\n")
+      ; return the value we care about
+      wrapped))
+
+(test let-binding (assert-eq :expected 2 :actual (get-cell (list 'a 'b 'c) -1) :description "get-cell list len 3, index -1, returns 2"))
 
 (fn main ()
   (print "This is a test file\n")

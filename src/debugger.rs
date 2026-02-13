@@ -23,7 +23,7 @@ Keys:
 <- arrow -> to change display data on right side
 Mode Keys Normal:
 ?  -  to show this message
-n  -  to toggle highlighting scopes
+h  -  to toggle highlighting scopes
 :  -  to enter command mode
 
 Default command is step.

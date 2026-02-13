@@ -34,6 +34,7 @@ pub struct Emitter<'a> {
     offset: usize,
     tests: Vec<(String, Span)>,
     errors: Vec<Error>,
+    free_var_counter: usize,
 }
 
 impl<'a> Emitter<'a> {
@@ -46,6 +47,7 @@ impl<'a> Emitter<'a> {
             offset: 0,
             tests: Vec::new(),
             errors: Vec::new(),
+            free_var_counter: 0,
         }
     }
 
@@ -458,6 +460,13 @@ impl AstWalker<Program> for Emitter<'_> {
         for spanned in lambda.body.iter() {
             self.walk_expr(program, spanned);
         }
+
+        let free_vars = self
+            .symbol_table
+            .scopes
+            .get(&scope_name)
+            .map(|s| s.free_symbols.clone())
+            .unwrap_or_default();
         program.push(Instruction::Return);
 
         self.symbol_table.exit_scope();
@@ -469,8 +478,21 @@ impl AstWalker<Program> for Emitter<'_> {
         let callable = Callable::new(start, &name, lambda.span());
         let value = Value::Callable(Box::new(callable));
         program.push(Instruction::Push(Box::new(value)));
+
         let end = self.get_program_size(program);
         self.symbol_table.set_location(&name, start..end);
+
+        // NOTE: I think this is going to cause a problem in the future.
+        self.free_var_counter = 0;
+        for name in &free_vars {
+            let symbol = self.symbol_table.get(name).unwrap();
+            let metadata = RuntimeMetadata::new(symbol.id(), name, symbol.span());
+            program.push(Instruction::GetLocal(metadata.clone()));
+            let metadata = RuntimeMetadata::new(self.free_var_counter, name, symbol.span());
+            self.free_var_counter += 1;
+            program.push(Instruction::SetFree(metadata));
+        }
+        self.free_var_counter = 0;
     }
 
     fn handle_let_binding(&mut self, program: &mut Program, let_binding: &LetBindingExpr) {
@@ -548,9 +570,7 @@ impl AstWalker<Program> for Emitter<'_> {
         }
 
         self.walk_expr(program, call.callee);
-        if let Some(Instruction::Call(_)) = program.last() {
-            return;
-        }
+
         program.push(Instruction::Call(call.args.len()));
     }
 
@@ -780,9 +800,13 @@ impl AstWalker<Program> for Emitter<'_> {
             self.error(Error::SymbolNotDefined(span, name.to_string()));
             return;
         };
-        let metadata = RuntimeMetadata::new(symbol.id(), name, span);
+        let metadata = RuntimeMetadata::new(symbol.id(), name, span.clone());
         let instruction = match symbol {
-            Symbol::UnboundVariable(UnboundVariable { .. }) => GetFree(metadata),
+            Symbol::UnboundVariable(UnboundVariable { .. }) => {
+                let metadata = RuntimeMetadata::new(self.free_var_counter, name, span);
+                self.free_var_counter += 1;
+                GetFree(metadata)
+            }
             Symbol::Variable(_) if symbol.is_global() => GetGlobal(metadata),
             Symbol::Variable(_) => GetLocal(metadata),
             Symbol::Parameter(_) => GetLocal(metadata),

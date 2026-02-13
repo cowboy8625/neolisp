@@ -425,6 +425,7 @@ into_symbol!(
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Scope {
     symbols: HashMap<String, Symbol>,
+    pub free_symbols: Vec<String>,
 }
 
 impl Scope {
@@ -534,6 +535,16 @@ impl SymbolTable {
 
     pub fn extend(&mut self, other: SymbolTable) {
         self.scopes.extend(other.scopes);
+    }
+
+    fn add_free_symbol(&mut self, name: impl Into<String>) {
+        if let Some(scope) = self.scope_stack.last() {
+            self.scopes
+                .entry(scope.to_string())
+                .or_default()
+                .free_symbols
+                .push(name.into());
+        }
     }
 }
 
@@ -1011,6 +1022,12 @@ impl AstWalker<SymbolTable> for SymbolTableBuilder {
             span,
             table.scope_level(),
         ));
+        table.add_free_symbol(name);
+        // let scope = table
+        //     .scopes
+        //     .get_mut(&table.get_full_scope_name())
+        //     .expect("Scope not found");
+        // scope.free_symbols.push(name.to_string());
         self.unbound_counter += 1;
     }
 
