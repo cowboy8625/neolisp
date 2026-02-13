@@ -43,11 +43,15 @@ impl Function {
         // (number? '(1 2 3)) ; -> false
         machine.check_arg_count(1)?;
         let arg1 = machine.pop_arg(1, None)?;
-        let result = matches!(
-            arg1,
-            Value::F64(_) | Value::U32(_) | Value::I32(_) | Value::F32(_) | Value::U8(_)
-        );
-        machine.push(Value::Bool(result))?;
+        match arg1 {
+            Value::F64(_) | Value::U32(_) | Value::I32(_) | Value::F32(_) | Value::U8(_) => {
+                machine.push(Value::Bool(true))?;
+            }
+            Value::String(string) => {
+                machine.push(Value::Bool(string.parse::<f64>().is_ok()))?;
+            }
+            _ => machine.push(Value::Bool(false))?,
+        }
         Ok(())
     }
 
@@ -115,10 +119,17 @@ impl Function {
 
         let frame = machine.get_current_frame_mut()?;
 
-        let result = string
-            .split(&*item)
-            .map(|i| Value::String(Box::new(i.to_string())))
-            .collect::<Vec<_>>();
+        let result = if item.is_empty() {
+            string
+                .chars()
+                .map(|c| Value::String(Box::new(c.to_string())))
+                .collect()
+        } else {
+            string
+                .split(&*item)
+                .map(|i| Value::String(Box::new(i.to_string())))
+                .collect()
+        };
         frame.stack.push(Value::List(Box::new(result)));
 
         Ok(())
@@ -189,13 +200,13 @@ impl Function {
     pub(crate) fn fn_fold(machine: &mut Machine) -> Result<()> {
         // (fold 0 (lambda (x y) (+ x y)) (list 1 2 3)) => 6
         machine.check_arg_count(3)?;
-        let Value::List(mut list) = machine.pop_arg(2, Some(&[ValueKind::List]))? else {
+        let Value::List(mut list) = machine.pop_arg(3, Some(&[ValueKind::List]))? else {
             unreachable!();
         };
         let Value::Callable(callable) = machine.pop_arg(2, Some(&[ValueKind::Callable]))? else {
             unreachable!();
         };
-        let mut result = machine.pop_arg(3, None)?;
+        let mut result = machine.pop_arg(1, None)?;
 
         for value in list.drain(..) {
             machine.push(result)?;
@@ -341,19 +352,28 @@ impl Function {
 
     pub(crate) fn fn_cdr(machine: &mut Machine) -> Result<()> {
         // (cdr (list 1 2)) => (2)
+
         machine.check_arg_count(1)?;
-        let Value::List(list) = machine.pop_arg(1, Some(&[ValueKind::List]))? else {
-            unreachable!();
-        };
 
-        if list.is_empty() {
-            machine.push(Value::Nil)?;
-            return Ok(());
+        match machine.pop_arg(1, Some(&[ValueKind::List, ValueKind::String]))? {
+            Value::List(list) => {
+                if list.is_empty() {
+                    machine.push(Value::Nil)?;
+                    return Ok(());
+                }
+                machine.push(Value::List(Box::new(list[1..].to_vec())))?;
+                Ok(())
+            }
+            Value::String(string) => {
+                if string.is_empty() {
+                    machine.push(Value::Nil)?;
+                    return Ok(());
+                }
+                machine.push(Value::String(Box::new(string[1..].to_string())))?;
+                Ok(())
+            }
+            _ => unreachable!(),
         }
-
-        machine.push(Value::List(Box::new(list[1..].to_vec())))?;
-
-        Ok(())
     }
 
     pub(crate) fn fn_typeof(machine: &mut Machine) -> Result<()> {
@@ -527,17 +547,25 @@ impl Function {
         // (car (list 1 2)) => 1
         machine.check_arg_count(1)?;
 
-        let Value::List(list) = machine.pop_arg(1, Some(&[ValueKind::List]))? else {
-            unreachable!();
-        };
-
-        let Some(item) = list.first() else {
-            machine.push(Value::Nil)?;
-            return Ok(());
-        };
-
-        machine.push(item.clone())?;
-        Ok(())
+        match machine.pop_arg(1, Some(&[ValueKind::List, ValueKind::String]))? {
+            Value::List(list) => {
+                let Some(item) = list.first() else {
+                    machine.push(Value::Nil)?;
+                    return Ok(());
+                };
+                machine.push(item.clone())?;
+                Ok(())
+            }
+            Value::String(string) => {
+                let Some(item) = string.chars().next() else {
+                    machine.push(Value::Nil)?;
+                    return Ok(());
+                };
+                machine.push(Value::String(Box::new(item.to_string())))?;
+                Ok(())
+            }
+            _ => unreachable!(),
+        }
     }
 
     pub(crate) fn fn_string_trim_left(machine: &mut Machine) -> Result<()> {

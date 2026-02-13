@@ -205,7 +205,9 @@ pub struct Machine {
     pub(crate) c_strings: Vec<CString>,
     pub(crate) options: MachineOptions,
     pub(crate) program: Vec<u8>,
+    /// Variables Accessible Globally
     pub(crate) global: Vec<Value>,
+    /// Free Variables that do not belong to any scope
     pub(crate) free: Vec<Value>,
     pub(crate) stack: Vec<Frame>,
     pub(crate) ip: usize,
@@ -419,20 +421,17 @@ impl Machine {
             frame.stack.split_off(length - count as usize)
         };
 
+        // NOTE: Lambda Environment is lost, some how we need to hold on to it while iterating.
         let new_frame = Frame::new(self.ip, scope_name, span, param_values);
         self.stack.push(new_frame);
         self.ip = address;
 
-        while self.ip < self.program.len() {
-            let byte = self
-                .peek_u8()
-                .map_or_else(|| Err(Box::new(Error::StackUnderflow)), Ok)?;
-            if let Some(OpCode::Return) = OpCode::from_u8(*byte) {
-                self.instruction_return()?;
-                break;
-            }
+        let frame_depth = self.stack.len();
+
+        while self.stack.len() >= frame_depth {
             self.run_once()?;
         }
+
         Ok(())
     }
 
@@ -622,9 +621,9 @@ impl Machine {
         }
     }
 
-    fn peek_u8(&mut self) -> Option<&u8> {
-        self.program.get(self.ip)
-    }
+    // fn peek_u8(&mut self) -> Option<&u8> {
+    //     self.program.get(self.ip)
+    // }
 
     fn get_u8(&mut self) -> Result<u8> {
         let Some(byte) = self.program.get(self.ip) else {
@@ -1332,10 +1331,13 @@ impl Machine {
         let index = metadata.data;
         let Some(value) = self.free.get(index).cloned() else {
             return Err(Box::new(Error::Internal(format!(
-                "{} invalid get-free address at {} ip: {}",
+                "{}:{}:{} invalid get-free address at {} ip: {} free: {:?}",
                 file!(),
+                line!(),
+                column!(),
                 index,
-                self.ip
+                self.ip,
+                self.free,
             ))));
         };
         let frame = self.get_current_frame_mut()?;

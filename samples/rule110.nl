@@ -5,14 +5,6 @@
 ; test is a list of assert-eq or assert
 (fn it (tests) (fold false (lambda (acc value) (or acc value)) tests))
 
-; using this map function instead of the builtin map
-; because the builtin map is currently broken
-(fn my-map (f lst)
-  (if (= 0 (length lst))
-    '()
-    (cons (f (car lst))
-      (my-map f (cdr lst)))))
-
 ; ----------------------------------------------------
 
 ; create a list of numbers from 0 to n
@@ -134,7 +126,7 @@
 
 ; Returns the next generation of the grid
 (fn next-generation (grid)
-  (my-map
+  (map
     (lambda (i) (generation-of-cell grid i))
     (range (length grid))))
 
@@ -150,9 +142,9 @@
 (fn main ()
   (var line nil)
   (let
-    ((grid (append (my-map (lambda (x) 0) (range 156)) (list 1)))
+    ((grid (append (map (lambda (x) 0) (range 156)) (list 1)))
     (is-running true))
     (loop is-running
       (set grid (next-generation grid))
-      (set line (join "" (my-map (lambda (x) (if (= x 1) "*" " ")) grid)))
+      (set line (join "" (map (lambda (x) (if (= x 1) "*" " ")) grid)))
       (print line "\n"))))
