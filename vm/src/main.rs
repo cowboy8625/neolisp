@@ -1,5 +1,3 @@
-use vm;
-
 fn main() {
     let mut machine = vm::Machine::default();
 

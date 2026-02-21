@@ -213,7 +213,7 @@ pub enum Instruction {
     Print,
     Return,
     ReturnImm(Number),
-    ReturnLocal(Number),
+    ReturnLocal(usize),
     JumpIfTrue(usize),
     Jump(usize),
     Call(usize),
@@ -408,22 +408,22 @@ impl FunctionBuilder {
                     2
                 }
                 [Instruction::Push(Value::Integer(k)), Instruction::Add, ..] => {
-                    self.instruction[i] = Instruction::AddImm(*k as i32);
+                    self.instruction[i] = Instruction::AddImm(*k);
                     self.instruction.remove(i + 1);
                     1
                 }
                 [Instruction::Push(Value::Integer(k)), Instruction::Sub, ..] => {
-                    self.instruction[i] = Instruction::SubImm(*k as i32);
+                    self.instruction[i] = Instruction::SubImm(*k);
                     self.instruction.remove(i + 1);
                     1
                 }
                 [Instruction::Push(Value::Integer(k)), Instruction::Mul, ..] => {
-                    self.instruction[i] = Instruction::MulImm(*k as i32);
+                    self.instruction[i] = Instruction::MulImm(*k);
                     self.instruction.remove(i + 1);
                     1
                 }
                 [Instruction::Push(Value::Integer(k)), Instruction::Div, ..] => {
-                    self.instruction[i] = Instruction::DivImm(*k as i32);
+                    self.instruction[i] = Instruction::DivImm(*k);
                     self.instruction.remove(i + 1);
                     1
                 }
@@ -432,12 +432,12 @@ impl FunctionBuilder {
                     Instruction::Return,
                     ..,
                 ] => {
-                    self.instruction[i] = Instruction::ReturnImm(*k as i32);
+                    self.instruction[i] = Instruction::ReturnImm(*k);
                     self.instruction.remove(i + 1);
                     1
                 }
                 [Instruction::LoadLocal(k), Instruction::Return, ..] => {
-                    self.instruction[i] = Instruction::ReturnLocal(*k as i32);
+                    self.instruction[i] = Instruction::ReturnLocal(*k);
                     self.instruction.remove(i + 1);
                     1
                 }
@@ -512,10 +512,9 @@ impl Function {
     fn link(&mut self, function_table: &HashMap<Rc<String>, usize>) {
         for (index, instruction) in self.instruction.iter_mut().enumerate() {
             if let Instruction::Call(old_pc) = instruction {
-                let name = self.links.get(&index).expect(&format!(
-                    "{} | Function name not found {:?}",
-                    index, self.links,
-                ));
+                let name = self.links.get(&index).unwrap_or_else(|| {
+                    panic!("{} | Function name not found {:?}", index, self.links)
+                });
                 if let Some(pc) = function_table.get(name) {
                     *old_pc = *pc
                 } else {
@@ -623,7 +622,7 @@ impl Frame {
                 FrameSignal::Return
             }
             Instruction::ReturnLocal(index) => {
-                self.stack.push(self.locals[(*index) as usize].clone());
+                self.stack.push(self.locals[*index].clone());
                 FrameSignal::Return
             }
             Instruction::JumpIfTrue(next_pc) => {
@@ -847,7 +846,7 @@ impl Machine {
 
     pub fn run(&mut self) -> Result<(), RuntimeError> {
         self.link();
-        while self.call_stack.len() > 0 {
+        while !self.call_stack.is_empty() {
             self.step()?;
         }
         Ok(())
