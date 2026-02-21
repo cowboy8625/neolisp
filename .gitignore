@@ -1,3 +1,5 @@
 /target
+/vm/target
+/vm/Cargo.lock
 main
 main.nl

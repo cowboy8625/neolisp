@@ -301,6 +301,12 @@
     :actual (atom? add)
     :description "atom? add -> false ; is a function"))
 
+(test number?-int
+  (assert-eq
+    :expected true
+    :actual (number? 123)
+    :description "number? 123 -> true"))
+
 (test number?-f32
   (assert-eq
     :expected true
